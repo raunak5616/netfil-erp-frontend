@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * RBAC Permission Checker
-   * Evaluates user-specific overrides first (DENY -> ALLOW), then checks Role permissions.
+   * Evaluates user-specific overrides first (DENY -> ALLOW), then checks Admin role, then checks Role permissions union.
    */
   const hasPermission = useCallback((permissionCode) => {
     if (!user) return false;
@@ -83,15 +83,33 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // 2. Check role permissions
-    if (user.role && user.role.permissions && Array.isArray(user.role.permissions)) {
-      return user.role.permissions.some((perm) => {
+    // Support both user.roles (array) and fallback user.role (object)
+    const rolesArray = user.roles
+      ? user.roles
+      : user.role
+      ? [user.role]
+      : [];
+
+    if (!Array.isArray(rolesArray) || rolesArray.length === 0) return false;
+
+    // 2. Check if user has an "Admin" role (Admin has all permissions)
+    const isAdmin = rolesArray.some((r) => {
+      if (!r) return false;
+      const roleName = typeof r === 'string' ? r : r.roleName;
+      return roleName?.toLowerCase() === 'admin';
+    });
+
+    if (isAdmin) return true;
+
+    // 3. Check union of all assigned roles permissions
+    return rolesArray.some((role) => {
+      if (!role || typeof role === 'string' || !role.permissions || !Array.isArray(role.permissions)) return false;
+      return role.permissions.some((perm) => {
+        if (!perm) return false;
         if (typeof perm === 'string') return perm === permissionCode;
         return perm.permissionCode === permissionCode;
       });
-    }
-
-    return false;
+    });
   }, [user]);
 
   return (
