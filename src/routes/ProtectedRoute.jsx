@@ -1,0 +1,39 @@
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { ShieldAlert } from 'lucide-react';
+
+const ProtectedRoute = ({ requiredPermission }) => {
+  const { isAuthenticated, loading, hasPermission } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex-center" style={{ minHeight: '100vh', flexDirection: 'column', gap: '12px' }}>
+        <div className="btn-primary" style={{ padding: '12px 24px', borderRadius: '20px' }}>Loading NETFIL ERP...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
+    return (
+      <div className="card" style={{ maxWidth: '500px', margin: '60px auto', textAlign: 'center', padding: '40px' }}>
+        <ShieldAlert size={48} color="var(--danger-500)" style={{ margin: '0 auto 16px' }} />
+        <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Access Denied</h2>
+        <p className="text-muted" style={{ marginBottom: '20px' }}>
+          You do not have permission code <code>{requiredPermission}</code> required to access this module.
+        </p>
+        <button className="btn btn-secondary" onClick={() => window.history.back()}>
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  return <Outlet />;
+};
+
+export default ProtectedRoute;
