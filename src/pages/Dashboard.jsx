@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Users, ArrowRight, Building, CheckCircle2 } from 'lucide-react';
+import { Users, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -13,7 +13,7 @@ const Dashboard = () => {
         <div>
           <h1 className="page-title">Welcome, {user?.employee?.fullName || user?.username}!</h1>
           <p className="text-muted" style={{ fontSize: '13px', marginTop: '2px' }}>
-            NETFIL ERP Enterprise Control Panel — Phase 1 Functional System
+            NETFIL ERP Enterprise Control Panel
           </p>
         </div>
       </div>
@@ -45,22 +45,6 @@ const Dashboard = () => {
               Permission EMPLOYEE_VIEW required
             </span>
           )}
-        </div>
-
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: 0.8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-500)', textTransform: 'uppercase' }}>
-              Next Up
-            </span>
-            <Building size={20} color="var(--neutral-500)" />
-          </div>
-          <h3 style={{ fontSize: '18px', fontWeight: 700 }}>Phase 2 Redesign & Modules</h3>
-          <p className="text-muted" style={{ fontSize: '13px' }}>
-            Department, Item, Quotation, Sales Order, Inventory, and Production modules queued after Phase 1 evaluation.
-          </p>
-          <span className="badge badge-inactive" style={{ alignSelf: 'flex-start', marginTop: 'auto' }}>
-            Pending Client Review
-          </span>
         </div>
       </div>
     </div>
