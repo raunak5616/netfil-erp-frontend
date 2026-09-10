@@ -306,7 +306,7 @@ const MainLayout = () => {
                             {item.children.map((child) => {
                               const ChildIcon = child.icon;
 
-                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items') {
+                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories') {
                                 return (
                                   <div
                                     key={child.path}

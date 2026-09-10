@@ -10,6 +10,8 @@ import DepartmentList from './pages/departments/DepartmentList';
 import UserList from './pages/users/UserList';
 import UOMList from './pages/uom/UOMList';
 import ItemList from './pages/items/ItemList';
+import ItemGroupList from './pages/item-groups/ItemGroupList';
+import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 
 function App() {
   return (
@@ -42,6 +44,16 @@ function App() {
               {/* Protected UOM Module Route */}
               <Route element={<ProtectedRoute requiredPermission="UOM_VIEW" />}>
                 <Route path="/uoms" element={<UOMList />} />
+              </Route>
+
+              {/* Protected Item Groups Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="ITEM_GROUP_VIEW" />}>
+                <Route path="/item-groups" element={<ItemGroupList />} />
+              </Route>
+
+              {/* Protected Item Categories Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="ITEM_CATEGORY_VIEW" />}>
+                <Route path="/item-categories" element={<ItemCategoryList />} />
               </Route>
 
               {/* Protected Items Module Route */}
