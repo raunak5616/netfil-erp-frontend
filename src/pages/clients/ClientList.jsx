@@ -53,7 +53,7 @@ const ClientList = () => {
         setError('Unexpected API response format');
       }
     } catch (err) {
-      console.error("Failed to fetch Clients:", err);
+      console.error("Failed to fetch Parties:", err);
       setError(err.response?.data?.message || 'Failed to connect to server');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const ClientList = () => {
 
   const handleStatusToggle = async (client) => {
     const nextStatus = client.status === 'active' ? 'inactive' : 'active';
-    const confirmMessage = `Are you sure you want to mark client "${client.companyName}" (${client.clientCode}) as ${nextStatus}?`;
+    const confirmMessage = `Are you sure you want to mark party "${client.companyName}" (${client.clientCode}) as ${nextStatus}?`;
     if (!window.confirm(confirmMessage)) return;
 
     setActionLoading(client._id);
@@ -78,8 +78,8 @@ const ClientList = () => {
         );
       }
     } catch (err) {
-      console.error("Failed to update client status:", err);
-      setError(err.response?.data?.message || 'Failed to update client status');
+      console.error("Failed to update party status:", err);
+      setError(err.response?.data?.message || 'Failed to update party status');
     } finally {
       setActionLoading(null);
     }
@@ -117,7 +117,7 @@ const ClientList = () => {
   const columns = [
     {
       key: 'clientCode',
-      header: 'Client Code',
+      header: 'Party Code',
       width: '140px',
       render: (val) => (
         <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
@@ -127,7 +127,7 @@ const ClientList = () => {
     },
     {
       key: 'companyName',
-      header: 'Company Name',
+      header: 'Party Name',
       width: '240px',
       render: (val) => <strong style={{ color: 'var(--neutral-900)' }}>{val}</strong>,
     },
@@ -151,7 +151,7 @@ const ClientList = () => {
     },
     {
       key: 'email',
-      header: 'Email / City',
+      header: 'Email / Location',
       width: '220px',
       render: (_, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -210,7 +210,7 @@ const ClientList = () => {
                 icon={Power}
                 loading={actionLoading === row._id}
                 onClick={() => handleStatusToggle(row)}
-                title={row.status === 'active' ? 'Deactivate Client' : 'Activate Client'}
+                title={row.status === 'active' ? 'Deactivate Party' : 'Activate Party'}
                 style={{
                   color: row.status === 'active' ? 'var(--danger-600)' : 'var(--success-600)',
                 }}
@@ -227,12 +227,12 @@ const ClientList = () => {
   return (
     <div>
       <PageHeader
-        title="Client Master"
-        description="Manage commercial client accounts, customer profiles, and organization addresses."
+        title="Party Master"
+        description="Manage commercial party accounts, customer profiles, and organization addresses."
         breadcrumbs={[
           { label: 'Home', path: '/dashboard' },
           { label: 'Commercial' },
-          { label: 'Clients' },
+          { label: 'Party Master' },
         ]}
         actions={
           <>
@@ -248,7 +248,7 @@ const ClientList = () => {
                   setIsFormOpen(true);
                 }}
               >
-                Add Client
+                Add Party
               </Button>
             )}
           </>
@@ -263,7 +263,7 @@ const ClientList = () => {
           <div className="search-input-wrap">
             <Search size={16} />
             <Input
-              placeholder="Search by client code, company, contact person, mobile, email, or city..."
+              placeholder="Search by party code, party name, contact person, mobile, email, or city..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -289,17 +289,17 @@ const ClientList = () => {
           columns={columns}
           data={filteredClients}
           loading={loading}
-          emptyTitle="No Client records found"
+          emptyTitle="No Party records found"
           emptyDescription={
             searchTerm || statusFilter !== 'all'
               ? 'Try adjusting your search query or status filter.'
-              : 'Click "Add Client" above to create your first client account record.'
+              : 'Click "Add Party" above to create your first party account record.'
           }
         />
 
         {/* Footer Summary */}
         <div className="flex-between text-muted" style={{ marginTop: '12px', fontSize: '12px' }}>
-          <span>Showing {filteredClients.length} of {clients.length} total Client accounts</span>
+          <span>Showing {filteredClients.length} of {clients.length} total Party accounts</span>
           <span>Access Level: {canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</span>
         </div>
       </div>

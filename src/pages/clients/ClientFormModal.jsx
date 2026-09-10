@@ -69,10 +69,10 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
 
   const validate = () => {
     if (!formData.clientCode.trim()) {
-      return 'Client Code is required.';
+      return 'Party Code is required.';
     }
     if (!formData.companyName.trim()) {
-      return 'Company Name is required.';
+      return 'Party Name / Company Name is required.';
     }
     if (formData.email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -108,7 +108,7 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
       if (isEditMode) {
         const res = await updateClient(client._id, formData);
         if (res.success) {
-          setSuccessMessage('Client record updated successfully!');
+          setSuccessMessage('Party record updated successfully!');
           setTimeout(() => {
             onSuccess();
             onClose();
@@ -117,7 +117,7 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
       } else {
         const res = await createClient(formData);
         if (res.success) {
-          setSuccessMessage('Client record created successfully!');
+          setSuccessMessage('Party record created successfully!');
           setTimeout(() => {
             onSuccess();
             onClose();
@@ -125,7 +125,7 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
         }
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save client record.';
+      const apiMsg = err.response?.data?.message || 'Failed to save party record.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);
@@ -136,147 +136,157 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditMode ? `Edit Client (${formData.clientCode})` : 'Add New Client Master'}
-      maxWidth="620px"
+      title={isEditMode ? `Edit Party Master (${formData.clientCode})` : 'Add New Party Master'}
+      maxWidth="640px"
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} loading={submitting}>
-            {isEditMode ? 'Update Client' : 'Create Client'}
+            {isEditMode ? 'Update Party' : 'Create Party'}
           </Button>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="form-grid">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {errorMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
-            <Alert type="danger" message={errorMessage} onClose={() => setErrorMessage('')} />
-          </div>
+          <Alert type="danger" message={errorMessage} onClose={() => setErrorMessage('')} />
         )}
 
         {successMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
-            <Alert type="success" message={successMessage} />
-          </div>
+          <Alert type="success" message={successMessage} />
         )}
 
-        {/* Client Code Input */}
-        <FormField label="Client Code" required helperText="Unique client code (e.g. CLI-ACME, CLI-TATA)">
-          <Input
-            name="clientCode"
-            placeholder="e.g. CLI-ACME"
-            value={formData.clientCode}
-            onChange={handleChange}
-            disabled={submitting}
-            autoFocus
-          />
-        </FormField>
+        {/* SECTION 1: PARTY IDENTIFICATION */}
+        <div style={{ backgroundColor: 'var(--neutral-50)', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '10px' }}>
+            1. Party Identification
+          </div>
+          <div className="form-grid">
+            <FormField label="Party Code" required helperText="Unique party code identifier (e.g. PRT-ACME)">
+              <Input
+                name="clientCode"
+                placeholder="e.g. PRT-ACME"
+                value={formData.clientCode}
+                onChange={handleChange}
+                disabled={submitting}
+                autoFocus
+              />
+            </FormField>
 
-        {/* Company Name Input */}
-        <FormField label="Company Name" required helperText="Registered commercial business name">
-          <Input
-            name="companyName"
-            placeholder="e.g. ACME Industries Pvt Ltd"
-            value={formData.companyName}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
+            <FormField label="Party Name / Company" required helperText="Registered commercial business name">
+              <Input
+                name="companyName"
+                placeholder="e.g. ACME Manufacturing Pvt Ltd"
+                value={formData.companyName}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
 
-        {/* Contact Person Input */}
-        <FormField label="Contact Person" helperText="Primary representative name">
-          <Input
-            name="contactPerson"
-            placeholder="e.g. Rajesh Sharma"
-            value={formData.contactPerson}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
-
-        {/* Mobile Input */}
-        <FormField label="Mobile Number" helperText="10-digit primary mobile contact">
-          <Input
-            name="mobile"
-            placeholder="e.g. 9876543210"
-            value={formData.mobile}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
-
-        {/* Email Input */}
-        <FormField label="Email Address" helperText="Official communication email">
-          <Input
-            name="email"
-            type="email"
-            placeholder="e.g. contact@acme.com"
-            value={formData.email}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
-
-        {/* Status Select */}
-        <FormField label="Status" required>
-          <Select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            disabled={submitting}
-          >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </Select>
-        </FormField>
-
-        {/* Street Address Input (Full width) */}
-        <div style={{ gridColumn: 'span 2' }}>
-          <FormField label="Address" fullWidth helperText="Registered Office or Works plant address">
-            <Input
-              name="address"
-              placeholder="e.g. Plot No. 45, GIDC Industrial Estate"
-              value={formData.address}
-              onChange={handleChange}
-              disabled={submitting}
-            />
-          </FormField>
+            <FormField label="Status" required>
+              <Select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                disabled={submitting}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </FormField>
+          </div>
         </div>
 
-        {/* City Input */}
-        <FormField label="City">
-          <Input
-            name="city"
-            placeholder="e.g. Vadodara"
-            value={formData.city}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
+        {/* SECTION 2: CONTACT DETAILS */}
+        <div style={{ backgroundColor: 'var(--neutral-50)', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '10px' }}>
+            2. Contact Information
+          </div>
+          <div className="form-grid">
+            <FormField label="Contact Person" helperText="Primary representative name">
+              <Input
+                name="contactPerson"
+                placeholder="e.g. Rajesh Sharma"
+                value={formData.contactPerson}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
 
-        {/* State Input */}
-        <FormField label="State">
-          <Input
-            name="state"
-            placeholder="e.g. Gujarat"
-            value={formData.state}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
+            <FormField label="Mobile Number" helperText="10-digit primary mobile contact">
+              <Input
+                name="mobile"
+                placeholder="e.g. 9876543210"
+                value={formData.mobile}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
 
-        {/* Pincode Input */}
-        <FormField label="Pincode / Zip Code">
-          <Input
-            name="pincode"
-            placeholder="e.g. 390010"
-            value={formData.pincode}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
+            <FormField label="Email Address" helperText="Official communication email">
+              <Input
+                name="email"
+                type="email"
+                placeholder="e.g. contact@acme.com"
+                value={formData.email}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+          </div>
+        </div>
+
+        {/* SECTION 3: ADDRESS & LOCATION */}
+        <div style={{ backgroundColor: 'var(--neutral-50)', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '10px' }}>
+            3. Address & Location
+          </div>
+          <div className="form-grid">
+            <div style={{ gridColumn: 'span 2' }}>
+              <FormField label="Street Address" fullWidth helperText="Registered Office or Works plant address">
+                <Input
+                  name="address"
+                  placeholder="e.g. Plot No. 45, GIDC Industrial Estate"
+                  value={formData.address}
+                  onChange={handleChange}
+                  disabled={submitting}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="City">
+              <Input
+                name="city"
+                placeholder="e.g. Vadodara"
+                value={formData.city}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+
+            <FormField label="State">
+              <Input
+                name="state"
+                placeholder="e.g. Gujarat"
+                value={formData.state}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+
+            <FormField label="Pincode / Zip Code">
+              <Input
+                name="pincode"
+                placeholder="e.g. 390010"
+                value={formData.pincode}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+          </div>
+        </div>
       </form>
     </Modal>
   );

@@ -2,7 +2,7 @@ import React from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { Edit, Phone, Mail, MapPin, Building2, User } from 'lucide-react';
+import { Edit, Phone, Mail, MapPin, User, Building2 } from 'lucide-react';
 
 const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
   if (!isOpen || !client) return null;
@@ -26,7 +26,7 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Client Account — ${client.clientCode}`}
+      title={`Party Account — ${client.clientCode}`}
       maxWidth="540px"
       footer={
         <>
@@ -42,7 +42,7 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
                 onEdit(client);
               }}
             >
-              Edit Client
+              Edit Party
             </Button>
           )}
         </>
@@ -63,7 +63,7 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
         >
           <div>
             <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Client Code
+              Party Code
             </div>
             <div className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary-700)', marginTop: '2px' }}>
               {client.clientCode}
@@ -72,7 +72,7 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
 
           <div>
             <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Company Name
+              Party Name
             </div>
             <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--neutral-900)', marginTop: '2px' }}>
               {client.companyName}

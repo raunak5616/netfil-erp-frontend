@@ -43,9 +43,10 @@ function App() {
                 <Route path="/departments" element={<DepartmentList />} />
               </Route>
 
-              {/* Protected Client Master Route */}
+              {/* Protected Party Master Route */}
               <Route element={<ProtectedRoute requiredPermission="CLIENT_VIEW" />}>
                 <Route path="/clients" element={<ClientList />} />
+                <Route path="/parties" element={<ClientList />} />
               </Route>
 
               {/* Protected UOM Module Route */}

@@ -196,7 +196,7 @@ const MainLayout = () => {
           ],
         },
         {
-          label: 'Clients',
+          label: 'Party Master',
           path: '/clients',
           icon: Users,
           permission: 'CLIENT_VIEW',
