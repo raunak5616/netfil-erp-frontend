@@ -109,6 +109,9 @@ const MainLayout = () => {
     if (path === '/specifications') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Specifications' }];
     }
+    if (path === '/clients') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Clients' }];
+    }
     return [{ label: 'Home', path: '/dashboard' }];
   };
 
@@ -306,7 +309,7 @@ const MainLayout = () => {
                             {item.children.map((child) => {
                               const ChildIcon = child.icon;
 
-                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories') {
+                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories' && child.path !== '/specifications') {
                                 return (
                                   <div
                                     key={child.path}
@@ -340,7 +343,7 @@ const MainLayout = () => {
                   // Standard single navigation item
                   const Icon = item.icon;
 
-                  if (item.phase2 && item.path !== '/employees' && item.path !== '/dashboard') {
+                  if (item.phase2 && item.path !== '/employees' && item.path !== '/dashboard' && item.path !== '/clients') {
                     return (
                       <div
                         key={item.path}

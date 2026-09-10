@@ -12,6 +12,8 @@ import UOMList from './pages/uom/UOMList';
 import ItemList from './pages/items/ItemList';
 import ItemGroupList from './pages/item-groups/ItemGroupList';
 import ItemCategoryList from './pages/item-categories/ItemCategoryList';
+import SpecificationList from './pages/specifications/SpecificationList';
+import ClientList from './pages/clients/ClientList';
 
 function App() {
   return (
@@ -41,6 +43,11 @@ function App() {
                 <Route path="/departments" element={<DepartmentList />} />
               </Route>
 
+              {/* Protected Client Master Route */}
+              <Route element={<ProtectedRoute requiredPermission="CLIENT_VIEW" />}>
+                <Route path="/clients" element={<ClientList />} />
+              </Route>
+
               {/* Protected UOM Module Route */}
               <Route element={<ProtectedRoute requiredPermission="UOM_VIEW" />}>
                 <Route path="/uoms" element={<UOMList />} />
@@ -54,6 +61,11 @@ function App() {
               {/* Protected Item Categories Module Route */}
               <Route element={<ProtectedRoute requiredPermission="ITEM_CATEGORY_VIEW" />}>
                 <Route path="/item-categories" element={<ItemCategoryList />} />
+              </Route>
+
+              {/* Protected Specifications Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="SPECIFICATION_VIEW" />}>
+                <Route path="/specifications" element={<SpecificationList />} />
               </Route>
 
               {/* Protected Items Module Route */}
