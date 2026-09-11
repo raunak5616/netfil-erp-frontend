@@ -15,6 +15,9 @@ import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 import SpecificationList from './pages/specifications/SpecificationList';
 import ClientList from './pages/clients/ClientList';
 import RequirementList from './pages/requirements/RequirementList';
+import EnquiryMis from './pages/requirements/EnquiryMis';
+import QuotationList from './pages/quotations/QuotationList';
+import SalesOrderList from './pages/sales-orders/SalesOrderList';
 
 function App() {
   return (
@@ -50,10 +53,21 @@ function App() {
                 <Route path="/parties" element={<ClientList />} />
               </Route>
 
-              {/* Protected Requirement / Enquiry Route */}
+              {/* Protected Requirement / Enquiry & Enquiry MIS Route */}
               <Route element={<ProtectedRoute requiredPermission="REQUIREMENT_VIEW" />}>
                 <Route path="/requirements" element={<RequirementList />} />
                 <Route path="/enquiries" element={<RequirementList />} />
+                <Route path="/enquiry-mis" element={<EnquiryMis />} />
+              </Route>
+
+              {/* Protected Quotation Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="QUOTATION_VIEW" />}>
+                <Route path="/quotations" element={<QuotationList />} />
+              </Route>
+
+              {/* Protected Sales Order Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="SALES_ORDER_VIEW" />}>
+                <Route path="/sales-orders" element={<SalesOrderList />} />
               </Route>
 
               {/* Protected UOM Module Route */}

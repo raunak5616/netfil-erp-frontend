@@ -20,7 +20,8 @@ import {
   ClipboardList,
   Calculator,
   CheckSquare,
-  Wrench
+  Wrench,
+  FileCheck
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -52,7 +53,7 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries'];
+    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -130,6 +131,15 @@ const MainLayout = () => {
     }
     if (path === '/requirements' || path === '/enquiries') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Requirement / Enquiry' }];
+    }
+    if (path === '/enquiry-mis') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Enquiry MIS' }];
+    }
+    if (path === '/quotations') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Quotation' }];
+    }
+    if (path === '/sales-orders') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Sales Order' }];
     }
     return [{ label: 'Home', path: '/dashboard' }];
   };
@@ -231,6 +241,24 @@ const MainLayout = () => {
               path: '/requirements',
               icon: ClipboardList,
               permission: 'REQUIREMENT_VIEW',
+            },
+            {
+              label: 'Enquiry MIS',
+              path: '/enquiry-mis',
+              icon: FileText,
+              permission: 'REQUIREMENT_VIEW',
+            },
+            {
+              label: 'Quotation',
+              path: '/quotations',
+              icon: Calculator,
+              permission: 'QUOTATION_VIEW',
+            },
+            {
+              label: 'Sales Order',
+              path: '/sales-orders',
+              icon: FileCheck,
+              permission: 'SALES_ORDER_VIEW',
             },
           ],
         },
