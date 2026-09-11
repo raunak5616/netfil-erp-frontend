@@ -16,7 +16,11 @@ import {
   Menu,
   ChevronRight,
   ChevronDown,
-  Layers
+  Layers,
+  ClipboardList,
+  Calculator,
+  CheckSquare,
+  Wrench
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -39,7 +43,7 @@ const MainLayout = () => {
         console.error("Failed to parse expanded groups state:", e);
       }
     }
-    return { 'item-master': true };
+    return { 'item-master': true, 'commercial-module': true };
   });
 
   // Auto-expand parent group on route match or browser refresh
@@ -48,10 +52,22 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
+    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries'];
+    const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
+
     if (isItemMasterChild) {
       setExpandedGroups((prev) => {
         if (prev['item-master']) return prev;
         const next = { ...prev, 'item-master': true };
+        localStorage.setItem('netfil_sidebar_expanded_groups', JSON.stringify(next));
+        return next;
+      });
+    }
+
+    if (isCommercialChild) {
+      setExpandedGroups((prev) => {
+        if (prev['commercial-module']) return prev;
+        const next = { ...prev, 'commercial-module': true };
         localStorage.setItem('netfil_sidebar_expanded_groups', JSON.stringify(next));
         return next;
       });
@@ -109,8 +125,11 @@ const MainLayout = () => {
     if (path === '/specifications') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Specifications' }];
     }
-    if (path === '/clients') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Clients' }];
+    if (path === '/clients' || path === '/parties') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Party Master' }];
+    }
+    if (path === '/requirements' || path === '/enquiries') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Requirement / Enquiry' }];
     }
     return [{ label: 'Home', path: '/dashboard' }];
   };
@@ -196,32 +215,24 @@ const MainLayout = () => {
           ],
         },
         {
-          label: 'Party Master',
-          path: '/clients',
-          icon: Users,
-          permission: 'CLIENT_VIEW',
-          phase2: true,
-        },
-        {
-          label: 'Quotations',
-          path: '/quotations',
-          icon: FileText,
-          permission: 'QUOTATION_VIEW',
-          phase2: true,
-        },
-        {
-          label: 'Sales Orders',
-          path: '/sales-orders',
+          id: 'commercial-module',
+          label: 'Commercial',
           icon: ShoppingCart,
-          permission: 'SALES_ORDER_VIEW',
-          phase2: true,
-        },
-        {
-          label: 'Inventory',
-          path: '/inventory',
-          icon: Boxes,
-          permission: 'INVENTORY_STOCK_VIEW',
-          phase2: true,
+          isGroup: true,
+          children: [
+            {
+              label: 'Party Master',
+              path: '/clients',
+              icon: Users,
+              permission: 'CLIENT_VIEW',
+            },
+            {
+              label: 'Requirement / Enquiry',
+              path: '/requirements',
+              icon: ClipboardList,
+              permission: 'REQUIREMENT_VIEW',
+            },
+          ],
         },
       ],
     },
@@ -309,7 +320,7 @@ const MainLayout = () => {
                             {item.children.map((child) => {
                               const ChildIcon = child.icon;
 
-                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories' && child.path !== '/specifications') {
+                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories' && child.path !== '/specifications' && child.path !== '/requirements' && child.path !== '/enquiries') {
                                 return (
                                   <div
                                     key={child.path}
