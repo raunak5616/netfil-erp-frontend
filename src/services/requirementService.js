@@ -24,3 +24,40 @@ export const updateRequirementStatus = async (requirementId, status) => {
   const response = await api.patch(`/requirements/${requirementId}/status`, { status });
   return response.data;
 };
+
+// Enquiry MIS API Endpoints
+export const getUnifiedMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis', { params });
+  return response.data;
+};
+
+export const getCustomerMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/customer', { params });
+  return response.data;
+};
+
+export const getItemMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/item', { params });
+  return response.data;
+};
+
+export const getItemCategoryMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/item-category', { params });
+  return response.data;
+};
+
+export const getStatusMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/status', { params });
+  return response.data;
+};
+
+export const getSalesPersonMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/sales-person', { params });
+  return response.data;
+};
+
+export const getFollowUpMis = async (params = {}) => {
+  const response = await api.get('/requirements/mis/follow-up', { params });
+  return response.data;
+};
+
