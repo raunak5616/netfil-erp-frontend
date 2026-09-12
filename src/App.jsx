@@ -18,6 +18,7 @@ import RequirementList from './pages/requirements/RequirementList';
 import EnquiryMis from './pages/requirements/EnquiryMis';
 import QuotationList from './pages/quotations/QuotationList';
 import SalesOrderList from './pages/sales-orders/SalesOrderList';
+import MasterBOMList from './pages/master-boms/MasterBOMList';
 
 function App() {
   return (
@@ -68,6 +69,11 @@ function App() {
               {/* Protected Sales Order Module Route */}
               <Route element={<ProtectedRoute requiredPermission="SALES_ORDER_VIEW" />}>
                 <Route path="/sales-orders" element={<SalesOrderList />} />
+              </Route>
+
+              {/* Protected Master BOM Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="BOM_VIEW" />}>
+                <Route path="/master-boms" element={<MasterBOMList />} />
               </Route>
 
               {/* Protected UOM Module Route */}

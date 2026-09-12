@@ -53,7 +53,7 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders'];
+    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -140,6 +140,9 @@ const MainLayout = () => {
     }
     if (path === '/sales-orders') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Sales Order' }];
+    }
+    if (path === '/master-boms') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Master BOM' }];
     }
     return [{ label: 'Home', path: '/dashboard' }];
   };
@@ -259,6 +262,12 @@ const MainLayout = () => {
               path: '/sales-orders',
               icon: FileCheck,
               permission: 'SALES_ORDER_VIEW',
+            },
+            {
+              label: 'Master BOM',
+              path: '/master-boms',
+              icon: Layers,
+              permission: 'BOM_VIEW',
             },
           ],
         },
