@@ -53,7 +53,7 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms'];
+    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -143,6 +143,9 @@ const MainLayout = () => {
     }
     if (path === '/master-boms') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Master BOM' }];
+    }
+    if (path === '/order-boms') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Order BOM' }];
     }
     return [{ label: 'Home', path: '/dashboard' }];
   };
@@ -268,6 +271,12 @@ const MainLayout = () => {
               path: '/master-boms',
               icon: Layers,
               permission: 'BOM_VIEW',
+            },
+            {
+              label: 'Order BOM',
+              path: '/order-boms',
+              icon: ClipboardList,
+              permission: 'ORDER_BOM_VIEW',
             },
           ],
         },

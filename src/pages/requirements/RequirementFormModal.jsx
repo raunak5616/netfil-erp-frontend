@@ -72,8 +72,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         if (iRes.success && Array.isArray(iRes.items)) {
           setItems(iRes.items.filter((i) => i.status === 'active'));
         }
-        if (catRes.success && Array.isArray(catRes.categories)) {
-          setItemCategories(catRes.categories.filter((cat) => cat.status === 'active'));
+        const categoriesArray = catRes.itemCategories || catRes.categories;
+        if (catRes.success && Array.isArray(categoriesArray)) {
+          setItemCategories(categoriesArray.filter((cat) => cat.status === 'active'));
         }
         if (uRes.success && Array.isArray(uRes.uoms)) {
           setUoms(uRes.uoms.filter((u) => u.status === 'active'));

@@ -66,11 +66,13 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
           getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
         ]);
 
-        if (groupRes.success && Array.isArray(groupRes.groups)) {
-          setItemGroups(groupRes.groups.filter((g) => g.status === 'active'));
+        const groupsArray = groupRes.itemGroups || groupRes.groups;
+        if (groupRes.success && Array.isArray(groupsArray)) {
+          setItemGroups(groupsArray.filter((g) => g.status === 'active'));
         }
-        if (catRes.success && Array.isArray(catRes.categories)) {
-          setItemCategories(catRes.categories.filter((c) => c.status === 'active'));
+        const categoriesArray = catRes.itemCategories || catRes.categories;
+        if (catRes.success && Array.isArray(categoriesArray)) {
+          setItemCategories(categoriesArray.filter((c) => c.status === 'active'));
         }
         if (uomRes.success && Array.isArray(uomRes.uoms)) {
           setUoms(uomRes.uoms.filter((u) => u.status === 'active'));
@@ -170,8 +172,20 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     getCategorySpecifications(formData.itemCategory)
       .then((res) => {
         if (res.success && Array.isArray(res.specifications)) {
-          // Flatten CategorySpecification list
-          const specs = res.specifications.map((cs) => cs.specification).filter(Boolean);
+          // Preserve required and displayOrder from CategorySpecification wrapper
+          const specs = res.specifications
+            .map((cs) => {
+              if (!cs.specification) return null;
+              return {
+                ...cs.specification,
+                isRequiredCategorySpec: !!cs.required,
+                categoryDisplayOrder: cs.displayOrder ?? 0,
+              };
+            })
+            .filter(Boolean);
+
+          // Sort by categoryDisplayOrder
+          specs.sort((a, b) => a.categoryDisplayOrder - b.categoryDisplayOrder);
           setCategorySpecs(specs);
         }
       })
@@ -246,6 +260,17 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     if (Number(formData.itemPerSalesUnit) <= 0) {
       return 'Item per sales unit must be greater than 0.';
     }
+
+    // Validate required category specifications
+    for (const spec of categorySpecs) {
+      if (spec.isRequiredCategorySpec) {
+        const val = specsData[spec._id]?.value;
+        if (val === undefined || val === null || val === '') {
+          return `Specification '${spec.specificationName}' is required for this item category.`;
+        }
+      }
+    }
+
     return null;
   };
 
@@ -700,11 +725,17 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                       }}
                     >
                       <div>
-                        <strong style={{ fontSize: '13px', color: 'var(--neutral-900)' }}>
+                        <strong style={{ fontSize: '13px', color: 'var(--neutral-900)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           {spec.specificationName}
+                          {spec.isRequiredCategorySpec && <span style={{ color: 'var(--danger-600)', fontWeight: 700 }}>*</span>}
                         </strong>
-                        <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }} className="font-mono">
-                          {spec.specificationCode} ({spec.dataType})
+                        <div style={{ fontSize: '11px', color: 'var(--neutral-500)', display: 'flex', alignItems: 'center', gap: '6px' }} className="font-mono">
+                          <span>{spec.specificationCode} ({spec.dataType})</span>
+                          {spec.unit && (
+                            <span style={{ backgroundColor: 'var(--neutral-100)', color: 'var(--neutral-700)', padding: '1px 5px', borderRadius: '3px', fontSize: '10.5px', fontWeight: 600 }}>
+                              {spec.unit?.uomCode || spec.unit?.uomName || spec.unit}
+                            </span>
+                          )}
                         </div>
                       </div>
 

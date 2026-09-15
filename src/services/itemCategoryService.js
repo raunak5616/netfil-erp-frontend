@@ -30,3 +30,17 @@ export const getCategorySpecifications = async (categoryId) => {
   return response.data;
 };
 
+export const assignCategorySpecification = async (categoryId, data) => {
+  const response = await api.post(`/item-categories/${categoryId}/specifications`, data);
+  return response.data;
+};
+
+export const updateCategorySpecification = async (categoryId, specificationId, data) => {
+  const response = await api.put(`/item-categories/${categoryId}/specifications/${specificationId}`, data);
+  return response.data;
+};
+
+export const removeCategorySpecification = async (categoryId, specificationId) => {
+  const response = await api.delete(`/item-categories/${categoryId}/specifications/${specificationId}`);
+  return response.data;
+};

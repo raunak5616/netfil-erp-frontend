@@ -50,8 +50,8 @@ const ItemList = () => {
     try {
       const [itemRes, groupRes, catRes] = await Promise.all([
         getItems(),
-        getItemGroups().catch(() => ({ success: true, groups: [] })),
-        getItemCategories().catch(() => ({ success: true, categories: [] })),
+        getItemGroups().catch(() => ({ success: true, itemGroups: [] })),
+        getItemCategories().catch(() => ({ success: true, itemCategories: [] })),
       ]);
 
       if (itemRes.success && Array.isArray(itemRes.items)) {
@@ -60,11 +60,13 @@ const ItemList = () => {
         setError('Unexpected API response format');
       }
 
-      if (groupRes.success && Array.isArray(groupRes.groups)) {
-        setItemGroups(groupRes.groups);
+      const groupsArray = groupRes.itemGroups || groupRes.groups;
+      if (groupRes.success && Array.isArray(groupsArray)) {
+        setItemGroups(groupsArray);
       }
-      if (catRes.success && Array.isArray(catRes.categories)) {
-        setItemCategories(catRes.categories);
+      const categoriesArray = catRes.itemCategories || catRes.categories;
+      if (catRes.success && Array.isArray(categoriesArray)) {
+        setItemCategories(categoriesArray);
       }
     } catch (err) {
       console.error("Failed to fetch Items:", err);
