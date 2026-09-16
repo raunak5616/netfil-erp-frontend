@@ -17,7 +17,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Info
+  Info,
+  ShieldCheck,
+  History
 } from 'lucide-react';
 
 const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated }) => {
@@ -75,17 +77,19 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
 
   if (!isOpen) return null;
 
+  const uomName = orderBOM?.uom?.uomCode || orderBOM?.uom?.uomName || 'Nos';
+
   return (
     <>
       <Modal
         isOpen={isOpen}
         onClose={onClose}
         title={orderBOM ? `Order BOM: ${orderBOM.orderBOMCode}` : 'Order BOM Detail'}
-        maxWidth="900px"
+        maxWidth="920px"
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {/* Route Store Actions */}
+              {/* Store Actions */}
               {canRouteStore && orderBOM?.status === 'DRAFT' && (
                 <Button
                   variant="primary"
@@ -106,7 +110,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                 </Button>
               )}
 
-              {/* Route Factory Actions */}
+              {/* Factory Actions */}
               {canRouteFactory && orderBOM?.status === 'RECEIVED_BY_STORE' && (
                 <Button
                   variant="primary"
@@ -127,7 +131,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                 </Button>
               )}
 
-              {/* Cancel Action */}
+              {/* Cancel Action (Only allowed from DRAFT, SENT_TO_STORE, RECEIVED_BY_STORE) */}
               {canEdit && ['DRAFT', 'SENT_TO_STORE', 'RECEIVED_BY_STORE'].includes(orderBOM?.status) && (
                 <Button
                   variant="danger"
@@ -154,38 +158,48 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
         ) : !orderBOM ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>No record found</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Header Meta Card */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Snapshot Visualization Callout Banner */}
+            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldCheck size={20} color="#2563eb" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '12px', color: '#334155' }}>
+                <strong>HISTORICAL ORDER BOM SNAPSHOT:</strong> Created from <strong>Master BOM Version {orderBOM.masterBOMVersion || 1}</strong> ({orderBOM.masterBOM?.bomCode || 'Master BOM'}).
+                This Order BOM is historically isolated; subsequent changes to the Master BOM will not alter this snapshot.
+              </div>
+            </div>
+
+            {/* Header Metadata Card */}
             <div style={{ background: 'var(--neutral-50)', border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--neutral-900)' }} className="font-mono">
                       {orderBOM.orderBOMCode}
                     </span>
                     <StatusBadge status={orderBOM.status} />
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--neutral-500)', marginTop: '2px' }}>
-                    Created on {new Date(orderBOM.createdAt).toLocaleString('en-GB')} by {orderBOM.createdBy?.username || 'System'}
+                    Created on {new Date(orderBOM.createdAt).toLocaleString('en-GB')} by <strong>{orderBOM.createdBy?.username || 'System User'}</strong>
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--neutral-500)', fontWeight: 700 }}>
-                    Order Quantity
+                    Order Quantity & UOM
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary-700)' }}>
-                    {orderBOM.orderQuantity} {orderBOM.uom?.uomCode || orderBOM.uom?.uomName || ''}
+                    {orderBOM.orderQuantity} {uomName}
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', paddingTop: '12px', borderTop: '1px solid var(--neutral-200)' }}>
+              {/* Grid of Key Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', paddingTop: '12px', borderTop: '1px solid var(--neutral-200)' }}>
                 <div>
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--neutral-500)', fontWeight: 700, display: 'block' }}>
-                    Sales Order & Customer
+                    Sales Order & Party
                   </span>
-                  <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
                     {orderBOM.salesOrder?.salesOrderNo || 'N/A'}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--neutral-600)' }}>
@@ -197,7 +211,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--neutral-500)', fontWeight: 700, display: 'block' }}>
                     Parent Finished Item
                   </span>
-                  <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
                     {orderBOM.parentItem?.itemName || 'N/A'}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }} className="font-mono">
@@ -207,25 +221,25 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
 
                 <div>
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--neutral-500)', fontWeight: 700, display: 'block' }}>
-                    Master BOM Snapshot Source
+                    Master BOM Source
                   </span>
-                  <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>
-                    {orderBOM.masterBOM?.bomCode || 'N/A'} (v{orderBOM.masterBOMVersion})
+                  <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                    {orderBOM.masterBOM?.bomCode || 'N/A'}
                   </div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }}>
-                    Historical Snapshot Protected
+                  <div style={{ fontSize: '12px', color: 'var(--neutral-600)' }}>
+                    Version: <span className="font-mono">v{orderBOM.masterBOMVersion || 1}</span>
                   </div>
                 </div>
 
                 <div>
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--neutral-500)', fontWeight: 700, display: 'block' }}>
-                    Target Locations
+                    Locations (Store / Factory)
                   </span>
-                  <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
-                    Store: <strong>{orderBOM.store?.storeName || 'Unassigned'}</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--neutral-800)' }}>
+                    Store: <strong>{orderBOM.store?.storeName || orderBOM.store?.storeCode || 'Unassigned'}</strong>
                   </div>
-                  <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
-                    Factory: <strong>{orderBOM.plant?.plantName || 'Unassigned'}</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--neutral-800)' }}>
+                    Factory: <strong>{orderBOM.plant?.plantName || orderBOM.plant?.plantCode || 'Unassigned'}</strong>
                   </div>
                 </div>
               </div>
@@ -241,10 +255,10 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--neutral-900)' }}>
-                  Snapshotted Component Items ({items.length})
+                  Component Items Snapshot ({items.length})
                 </h4>
                 <span style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }}>
-                  Exact components snapshotted for THIS order quantity ({orderBOM.orderQuantity})
+                  Calculated required quantities for order quantity ({orderBOM.orderQuantity} {uomName})
                 </span>
               </div>
 
@@ -274,7 +288,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                           <td>{idx + 1}</td>
                           <td>
                             <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-                              {item.componentItem?.itemName || 'Component'}
+                              {item.componentItem?.itemName || 'Component Item'}
                             </div>
                             <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }} className="font-mono">
                               {item.componentItem?.itemCode || 'N/A'}
@@ -295,12 +309,12 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
               </div>
             </div>
 
-            {/* Document Handover & Audit Trail */}
+            {/* Document Handover Audit Trail & Status History */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* Handover Audit Grid */}
+              {/* Handover Timestamps */}
               <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', background: '#fff' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--neutral-900)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Building2 size={15} /> Handover Audit Audit Trail
+                  <Building2 size={15} /> Handover Audit Trail
                 </h4>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
@@ -334,26 +348,26 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                 </div>
               </div>
 
-              {/* Chronological Status History */}
+              {/* Status History */}
               <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', background: '#fff' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--neutral-900)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Clock size={15} /> Status History Log
+                  <Clock size={15} /> Status History Timeline
                 </h4>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
                   {(!orderBOM.statusHistory || orderBOM.statusHistory.length === 0) ? (
                     <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>No status history logged</div>
                   ) : (
                     orderBOM.statusHistory.map((h, idx) => (
-                      <div key={idx} style={{ fontSize: '11.5px', borderLeft: '2px solid var(--primary-500)', paddingLeft: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div key={idx} style={{ fontSize: '11.5px', borderLeft: '2px solid var(--primary-500)', paddingLeft: '8px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <StatusBadge status={h.status} />
-                          <span style={{ color: 'var(--neutral-500)' }}>
+                          <span style={{ color: 'var(--neutral-500)', fontSize: '11px' }}>
                             {new Date(h.performedAt).toLocaleString('en-GB')}
                           </span>
                         </div>
-                        <div style={{ color: 'var(--neutral-600)', marginTop: '2px' }}>
-                          By: {h.performedBy?.username || 'User'} {h.remarks ? `— "${h.remarks}"` : ''}
+                        <div style={{ color: 'var(--neutral-700)', marginTop: '2px' }}>
+                          By <strong>{h.performedBy?.username || 'User'}</strong> {h.remarks ? `— "${h.remarks}"` : ''}
                         </div>
                       </div>
                     ))

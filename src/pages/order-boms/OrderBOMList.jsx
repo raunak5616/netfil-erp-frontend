@@ -10,7 +10,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import { Input, Select } from '../../components/ui/FormField';
 
-import OrderBOMFormModal from './OrderBOMFormModal';
+import OrderBOMCreateModal from './OrderBOMCreateModal';
 import OrderBOMDetailModal from './OrderBOMDetailModal';
 import OrderBOMRouteModal from './OrderBOMRouteModal';
 
@@ -22,8 +22,7 @@ import {
   Send,
   CheckCircle2,
   XCircle,
-  ClipboardList,
-  FileCheck
+  ClipboardList
 } from 'lucide-react';
 
 const OrderBOMList = () => {
@@ -51,7 +50,7 @@ const OrderBOMList = () => {
   const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal States
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedOrderBOMId, setSelectedOrderBOMId] = useState(null);
 
@@ -68,6 +67,7 @@ const OrderBOMList = () => {
       if (statusFilter !== 'all') params.status = statusFilter;
       if (salesOrderFilter !== 'all') params.salesOrder = salesOrderFilter;
       if (parentItemFilter !== 'all') params.parentItem = parentItemFilter;
+      if (searchTerm.trim()) params.search = searchTerm.trim();
 
       const [obomRes, soRes, itemRes] = await Promise.all([
         getOrderBOMs(params),
@@ -101,7 +101,7 @@ const OrderBOMList = () => {
     fetchOrderBOMsData();
   }, [statusFilter, salesOrderFilter, parentItemFilter, page, limit]);
 
-  // Client-side search filtering on returned records
+  // Client-side search fallback/filtering
   const filteredOrderBOMs = useMemo(() => {
     if (!searchTerm.trim()) return orderBOMs;
     const term = searchTerm.toLowerCase();
@@ -129,11 +129,12 @@ const OrderBOMList = () => {
     setIsRouteOpen(true);
   };
 
+  // Recommended list columns: Order BOM Code, Sales Order, Parent Item, Order Quantity, UOM, Master BOM Version, Status, Store, Plant, Created Date, Actions
   const columns = useMemo(
     () => [
       {
         key: 'orderBOMCode',
-        header: 'Order BOM No.',
+        header: 'Order BOM Code',
         sortable: true,
         render: (val, row) => (
           <button
@@ -160,7 +161,7 @@ const OrderBOMList = () => {
       },
       {
         key: 'salesOrder',
-        header: 'Sales Order & Party',
+        header: 'Sales Order',
         sortable: true,
         render: (_, row) => (
           <div>
@@ -175,7 +176,7 @@ const OrderBOMList = () => {
       },
       {
         key: 'parentItem',
-        header: 'Parent Finished Item',
+        header: 'Parent Item',
         sortable: true,
         render: (_, row) => (
           <div>
@@ -191,28 +192,34 @@ const OrderBOMList = () => {
         )
       },
       {
-        key: 'masterBOM',
-        header: 'Master BOM Source',
-        sortable: true,
-        render: (_, row) => (
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>
-              {row.masterBOM?.bomCode || 'N/A'}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }}>
-              Version <span className="badge badge-primary" style={{ fontSize: '11px', padding: '1px 5px' }}>v{row.masterBOMVersion}</span>
-            </div>
-          </div>
-        )
-      },
-      {
         key: 'orderQuantity',
-        header: 'Order Qty',
+        header: 'Order Quantity',
         sortable: true,
-        render: (val, row) => (
+        render: (val) => (
           <span style={{ fontWeight: 700, color: 'var(--neutral-900)' }}>
             {val}
           </span>
+        )
+      },
+      {
+        key: 'uom',
+        header: 'UOM',
+        sortable: true,
+        render: (_, row) => row.uom?.uomCode || row.uom?.uomName || '-'
+      },
+      {
+        key: 'masterBOMVersion',
+        header: 'Master BOM Version',
+        sortable: true,
+        render: (val, row) => (
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--neutral-800)', fontSize: '12px' }}>
+              {row.masterBOM?.bomCode || 'Master BOM'}
+            </div>
+            <span className="badge badge-primary" style={{ fontSize: '11px', padding: '1px 5px' }}>
+              v{val || 1}
+            </span>
+          </div>
         )
       },
       {
@@ -220,6 +227,26 @@ const OrderBOMList = () => {
         header: 'Status',
         sortable: true,
         render: (val) => <StatusBadge status={val} />
+      },
+      {
+        key: 'store',
+        header: 'Store',
+        sortable: true,
+        render: (_, row) => (
+          <span style={{ fontSize: '12px', color: 'var(--neutral-700)' }}>
+            {row.store?.storeName || row.store?.storeCode || 'Unassigned'}
+          </span>
+        )
+      },
+      {
+        key: 'plant',
+        header: 'Plant',
+        sortable: true,
+        render: (_, row) => (
+          <span style={{ fontSize: '12px', color: 'var(--neutral-700)' }}>
+            {row.plant?.plantName || row.plant?.plantCode || 'Unassigned'}
+          </span>
+        )
       },
       {
         key: 'createdAt',
@@ -231,7 +258,7 @@ const OrderBOMList = () => {
         key: 'actions',
         header: 'Actions',
         align: 'right',
-        width: '260px',
+        width: '240px',
         render: (_, row) => (
           <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
             <Button
@@ -331,7 +358,7 @@ const OrderBOMList = () => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsFormOpen(true)}
+                onClick={() => setIsCreateOpen(true)}
               >
                 <Plus size={14} style={{ marginRight: '6px' }} /> Create Order BOM
               </Button>
@@ -352,6 +379,9 @@ const OrderBOMList = () => {
                 placeholder="Search by OBOM Code, Sales Order, Party, Parent Item..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') fetchOrderBOMsData();
+                }}
               />
             </div>
 
@@ -361,7 +391,7 @@ const OrderBOMList = () => {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              style={{ width: '190px' }}
+              style={{ width: '180px' }}
             >
               <option value="all">All Statuses</option>
               <option value="DRAFT">Draft</option>
@@ -417,12 +447,12 @@ const OrderBOMList = () => {
       </div>
 
       {/* Creation Modal */}
-      {isFormOpen && (
-        <OrderBOMFormModal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
+      {isCreateOpen && (
+        <OrderBOMCreateModal
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
           onSuccess={() => {
-            setIsFormOpen(false);
+            setIsCreateOpen(false);
             fetchOrderBOMsData();
           }}
         />
