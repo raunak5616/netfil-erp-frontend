@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -19,14 +20,17 @@ import {
   Clock,
   Info,
   ShieldCheck,
-  History
+  History,
+  Wrench
 } from 'lucide-react';
 
 const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated }) => {
   const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   const canRouteStore = hasPermission('ORDER_BOM_ROUTE_STORE');
   const canRouteFactory = hasPermission('ORDER_BOM_ROUTE_FACTORY');
   const canEdit = hasPermission('ORDER_BOM_EDIT');
+  const canCreateWorkOrder = hasPermission('WORK_ORDER_CREATE');
 
   const [orderBOM, setOrderBOM] = useState(null);
   const [items, setItems] = useState([]);
@@ -128,6 +132,20 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                   onClick={() => handleRouteAction('RECEIVE_BY_FACTORY')}
                 >
                   <CheckCircle2 size={14} style={{ marginRight: '4px' }} /> Receive in Factory
+                </Button>
+              )}
+
+              {/* Create Work Order Action */}
+              {canCreateWorkOrder && orderBOM?.status === 'RECEIVED_BY_FACTORY' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    navigate('/work-orders', { state: { createFromOrderBOM: orderBOM } });
+                  }}
+                >
+                  <Wrench size={14} style={{ marginRight: '4px' }} /> Create Work Order
                 </Button>
               )}
 

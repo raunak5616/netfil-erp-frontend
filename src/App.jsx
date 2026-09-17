@@ -20,6 +20,7 @@ import QuotationList from './pages/quotations/QuotationList';
 import SalesOrderList from './pages/sales-orders/SalesOrderList';
 import MasterBOMList from './pages/master-boms/MasterBOMList';
 import OrderBOMList from './pages/order-boms/OrderBOMList';
+import WorkOrderList from './pages/work-orders/WorkOrderList';
 
 function App() {
   return (
@@ -80,6 +81,11 @@ function App() {
               {/* Protected Order BOM Module Route */}
               <Route element={<ProtectedRoute requiredPermission="ORDER_BOM_VIEW" />}>
                 <Route path="/order-boms" element={<OrderBOMList />} />
+              </Route>
+
+              {/* Protected Work Order Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="WORK_ORDER_VIEW" />}>
+                <Route path="/work-orders" element={<WorkOrderList />} />
               </Route>
 
               {/* Protected UOM Module Route */}

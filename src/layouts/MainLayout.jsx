@@ -53,7 +53,7 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms'];
+    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -146,6 +146,9 @@ const MainLayout = () => {
     }
     if (path === '/order-boms') {
       return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Order BOM' }];
+    }
+    if (path === '/work-orders') {
+      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Work Order' }];
     }
     return [{ label: 'Home', path: '/dashboard' }];
   };
@@ -277,6 +280,12 @@ const MainLayout = () => {
               path: '/order-boms',
               icon: ClipboardList,
               permission: 'ORDER_BOM_VIEW',
+            },
+            {
+              label: 'Work Order',
+              path: '/work-orders',
+              icon: Wrench,
+              permission: 'WORK_ORDER_VIEW',
             },
           ],
         },
