@@ -11,7 +11,6 @@ import {
   Package, 
   ShoppingCart, 
   FileText,
-  Menu,
   X,
   ChevronRight,
   ChevronDown,
@@ -21,14 +20,8 @@ import {
   FileCheck,
   Wrench,
   Search,
-  Bell,
-  HelpCircle,
-  Check,
   Command,
-  Activity,
   User,
-  Sparkles,
-  ExternalLink
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -49,12 +42,10 @@ const MainLayout = () => {
 
   // Dropdown states for header popovers
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notifMenuOpen, setNotifMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const userMenuRef = useRef(null);
-  const notifMenuRef = useRef(null);
 
   // Track expanded navigation groups
   const [expandedGroups, setExpandedGroups] = useState(() => {
@@ -87,9 +78,6 @@ const MainLayout = () => {
     const handleClickOutside = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false);
-      }
-      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
-        setNotifMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -274,17 +262,17 @@ const MainLayout = () => {
           fixed lg:static top-0 bottom-0 left-0 z-50
           bg-slate-900 text-slate-200 flex flex-col shrink-0
           border-r border-slate-800 shadow-xl lg:shadow-none
-          transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
-          ${isMobile ? (mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (collapsed ? 'w-[68px]' : 'w-64')}
+          transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${isMobile ? (mobileOpen ? 'translate-x-0 w-60' : '-translate-x-full w-60') : (collapsed ? 'w-[60px]' : 'w-60')}
         `}
       >
         {/* Sidebar Brand Header */}
-        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between overflow-hidden shrink-0 bg-white">
-          <div className="flex items-center gap-2 overflow-hidden py-1">
+        <div className="h-14 px-3 border-b border-slate-800/80 flex items-center justify-between overflow-hidden shrink-0 bg-white transition-all duration-300">
+          <div className="flex items-center justify-center overflow-hidden py-1 w-full">
             <img 
               src="/logo.png" 
               alt="Netfil Clean Solutions" 
-              className={`object-contain transition-all duration-300 ${collapsed && !isMobile ? 'h-9 w-9' : 'h-11 max-w-[210px]'}`} 
+              className={`object-contain transition-all duration-300 ${collapsed && !isMobile ? 'h-7 w-7' : 'h-8 max-w-[170px]'}`} 
             />
           </div>
 
@@ -292,15 +280,15 @@ const MainLayout = () => {
           {isMobile && (
             <button
               onClick={() => setMobileOpen(false)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           )}
         </div>
 
         {/* Sidebar Nav Links */}
-        <nav className="p-3 flex-1 overflow-y-auto overflow-x-hidden space-y-4 custom-scrollbar">
+        <nav className="p-2 flex-1 overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar">
           {menuSections.map((section, sIdx) => {
             const visibleItems = section.items
               .map((item) => {
@@ -322,11 +310,16 @@ const MainLayout = () => {
 
             return (
               <div key={sIdx} className="space-y-1">
-                {(!collapsed || isMobile) && (
-                  <div className="text-[10.5px] uppercase tracking-wider text-slate-400 px-2.5 py-1 font-bold font-mono">
-                    {section.title}
-                  </div>
-                )}
+                {/* Section Title */}
+                <div 
+                  className={`
+                    text-[10px] uppercase tracking-wider text-slate-400 px-2.5 py-1 font-bold font-mono
+                    transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                    ${collapsed && !isMobile ? 'opacity-0 max-h-0 py-0' : 'opacity-100 max-h-8'}
+                  `}
+                >
+                  {section.title}
+                </div>
 
                 {visibleItems.map((item) => {
                   if (item.isGroup) {
@@ -336,55 +329,55 @@ const MainLayout = () => {
                     );
                     const GroupIcon = item.icon;
 
-                    if (collapsed && !isMobile) {
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            setCollapsed(false);
-                            setExpandedGroups((prev) => ({ ...prev, [item.id]: true }));
-                          }}
-                          title={item.label}
-                          className={`
-                            w-11 h-11 mx-auto flex items-center justify-center rounded-xl cursor-pointer
-                            transition-all duration-200 group relative
-                            ${isChildActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
-                          `}
-                        >
-                          <GroupIcon size={18} />
-                          {/* Tooltip on collapsed state */}
-                          <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-950 text-white text-xs rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 border border-slate-800">
-                            {item.label}
-                          </div>
-                        </div>
-                      );
-                    }
-
                     return (
                       <div key={item.id} className="space-y-0.5">
                         <button
                           type="button"
-                          onClick={() => toggleGroup(item.id)}
+                          onClick={() => {
+                            if (collapsed && !isMobile) {
+                              setCollapsed(false);
+                              setExpandedGroups((prev) => ({ ...prev, [item.id]: true }));
+                            } else {
+                              toggleGroup(item.id);
+                            }
+                          }}
+                          title={collapsed && !isMobile ? item.label : undefined}
                           className={`
-                            w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium
-                            transition-all duration-200 group cursor-pointer
-                            ${isChildActive ? 'text-blue-400 font-semibold bg-slate-800/60' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}
+                            w-full flex items-center justify-between py-2 rounded-lg text-xs font-medium
+                            transition-all duration-300 ease-in-out group cursor-pointer overflow-hidden
+                            ${collapsed && !isMobile ? 'px-0 justify-center' : 'px-2.5'}
+                            ${isChildActive ? 'text-blue-400 font-semibold bg-slate-800/80 shadow-xs' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}
                           `}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <GroupIcon size={17} className={isChildActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'} />
-                            <span>{item.label}</span>
+                          <div className={`flex items-center gap-2.5 min-w-0 ${collapsed && !isMobile ? 'justify-center w-full' : ''}`}>
+                            <GroupIcon size={17} className={`shrink-0 transition-colors ${isChildActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                            <span 
+                              className={`
+                                truncate transition-all duration-300 ease-in-out whitespace-nowrap
+                                ${collapsed && !isMobile ? 'opacity-0 max-w-0 hidden' : 'opacity-100 max-w-xs'}
+                              `}
+                            >
+                              {item.label}
+                            </span>
                           </div>
-                          <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-500'}`}>
+                          <div 
+                            className={`
+                              transition-all duration-300 shrink-0
+                              ${collapsed && !isMobile ? 'opacity-0 hidden' : 'opacity-100 scale-100'}
+                              ${isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-500'}
+                            `}
+                          >
                             <ChevronDown size={14} />
                           </div>
                         </button>
 
-                        {/* Accordion Submenu with smooth transition */}
+                        {/* Accordion Submenu */}
                         <div 
                           className={`
-                            ml-4 pl-3 border-l border-slate-800 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out
-                            ${isExpanded ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}
+                            pl-2.5 border-l border-slate-800/80 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out
+                            ${collapsed && !isMobile 
+                              ? 'max-h-0 opacity-0 ml-0' 
+                              : (isExpanded ? 'max-h-96 opacity-100 ml-3 mt-0.5' : 'max-h-0 opacity-0 ml-3')}
                           `}
                         >
                           {item.children.map((child) => {
@@ -394,8 +387,8 @@ const MainLayout = () => {
                                 key={child.path}
                                 to={child.path}
                                 className={({ isActive }) => `
-                                  flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12.5px] font-medium
-                                  transition-all duration-150 relative group
+                                  flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] font-medium
+                                  transition-all duration-200 relative group whitespace-nowrap
                                   ${isActive 
                                     ? 'bg-blue-600 text-white shadow-xs font-semibold' 
                                     : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}
@@ -414,38 +407,29 @@ const MainLayout = () => {
                   // Single NavLink item
                   const Icon = item.icon;
 
-                  if (collapsed && !isMobile) {
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) => `
-                          w-11 h-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200 relative group
-                          ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
-                        `}
-                      >
-                        <Icon size={18} />
-                        <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-950 text-white text-xs rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 border border-slate-800">
-                          {item.label}
-                        </div>
-                      </NavLink>
-                    );
-                  }
-
                   return (
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      title={collapsed && !isMobile ? item.label : undefined}
                       className={({ isActive }) => `
-                        flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium
-                        transition-all duration-150 group
+                        flex items-center py-2 rounded-lg text-xs font-medium
+                        transition-all duration-300 ease-in-out group overflow-hidden whitespace-nowrap
+                        ${collapsed && !isMobile ? 'justify-center px-0' : 'px-2.5 gap-2.5'}
                         ${isActive 
                           ? 'bg-blue-600 text-white shadow-xs font-semibold' 
                           : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}
                       `}
                     >
-                      <Icon size={17} className="text-slate-400 group-hover:text-slate-200" />
-                      <span>{item.label}</span>
+                      <Icon size={17} className="shrink-0 text-slate-400 group-hover:text-slate-200 transition-colors" />
+                      <span 
+                        className={`
+                          truncate transition-all duration-300 ease-in-out
+                          ${collapsed && !isMobile ? 'opacity-0 max-w-0 hidden' : 'opacity-100 max-w-xs'}
+                        `}
+                      >
+                        {item.label}
+                      </span>
                     </NavLink>
                   );
                 })}
@@ -455,38 +439,44 @@ const MainLayout = () => {
         </nav>
 
         {/* Sidebar Footer User Info */}
-        {(!collapsed || isMobile) && (
-          <div className="p-3 border-t border-slate-800/80 bg-slate-950/40">
-            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                  {user?.username?.charAt(0).toUpperCase() || 'A'}
-                </div>
-                <div className="truncate">
-                  <div className="text-xs font-semibold text-white truncate">
-                    {user?.employee?.fullName || user?.username || 'Admin'}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">NETFIL Workspace</div>
-                </div>
+        <div className="p-2 border-t border-slate-800/80 bg-slate-950/40">
+          <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                {user?.username?.charAt(0).toUpperCase() || 'A'}
               </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                title="Sign Out"
-                className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+              <div 
+                className={`
+                  transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap min-w-0
+                  ${collapsed && !isMobile ? 'opacity-0 max-w-0 hidden' : 'opacity-100 max-w-xs'}
+                `}
               >
-                <LogOut size={15} />
-              </button>
+                <div className="text-xs font-semibold text-white truncate">
+                  {user?.employee?.fullName || user?.username || 'Admin'}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">NETFIL Workspace</div>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Sign Out"
+              className={`
+                p-1 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all duration-300 cursor-pointer shrink-0
+                ${collapsed && !isMobile ? 'opacity-0 max-w-0 hidden' : 'opacity-100'}
+              `}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
-        )}
+        </div>
       </aside>
 
       {/* MAIN LAYOUT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-slate-100">
         
         {/* TOP NAVBAR */}
-        <header className="h-16 bg-white border-b border-slate-200/90 flex items-center justify-between px-4 lg:px-6 shadow-2xs z-30 shrink-0">
+        <header className="h-14 bg-white border-b border-slate-200/90 flex items-center justify-between px-4 lg:px-6 shadow-2xs z-30 shrink-0">
           
           {/* Left Controls: Hamburger + Breadcrumbs */}
           <div className="flex items-center gap-3">
@@ -495,14 +485,14 @@ const MainLayout = () => {
             <button
               type="button"
               onClick={toggleSidebar}
-              className="p-2 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200/80 hover:text-slate-900 active:scale-95 transition-all cursor-pointer border border-slate-200 shadow-2xs"
+              className="p-1.5 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200/80 hover:text-slate-900 active:scale-95 transition-all cursor-pointer border border-slate-200 shadow-2xs group"
               title={isMobile ? (mobileOpen ? 'Close Menu' : 'Open Menu') : (collapsed ? 'Expand Sidebar' : 'Collapse Sidebar')}
             >
-              {/* Morphing Hamburger / Arrow Icon */}
-              <div className="w-5 h-5 flex flex-col justify-center gap-1">
-                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-5' : 'w-5'}`} />
-                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-3' : 'w-4'}`} />
-                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-4' : 'w-3'}`} />
+              {/* Morphing Hamburger Icon */}
+              <div className="w-5 h-5 flex flex-col justify-center items-center gap-1">
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-4' : 'w-4'}`} />
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-2.5' : 'w-3.5'}`} />
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-3.5' : 'w-2.5'}`} />
               </div>
             </button>
 
@@ -538,56 +528,17 @@ const MainLayout = () => {
             </button>
           </div>
 
-          {/* Right Controls: Status Badge, Notifications, User Menu */}
+          {/* Right Controls: User Menu */}
           <div className="flex items-center gap-2.5">
             
-            {/* System Live Pill */}
-            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-medium text-[11px]">Factory System Online</span>
-            </div>
-
-            {/* Notification Bell Dropdown */}
-            <div className="relative" ref={notifMenuRef}>
-              <button
-                type="button"
-                onClick={() => setNotifMenuOpen(!notifMenuOpen)}
-                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors relative cursor-pointer"
-                title="Notifications"
-              >
-                <Bell size={18} />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-              </button>
-
-              {/* Notification Popover Menu */}
-              {notifMenuOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-fadeIn p-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2">
-                    <span className="font-bold text-xs text-slate-900">System Notifications</span>
-                    <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold">2 New</span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div className="p-2 rounded-lg bg-blue-50/50 border border-blue-100">
-                      <div className="font-medium text-slate-900">Work Order #WO-2026-08</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Routed to Assembly Store for material issue.</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="font-medium text-slate-900">Quotation Approved</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Commercial quotation #Q-2026-04 released by Admin.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* User Profile Pill & Dropdown */}
             <div className="relative" ref={userMenuRef}>
               <button
                 type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+                className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-semibold flex items-center justify-center text-xs shadow-2xs">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center text-xs shadow-2xs">
                   {user?.employee?.fullName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'A'}
                 </div>
                 <div className="hidden sm:flex flex-col text-left leading-tight">
@@ -605,7 +556,7 @@ const MainLayout = () => {
 
               {/* User Dropdown Popover */}
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-fadeIn p-1.5 text-xs">
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 animate-fadeIn p-1.5 text-xs">
                   <div className="px-3 py-2 border-b border-slate-100 mb-1">
                     <p className="font-semibold text-slate-900">{user?.employee?.fullName || user?.username}</p>
                     <p className="text-[11px] text-slate-500 truncate">{user?.employee?.email || 'admin@netfil-erp.local'}</p>
