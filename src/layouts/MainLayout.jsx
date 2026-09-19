@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Button from '../components/ui/Button';
 import { 
   Users, 
   UserCheck,
@@ -11,17 +10,25 @@ import {
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
-  Boxes, 
   FileText,
   Menu,
+  X,
   ChevronRight,
   ChevronDown,
   Layers,
   ClipboardList,
   Calculator,
-  CheckSquare,
+  FileCheck,
   Wrench,
-  FileCheck
+  Search,
+  Bell,
+  HelpCircle,
+  Check,
+  Command,
+  Activity,
+  User,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -29,12 +36,27 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Persist sidebar collapsed state
+  // Screen size check for mobile drawer mode
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+
+  // Sidebar collapsed state for desktop
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('netfil_sidebar_collapsed') === 'true';
   });
 
-  // Track expanded parent groups
+  // Mobile sidebar open drawer state
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Dropdown states for header popovers
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const userMenuRef = useRef(null);
+  const notifMenuRef = useRef(null);
+
+  // Track expanded navigation groups
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const savedState = localStorage.getItem('netfil_sidebar_expanded_groups');
     if (savedState) {
@@ -47,7 +69,49 @@ const MainLayout = () => {
     return { 'item-master': true, 'commercial-module': true };
   });
 
-  // Auto-expand parent group on route match or browser refresh
+  // Handle window resize for mobile breakpoint
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close popovers on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
+        setNotifMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Keyboard shortcut (⌘K or Ctrl+K) to open Quick Search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Auto-expand parent group on route change
   useEffect(() => {
     const path = location.pathname;
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
@@ -57,30 +121,25 @@ const MainLayout = () => {
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
-      setExpandedGroups((prev) => {
-        if (prev['item-master']) return prev;
-        const next = { ...prev, 'item-master': true };
-        localStorage.setItem('netfil_sidebar_expanded_groups', JSON.stringify(next));
-        return next;
-      });
+      setExpandedGroups((prev) => ({ ...prev, 'item-master': true }));
     }
-
     if (isCommercialChild) {
-      setExpandedGroups((prev) => {
-        if (prev['commercial-module']) return prev;
-        const next = { ...prev, 'commercial-module': true };
-        localStorage.setItem('netfil_sidebar_expanded_groups', JSON.stringify(next));
-        return next;
-      });
+      setExpandedGroups((prev) => ({ ...prev, 'commercial-module': true }));
     }
+    // Close mobile drawer on route navigation
+    setMobileOpen(false);
   }, [location.pathname]);
 
   const toggleSidebar = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem('netfil_sidebar_collapsed', String(next));
-      return next;
-    });
+    if (isMobile) {
+      setMobileOpen((prev) => !prev);
+    } else {
+      setCollapsed((prev) => {
+        const next = !prev;
+        localStorage.setItem('netfil_sidebar_collapsed', String(next));
+        return next;
+      });
+    }
   };
 
   const toggleGroup = (groupId) => {
@@ -96,101 +155,51 @@ const MainLayout = () => {
     navigate('/login');
   };
 
-  // Build breadcrumb items based on path
+  // Breadcrumbs generator
   const getBreadcrumbs = () => {
     const path = location.pathname;
-    if (path === '/dashboard') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Dashboard' }];
-    }
-    if (path === '/employees') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Organization' }, { label: 'Employees' }];
-    }
-    if (path === '/users') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'System & Security' }, { label: 'User Accounts' }];
-    }
-    if (path === '/departments') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Organization' }, { label: 'Departments' }];
-    }
-    if (path === '/uoms') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Units of Measure' }];
-    }
-    if (path === '/items') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Items' }];
-    }
-    if (path === '/item-groups') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Item Groups' }];
-    }
-    if (path === '/item-categories') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Item Categories' }];
-    }
-    if (path === '/specifications') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Item Master' }, { label: 'Specifications' }];
-    }
-    if (path === '/clients' || path === '/parties') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Party Master' }];
-    }
-    if (path === '/requirements' || path === '/enquiries') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Requirement / Enquiry' }];
-    }
-    if (path === '/enquiry-mis') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Enquiry MIS' }];
-    }
-    if (path === '/quotations') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Quotation' }];
-    }
-    if (path === '/sales-orders') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Sales Order' }];
-    }
-    if (path === '/master-boms') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Master BOM' }];
-    }
-    if (path === '/order-boms') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Order BOM' }];
-    }
-    if (path === '/work-orders') {
-      return [{ label: 'Home', path: '/dashboard' }, { label: 'Commercial' }, { label: 'Work Order' }];
-    }
-    return [{ label: 'Home', path: '/dashboard' }];
+    const map = {
+      '/dashboard': [{ label: 'Operations' }, { label: 'Dashboard' }],
+      '/employees': [{ label: 'Organization' }, { label: 'Employee Master' }],
+      '/users': [{ label: 'Security' }, { label: 'User Accounts' }],
+      '/departments': [{ label: 'Organization' }, { label: 'Departments' }],
+      '/uoms': [{ label: 'Item Master' }, { label: 'Units of Measure (UOM)' }],
+      '/items': [{ label: 'Item Master' }, { label: 'Items Catalog' }],
+      '/item-groups': [{ label: 'Item Master' }, { label: 'Item Groups' }],
+      '/item-categories': [{ label: 'Item Master' }, { label: 'Item Categories' }],
+      '/specifications': [{ label: 'Item Master' }, { label: 'Specifications' }],
+      '/clients': [{ label: 'Commercial' }, { label: 'Party Master' }],
+      '/parties': [{ label: 'Commercial' }, { label: 'Party Master' }],
+      '/requirements': [{ label: 'Commercial' }, { label: 'Client Requirements' }],
+      '/enquiries': [{ label: 'Commercial' }, { label: 'Client Enquiries' }],
+      '/enquiry-mis': [{ label: 'Commercial' }, { label: 'Enquiry MIS Reports' }],
+      '/quotations': [{ label: 'Commercial' }, { label: 'Quotation Register' }],
+      '/sales-orders': [{ label: 'Commercial' }, { label: 'Sales Orders' }],
+      '/master-boms': [{ label: 'Engineering' }, { label: 'Master BOMs' }],
+      '/order-boms': [{ label: 'Engineering' }, { label: 'Order BOMs' }],
+      '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
+    };
+    return map[path] || [{ label: 'Workspace' }];
   };
 
-  // Centralized module menu structure
+  // Menu structure
   const menuSections = [
     {
       title: 'CORE MODULES',
       items: [
-        {
-          label: 'Dashboard',
-          path: '/dashboard',
-          icon: LayoutDashboard,
-          permission: null,
-        },
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: null },
       ],
     },
     {
       title: 'ORGANIZATION & SECURITY',
       items: [
-        {
-          label: 'Employees',
-          path: '/employees',
-          icon: Users,
-          permission: 'EMPLOYEE_VIEW',
-        },
-        {
-          label: 'User Accounts',
-          path: '/users',
-          icon: UserCheck,
-          permission: 'USER_VIEW',
-        },
-        {
-          label: 'Departments',
-          path: '/departments',
-          icon: Building2,
-          permission: 'DEPARTMENT_VIEW',
-        },
+        { label: 'Employees', path: '/employees', icon: Users, permission: 'EMPLOYEE_VIEW' },
+        { label: 'User Accounts', path: '/users', icon: UserCheck, permission: 'USER_VIEW' },
+        { label: 'Departments', path: '/departments', icon: Building2, permission: 'DEPARTMENT_VIEW' },
       ],
     },
     {
-      title: 'COMMERCIAL & INVENTORY',
+      title: 'COMMERCIAL & ENGINEERING',
       items: [
         {
           id: 'item-master',
@@ -198,127 +207,110 @@ const MainLayout = () => {
           icon: Package,
           isGroup: true,
           children: [
-            {
-              label: 'Items',
-              path: '/items',
-              icon: Package,
-              permission: 'ITEM_VIEW',
-            },
-            {
-              label: 'Item Groups',
-              path: '/item-groups',
-              icon: Layers,
-              permission: 'ITEM_GROUP_VIEW',
-              phase2: true,
-            },
-            {
-              label: 'Item Categories',
-              path: '/item-categories',
-              icon: Layers,
-              permission: 'ITEM_CATEGORY_VIEW',
-              phase2: true,
-            },
-            {
-              label: 'Specifications',
-              path: '/specifications',
-              icon: Layers,
-              permission: 'SPECIFICATION_VIEW',
-              phase2: true,
-            },
-            {
-              label: 'Units of Measure (UOM)',
-              path: '/uoms',
-              icon: Layers,
-              permission: 'UOM_VIEW',
-            },
+            { label: 'Items Catalog', path: '/items', icon: Package, permission: 'ITEM_VIEW' },
+            { label: 'Item Groups', path: '/item-groups', icon: Layers, permission: 'ITEM_GROUP_VIEW' },
+            { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
+            { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
+            { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
           ],
         },
         {
           id: 'commercial-module',
-          label: 'Commercial',
+          label: 'Commercial & Production',
           icon: ShoppingCart,
           isGroup: true,
           children: [
-            {
-              label: 'Party Master',
-              path: '/clients',
-              icon: Users,
-              permission: 'CLIENT_VIEW',
-            },
-            {
-              label: 'Requirement / Enquiry',
-              path: '/requirements',
-              icon: ClipboardList,
-              permission: 'REQUIREMENT_VIEW',
-            },
-            {
-              label: 'Enquiry MIS',
-              path: '/enquiry-mis',
-              icon: FileText,
-              permission: 'REQUIREMENT_VIEW',
-            },
-            {
-              label: 'Quotation',
-              path: '/quotations',
-              icon: Calculator,
-              permission: 'QUOTATION_VIEW',
-            },
-            {
-              label: 'Sales Order',
-              path: '/sales-orders',
-              icon: FileCheck,
-              permission: 'SALES_ORDER_VIEW',
-            },
-            {
-              label: 'Master BOM',
-              path: '/master-boms',
-              icon: Layers,
-              permission: 'BOM_VIEW',
-            },
-            {
-              label: 'Order BOM',
-              path: '/order-boms',
-              icon: ClipboardList,
-              permission: 'ORDER_BOM_VIEW',
-            },
-            {
-              label: 'Work Order',
-              path: '/work-orders',
-              icon: Wrench,
-              permission: 'WORK_ORDER_VIEW',
-            },
+            { label: 'Party Master', path: '/clients', icon: Users, permission: 'CLIENT_VIEW' },
+            { label: 'Enquiry & Requirement', path: '/requirements', icon: ClipboardList, permission: 'REQUIREMENT_VIEW' },
+            { label: 'Enquiry MIS', path: '/enquiry-mis', icon: FileText, permission: 'REQUIREMENT_VIEW' },
+            { label: 'Quotation Engine', path: '/quotations', icon: Calculator, permission: 'QUOTATION_VIEW' },
+            { label: 'Sales Orders', path: '/sales-orders', icon: FileCheck, permission: 'SALES_ORDER_VIEW' },
+            { label: 'Master BOM', path: '/master-boms', icon: Layers, permission: 'BOM_VIEW' },
+            { label: 'Order BOM Routing', path: '/order-boms', icon: ClipboardList, permission: 'ORDER_BOM_VIEW' },
+            { label: 'Work Orders', path: '/work-orders', icon: Wrench, permission: 'WORK_ORDER_VIEW' },
           ],
         },
       ],
     },
   ];
 
+  // Quick navigation items for Cmd+K search dialog
+  const quickJumpItems = [
+    { label: 'Items Catalog', path: '/items', category: 'Item Master', permission: 'ITEM_VIEW' },
+    { label: 'Item Groups', path: '/item-groups', category: 'Item Master', permission: 'ITEM_GROUP_VIEW' },
+    { label: 'Item Categories', path: '/item-categories', category: 'Item Master', permission: 'ITEM_CATEGORY_VIEW' },
+    { label: 'Party Master', path: '/clients', category: 'Commercial', permission: 'CLIENT_VIEW' },
+    { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },
+    { label: 'Quotation Register', path: '/quotations', category: 'Commercial', permission: 'QUOTATION_VIEW' },
+    { label: 'Sales Orders', path: '/sales-orders', category: 'Commercial', permission: 'SALES_ORDER_VIEW' },
+    { label: 'Master BOMs', path: '/master-boms', category: 'Engineering', permission: 'BOM_VIEW' },
+    { label: 'Order BOMs', path: '/order-boms', category: 'Engineering', permission: 'ORDER_BOM_VIEW' },
+    { label: 'Work Orders', path: '/work-orders', category: 'Production', permission: 'WORK_ORDER_VIEW' },
+    { label: 'Employee Master', path: '/employees', category: 'Organization', permission: 'EMPLOYEE_VIEW' },
+    { label: 'User Accounts', path: '/users', category: 'Security', permission: 'USER_VIEW' },
+  ].filter((item) => !item.permission || hasPermission(item.permission));
+
+  const filteredQuickJumps = quickJumpItems.filter((i) =>
+    i.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    i.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      {/* Collapsible Sidebar */}
-      <aside className={`bg-slate-900 text-white flex flex-col shrink-0 transition-all duration-200 z-50 ${collapsed ? 'w-15' : 'w-60'}`}>
-        <div className="h-13 px-4 border-b border-white/10 flex items-center gap-3 overflow-hidden whitespace-nowrap">
-          <Shield size={22} className="text-blue-500 shrink-0" />
-          {!collapsed && <div className="font-bold text-sm tracking-wider text-white">NETFIL ERP</div>}
+    <div className="flex h-screen w-full bg-slate-100 text-slate-800 overflow-hidden font-sans select-none">
+      
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isMobile && mobileOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 transition-opacity duration-300"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR CONTAINER */}
+      <aside 
+        className={`
+          fixed lg:static top-0 bottom-0 left-0 z-50
+          bg-slate-900 text-slate-200 flex flex-col shrink-0
+          border-r border-slate-800 shadow-xl lg:shadow-none
+          transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+          ${isMobile ? (mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (collapsed ? 'w-[68px]' : 'w-64')}
+        `}
+      >
+        {/* Sidebar Brand Header */}
+        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between overflow-hidden shrink-0 bg-white">
+          <div className="flex items-center gap-2 overflow-hidden py-1">
+            <img 
+              src="/logo.png" 
+              alt="Netfil Clean Solutions" 
+              className={`object-contain transition-all duration-300 ${collapsed && !isMobile ? 'h-9 w-9' : 'h-11 max-w-[210px]'}`} 
+            />
+          </div>
+
+          {/* Close button for mobile drawer */}
+          {isMobile && (
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
 
-        <nav className="p-2 flex-1 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
-          {menuSections.map((section, idx) => {
-            // Filter items & groups by user permissions
+        {/* Sidebar Nav Links */}
+        <nav className="p-3 flex-1 overflow-y-auto overflow-x-hidden space-y-4 custom-scrollbar">
+          {menuSections.map((section, sIdx) => {
             const visibleItems = section.items
               .map((item) => {
                 if (item.isGroup) {
-                  const visibleChildren = item.children.filter((child) => {
-                    if (!child.permission) return true;
-                    return hasPermission(child.permission);
-                  });
-
+                  const visibleChildren = item.children.filter(
+                    (child) => !child.permission || hasPermission(child.permission)
+                  );
                   if (visibleChildren.length === 0) return null;
                   return { ...item, children: visibleChildren };
                 }
-
                 if (!item.permission || hasPermission(item.permission)) {
                   return item;
                 }
@@ -329,8 +321,13 @@ const MainLayout = () => {
             if (visibleItems.length === 0) return null;
 
             return (
-              <div key={idx} className="mb-2">
-                {!collapsed && <div className="text-[10px] uppercase tracking-wider text-slate-400 px-2.5 pt-3.5 pb-1 font-bold whitespace-nowrap">{section.title}</div>}
+              <div key={sIdx} className="space-y-1">
+                {(!collapsed || isMobile) && (
+                  <div className="text-[10.5px] uppercase tracking-wider text-slate-400 px-2.5 py-1 font-bold font-mono">
+                    {section.title}
+                  </div>
+                )}
+
                 {visibleItems.map((item) => {
                   if (item.isGroup) {
                     const isExpanded = !!expandedGroups[item.id];
@@ -339,94 +336,99 @@ const MainLayout = () => {
                     );
                     const GroupIcon = item.icon;
 
-                    if (collapsed) {
+                    if (collapsed && !isMobile) {
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-center justify-center p-2.5 rounded text-xs text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer ${
-                            isChildActive ? 'bg-blue-700 text-white' : ''
-                          }`}
-                          title={`${item.label} (${item.children.length} items)`}
                           onClick={() => {
-                            toggleSidebar();
+                            setCollapsed(false);
                             setExpandedGroups((prev) => ({ ...prev, [item.id]: true }));
                           }}
+                          title={item.label}
+                          className={`
+                            w-11 h-11 mx-auto flex items-center justify-center rounded-xl cursor-pointer
+                            transition-all duration-200 group relative
+                            ${isChildActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
+                          `}
                         >
-                          <GroupIcon size={16} />
+                          <GroupIcon size={18} />
+                          {/* Tooltip on collapsed state */}
+                          <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-950 text-white text-xs rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 border border-slate-800">
+                            {item.label}
+                          </div>
                         </div>
                       );
                     }
 
                     return (
-                      <div key={item.id} className="mb-1">
-                        <div
-                          className={`flex items-center justify-between px-2.5 py-2 rounded text-xs font-medium transition-colors cursor-pointer select-none ${
-                            isChildActive ? 'text-blue-400 font-semibold' : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                          }`}
+                      <div key={item.id} className="space-y-0.5">
+                        <button
+                          type="button"
                           onClick={() => toggleGroup(item.id)}
-                          title={item.label}
+                          className={`
+                            w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium
+                            transition-all duration-200 group cursor-pointer
+                            ${isChildActive ? 'text-blue-400 font-semibold bg-slate-800/60' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}
+                          `}
                         >
                           <div className="flex items-center gap-2.5">
-                            <GroupIcon size={16} />
+                            <GroupIcon size={17} className={isChildActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'} />
                             <span>{item.label}</span>
                           </div>
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </div>
-
-                        {isExpanded && (
-                          <div className="ml-3.5 pl-2.5 border-l border-white/10 mt-0.5 mb-1 flex flex-col gap-0.5">
-                            {item.children.map((child) => {
-                              const ChildIcon = child.icon;
-
-                              if (child.phase2 && child.path !== '/uoms' && child.path !== '/items' && child.path !== '/item-groups' && child.path !== '/item-categories' && child.path !== '/specifications' && child.path !== '/requirements' && child.path !== '/enquiries') {
-                                return (
-                                  <div
-                                    key={child.path}
-                                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded text-[12.5px] text-slate-400 opacity-40 cursor-not-allowed whitespace-nowrap"
-                                    title={`${child.label} (Queued for Phase 2)`}
-                                  >
-                                    <ChildIcon size={15} />
-                                    <span>{child.label}</span>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <NavLink
-                                  key={child.path}
-                                  to={child.path}
-                                  className={({ isActive }) =>
-                                    `flex items-center gap-2.5 px-2.5 py-1.5 rounded text-[12.5px] font-medium transition-colors whitespace-nowrap ${
-                                      isActive ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                                    }`
-                                  }
-                                >
-                                  <ChildIcon size={15} />
-                                  <span>{child.label}</span>
-                                </NavLink>
-                              );
-                            })}
+                          <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-500'}`}>
+                            <ChevronDown size={14} />
                           </div>
-                        )}
+                        </button>
+
+                        {/* Accordion Submenu with smooth transition */}
+                        <div 
+                          className={`
+                            ml-4 pl-3 border-l border-slate-800 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out
+                            ${isExpanded ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}
+                          `}
+                        >
+                          {item.children.map((child) => {
+                            const ChildIcon = child.icon;
+                            return (
+                              <NavLink
+                                key={child.path}
+                                to={child.path}
+                                className={({ isActive }) => `
+                                  flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12.5px] font-medium
+                                  transition-all duration-150 relative group
+                                  ${isActive 
+                                    ? 'bg-blue-600 text-white shadow-xs font-semibold' 
+                                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}
+                                `}
+                              >
+                                <ChildIcon size={14} className="shrink-0" />
+                                <span className="truncate">{child.label}</span>
+                              </NavLink>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   }
 
-                  // Standard single navigation item
+                  // Single NavLink item
                   const Icon = item.icon;
 
-                  if (item.phase2 && item.path !== '/employees' && item.path !== '/dashboard' && item.path !== '/clients') {
+                  if (collapsed && !isMobile) {
                     return (
-                      <div
+                      <NavLink
                         key={item.path}
-                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded text-xs opacity-40 cursor-not-allowed whitespace-nowrap ${
-                          collapsed ? 'justify-center' : ''
-                        }`}
-                        title={`${item.label} (Queued for Phase 2)`}
+                        to={item.path}
+                        className={({ isActive }) => `
+                          w-11 h-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200 relative group
+                          ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}
+                        `}
                       >
-                        <Icon size={16} />
-                        {!collapsed && <span>{item.label}</span>}
-                      </div>
+                        <Icon size={18} />
+                        <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-950 text-white text-xs rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 border border-slate-800">
+                          {item.label}
+                        </div>
+                      </NavLink>
                     );
                   }
 
@@ -434,15 +436,16 @@ const MainLayout = () => {
                     <NavLink
                       key={item.path}
                       to={item.path}
-                      title={collapsed ? item.label : undefined}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 px-2.5 py-2 rounded text-xs font-medium transition-colors whitespace-nowrap ${
-                          collapsed ? 'justify-center' : ''
-                        } ${isActive ? 'bg-blue-700 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`
-                      }
+                      className={({ isActive }) => `
+                        flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium
+                        transition-all duration-150 group
+                        ${isActive 
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold' 
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'}
+                      `}
                     >
-                      <Icon size={16} />
-                      {!collapsed && <span>{item.label}</span>}
+                      <Icon size={17} className="text-slate-400 group-hover:text-slate-200" />
+                      <span>{item.label}</span>
                     </NavLink>
                   );
                 })}
@@ -450,72 +453,250 @@ const MainLayout = () => {
             );
           })}
         </nav>
+
+        {/* Sidebar Footer User Info */}
+        {(!collapsed || isMobile) && (
+          <div className="p-3 border-t border-slate-800/80 bg-slate-950/40">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  {user?.username?.charAt(0).toUpperCase() || 'A'}
+                </div>
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-white truncate">
+                    {user?.employee?.fullName || user?.username || 'Admin'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">NETFIL Workspace</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
 
-      {/* Main Content Wrapper */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <header className="h-13 bg-white border-b border-slate-200 flex items-center justify-between px-5 shadow-xs">
+      {/* MAIN LAYOUT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-slate-100">
+        
+        {/* TOP NAVBAR */}
+        <header className="h-16 bg-white border-b border-slate-200/90 flex items-center justify-between px-4 lg:px-6 shadow-2xs z-30 shrink-0">
+          
+          {/* Left Controls: Hamburger + Breadcrumbs */}
           <div className="flex items-center gap-3">
+            
+            {/* Custom Animated Hamburger Button */}
             <button
               type="button"
-              className="p-1.5 rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
               onClick={toggleSidebar}
-              title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              className="p-2 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200/80 hover:text-slate-900 active:scale-95 transition-all cursor-pointer border border-slate-200 shadow-2xs"
+              title={isMobile ? (mobileOpen ? 'Close Menu' : 'Open Menu') : (collapsed ? 'Expand Sidebar' : 'Collapse Sidebar')}
             >
-              <Menu size={18} />
+              {/* Morphing Hamburger / Arrow Icon */}
+              <div className="w-5 h-5 flex flex-col justify-center gap-1">
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-5' : 'w-5'}`} />
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-3' : 'w-4'}`} />
+                <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${collapsed ? 'w-4' : 'w-3'}`} />
+              </div>
             </button>
 
-            {/* Breadcrumb Context */}
-            <nav className="flex items-center gap-1.5 text-xs text-slate-500">
+            {/* Breadcrumb Navigation */}
+            <nav className="hidden sm:flex items-center gap-2 text-xs">
+              <span className="text-slate-400 font-medium">NETFIL</span>
               {breadcrumbs.map((crumb, idx) => (
                 <React.Fragment key={idx}>
-                  {idx > 0 && <ChevronRight size={12} className="text-slate-400" />}
-                  <span className={idx === breadcrumbs.length - 1 ? 'text-slate-900 font-semibold' : 'text-slate-600'}>
+                  <ChevronRight size={13} className="text-slate-300" />
+                  <span className={idx === breadcrumbs.length - 1 ? 'font-semibold text-slate-900' : 'text-slate-500 font-medium'}>
                     {crumb.label}
                   </span>
                 </React.Fragment>
               ))}
             </nav>
+
           </div>
 
-          {/* User Profile & Actions */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-semibold text-xs border border-blue-200">
-              {user?.employee?.fullName
-                ? user.employee.fullName.charAt(0).toUpperCase()
-                : user?.username?.charAt(0).toUpperCase() || 'U'}
-            </div>
-
-            <div className="flex flex-col leading-snug">
-              <span className="font-semibold text-xs text-slate-900">
-                {user?.employee?.fullName || user?.username || 'User'}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                {user?.roles && user.roles.length > 0
-                  ? user.roles.map((r) => (typeof r === 'string' ? r : r.roleName)).join(', ')
-                  : user?.role?.roleName || 'System User'}
-              </span>
-            </div>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={LogOut}
-              onClick={handleLogout}
-              className="ml-2"
-              title="Sign Out"
+          {/* Center Command Quick Search Trigger */}
+          <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-100/90 hover:bg-slate-100 border border-slate-200/80 text-xs text-slate-500 transition-all shadow-2xs group cursor-pointer"
             >
-              Logout
-            </Button>
+              <div className="flex items-center gap-2">
+                <Search size={14} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                <span>Search pages, modules, or BOMs...</span>
+              </div>
+              <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
+                <Command size={10} /> K
+              </div>
+            </button>
           </div>
+
+          {/* Right Controls: Status Badge, Notifications, User Menu */}
+          <div className="flex items-center gap-2.5">
+            
+            {/* System Live Pill */}
+            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-600">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-medium text-[11px]">Factory System Online</span>
+            </div>
+
+            {/* Notification Bell Dropdown */}
+            <div className="relative" ref={notifMenuRef}>
+              <button
+                type="button"
+                onClick={() => setNotifMenuOpen(!notifMenuOpen)}
+                className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors relative cursor-pointer"
+                title="Notifications"
+              >
+                <Bell size={18} />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
+              </button>
+
+              {/* Notification Popover Menu */}
+              {notifMenuOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-fadeIn p-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2">
+                    <span className="font-bold text-xs text-slate-900">System Notifications</span>
+                    <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold">2 New</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2 rounded-lg bg-blue-50/50 border border-blue-100">
+                      <div className="font-medium text-slate-900">Work Order #WO-2026-08</div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Routed to Assembly Store for material issue.</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="font-medium text-slate-900">Quotation Approved</div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Commercial quotation #Q-2026-04 released by Admin.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile Pill & Dropdown */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-semibold flex items-center justify-center text-xs shadow-2xs">
+                  {user?.employee?.fullName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'A'}
+                </div>
+                <div className="hidden sm:flex flex-col text-left leading-tight">
+                  <span className="font-semibold text-xs text-slate-900">
+                    {user?.employee?.fullName || user?.username || 'Admin User'}
+                  </span>
+                  <span className="text-[10.5px] text-slate-500">
+                    {user?.roles && user.roles.length > 0
+                      ? (typeof user.roles[0] === 'string' ? user.roles[0] : user.roles[0].roleName)
+                      : 'System Admin'}
+                  </span>
+                </div>
+                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+              </button>
+
+              {/* User Dropdown Popover */}
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-fadeIn p-1.5 text-xs">
+                  <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                    <p className="font-semibold text-slate-900">{user?.employee?.fullName || user?.username}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{user?.employee?.email || 'admin@netfil-erp.local'}</p>
+                  </div>
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/users'); }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 cursor-pointer"
+                  >
+                    <User size={14} />
+                    <span>User Account & Security</span>
+                  </button>
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/employees'); }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-700 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Building2 size={14} />
+                    <span>Organization Matrix</span>
+                  </button>
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 flex items-center gap-2 font-medium cursor-pointer"
+                  >
+                    <LogOut size={14} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+
         </header>
 
-        {/* Content Body Area */}
-        <main className="p-5 flex-1 overflow-y-auto">
+        {/* PAGE CONTENT CONTAINER */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>
       </div>
+
+      {/* QUICK JUMP COMMAND SEARCH DIALOG (⌘K) */}
+      {searchOpen && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-start justify-center pt-20 p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="p-3 border-b border-slate-200 flex items-center gap-2.5">
+              <Search size={18} className="text-slate-400" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Jump to page or module..."
+                className="w-full text-sm bg-transparent outline-none text-slate-900 placeholder-slate-400"
+              />
+              <button
+                onClick={() => setSearchOpen(false)}
+                className="p-1 rounded text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-2 max-h-72 overflow-y-auto space-y-1">
+              {filteredQuickJumps.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">No matching pages found</div>
+              ) : (
+                filteredQuickJumps.map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchQuery('');
+                      navigate(item.path);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between text-xs text-slate-700 transition-colors cursor-pointer group"
+                  >
+                    <span className="font-semibold">{item.label}</span>
+                    <span className="text-[10.5px] px-2 py-0.5 rounded bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-800">
+                      {item.category}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="p-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex justify-between">
+              <span>Use <kbd className="font-mono bg-white px-1 border rounded">↑</kbd> <kbd className="font-mono bg-white px-1 border rounded">↓</kbd> to navigate</span>
+              <span><kbd className="font-mono bg-white px-1 border rounded">ESC</kbd> to close</span>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

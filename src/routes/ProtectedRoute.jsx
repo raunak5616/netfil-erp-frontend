@@ -8,8 +8,12 @@ const ProtectedRoute = ({ requiredPermission }) => {
 
   if (loading) {
     return (
-      <div className="flex-center" style={{ minHeight: '100vh', flexDirection: 'column', gap: '12px' }}>
-        <div className="btn-primary" style={{ padding: '12px 24px', borderRadius: '20px' }}>Loading NETFIL ERP...</div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+        <img src="/logo.png" alt="Netfil Clean Solutions" className="h-16 w-auto object-contain animate-pulse" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span>Authenticating NETFIL ERP...</span>
+        </div>
       </div>
     );
   }

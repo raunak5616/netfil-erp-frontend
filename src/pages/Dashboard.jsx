@@ -9,13 +9,14 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Welcome, {user?.employee?.fullName || user?.username}!</h1>
           <p className="text-muted" style={{ fontSize: '13px', marginTop: '2px' }}>
             NETFIL ERP Enterprise Control Panel
           </p>
         </div>
+        <img src="/logo.png" alt="Netfil Clean Solutions" className="h-10 w-auto object-contain hidden sm:block bg-white p-1 rounded-lg border border-slate-200 shadow-2xs" />
       </div>
 
       <div className="alert alert-success">
