@@ -2,7 +2,7 @@ import React from 'react';
 
 const Tabs = ({ tabs = [], activeTab, onChange, className = '' }) => {
   return (
-    <div className={`tabs-header ${className}`}>
+    <div className={`flex border-b border-slate-200 gap-0.5 mb-4 ${className}`}>
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.key;
@@ -10,22 +10,21 @@ const Tabs = ({ tabs = [], activeTab, onChange, className = '' }) => {
           <button
             key={tab.key}
             type="button"
-            className={`tab-button ${isActive ? 'active' : ''}`}
+            className={`px-3.5 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer ${
+              isActive
+                ? 'border-blue-700 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
             onClick={() => onChange(tab.key)}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="flex items-center gap-1.5">
               {Icon && <Icon size={14} />}
               <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span
-                  style={{
-                    fontSize: '11px',
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    backgroundColor: isActive ? 'var(--primary-100)' : 'var(--neutral-100)',
-                    color: isActive ? 'var(--primary-800)' : 'var(--neutral-600)',
-                    fontWeight: 600,
-                  }}
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
+                    isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
+                  }`}
                 >
                   {tab.count}
                 </span>

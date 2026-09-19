@@ -217,7 +217,8 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={bom ? `Master BOM — ${bom.bomCode} (v${bom.version})` : 'Master BOM Details'}
-      size="xl"
+      size="2xl"
+      maxWidth="1150px"
     >
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
       {successMsg && <Alert type="success" message={successMsg} onClose={() => setSuccessMsg('')} />}
@@ -436,7 +437,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
                         <option value="">-- Select UOM --</option>
                         {allActiveUoms.map(u => (
                           <option key={u._id} value={u._id}>
-                            {u.unitSymbol || u.unitName}
+                            {u.uomCode ? `${u.uomCode} — ${u.uomName}` : u.uomName || u.uomCode || 'Unit'}
                           </option>
                         ))}
                       </Select>
@@ -533,7 +534,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
                               {it.quantityPerParent}
                             </td>
                             <td style={{ padding: '8px 12px', color: 'var(--neutral-700)' }}>
-                              {typeof it.uom === 'object' ? it.uom?.unitSymbol || it.uom?.unitName : 'Units'}
+                              {typeof it.uom === 'object' ? (it.uom?.uomCode || it.uom?.uomName || 'Units') : 'Units'}
                             </td>
                             <td style={{ padding: '8px 12px', color: 'var(--neutral-600)' }} className="font-mono">
                               {it.positionTagNo || '-'}

@@ -8,25 +8,29 @@ export const FormField = ({
   children,
   fullWidth = false,
   className = '',
+  style,
 }) => {
   return (
-    <div className={`form-group ${fullWidth ? 'full-width' : ''} ${className}`}>
+    <div className={`flex flex-col gap-1 ${fullWidth ? 'col-span-full' : ''} ${className}`} style={style}>
       {label && (
-        <label className="form-label">
-          {label} {required && <span className="required">*</span>}
+        <label className="block font-semibold text-[12.5px] text-slate-700">
+          {label} {required && <span className="text-red-600 ml-0.5">*</span>}
         </label>
       )}
       {children}
-      {error && <span className="form-error">{error}</span>}
-      {!error && helperText && <span className="form-helper">{helperText}</span>}
+      {error && <span className="text-[11.5px] text-red-600 mt-0.5">{error}</span>}
+      {!error && helperText && <span className="text-[11.5px] text-slate-500 mt-0.5">{helperText}</span>}
     </div>
   );
 };
 
+const baseFieldClasses = 'w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none transition-all focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed';
+const errorFieldClasses = 'border-red-600 bg-red-50 focus:ring-red-100';
+
 export const Input = ({ hasError, className = '', ...props }) => {
   return (
     <input
-      className={`form-input ${hasError ? 'has-error' : ''} ${className}`}
+      className={`${baseFieldClasses} ${hasError ? errorFieldClasses : ''} ${className}`}
       {...props}
     />
   );
@@ -35,7 +39,7 @@ export const Input = ({ hasError, className = '', ...props }) => {
 export const Select = ({ hasError, className = '', children, ...props }) => {
   return (
     <select
-      className={`form-select ${hasError ? 'has-error' : ''} ${className}`}
+      className={`${baseFieldClasses} ${hasError ? errorFieldClasses : ''} ${className}`}
       {...props}
     >
       {children}
@@ -46,7 +50,7 @@ export const Select = ({ hasError, className = '', children, ...props }) => {
 export const Textarea = ({ hasError, className = '', rows = 3, ...props }) => {
   return (
     <textarea
-      className={`form-textarea ${hasError ? 'has-error' : ''} ${className}`}
+      className={`${baseFieldClasses} ${hasError ? errorFieldClasses : ''} ${className}`}
       rows={rows}
       {...props}
     />

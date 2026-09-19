@@ -129,7 +129,7 @@ const ItemList = () => {
       header: 'Item Code',
       width: '140px',
       render: (val) => (
-        <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
+        <span className="font-mono font-semibold text-blue-700">
           {val}
         </span>
       ),
@@ -138,14 +138,14 @@ const ItemList = () => {
       key: 'itemName',
       header: 'Item Name',
       width: '220px',
-      render: (val) => <strong style={{ color: 'var(--neutral-900)' }}>{val}</strong>,
+      render: (val) => <strong className="text-slate-900 font-semibold">{val}</strong>,
     },
     {
       key: 'itemGroup',
       header: 'Group',
       width: '140px',
       render: (group) => (
-        <span style={{ fontSize: '12.5px', color: 'var(--neutral-800)', fontWeight: 500 }}>
+        <span className="text-xs text-slate-800 font-medium">
           {group?.groupName || '—'}
         </span>
       ),
@@ -155,7 +155,7 @@ const ItemList = () => {
       header: 'Category',
       width: '140px',
       render: (cat) => (
-        <span style={{ fontSize: '12.5px', color: 'var(--neutral-800)', fontWeight: 500 }}>
+        <span className="text-xs text-slate-800 font-medium">
           {cat?.categoryName || '—'}
         </span>
       ),
@@ -165,7 +165,7 @@ const ItemList = () => {
       header: 'UOM',
       width: '90px',
       render: (uom) => (
-        <span className="font-mono text-muted" style={{ fontWeight: 600 }}>
+        <span className="font-mono text-slate-500 font-semibold text-xs">
           {uom?.uomCode || '—'}
         </span>
       ),
@@ -175,7 +175,7 @@ const ItemList = () => {
       header: 'Default Bin',
       width: '110px',
       render: (bin) => (
-        <span className="font-mono text-muted" style={{ fontSize: '12px' }}>
+        <span className="font-mono text-slate-500 text-xs">
           {bin?.binCode || '—'}
         </span>
       ),
@@ -192,7 +192,7 @@ const ItemList = () => {
       align: 'right',
       width: '130px',
       render: (_, row) => (
-        <div style={{ display: 'inline-flex', gap: '4px' }}>
+        <div className="inline-flex gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -255,20 +255,21 @@ const ItemList = () => {
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
 
-      <div className="card">
+      <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-xs mb-4">
         {/* Toolbar Controls */}
-        <div className="toolbar">
-          <div className="search-input-wrap">
-            <Search size={16} />
+        <div className="flex flex-wrap gap-2.5 items-center mb-3.5">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <Input
               placeholder="Search by item code, name, HSN, group, or category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <Filter size={16} className="text-muted" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter size={16} className="text-slate-400" />
 
             <Select
               value={groupFilter}
@@ -276,7 +277,7 @@ const ItemList = () => {
                 setGroupFilter(e.target.value);
                 setCategoryFilter('all');
               }}
-              style={{ width: '150px' }}
+              className="w-36"
             >
               <option value="all">All Groups</option>
               {itemGroups.map((g) => (
@@ -289,7 +290,7 @@ const ItemList = () => {
             <Select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ width: '150px' }}
+              className="w-36"
             >
               <option value="all">All Categories</option>
               {availableCategoryFilters.map((c) => (
@@ -302,7 +303,7 @@ const ItemList = () => {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '130px' }}
+              className="w-32"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -325,7 +326,7 @@ const ItemList = () => {
         />
 
         {/* Footer Summary */}
-        <div className="flex-between text-muted" style={{ marginTop: '12px', fontSize: '12px' }}>
+        <div className="flex items-center justify-between text-slate-500 mt-3 text-xs">
           <span>Showing {filteredItems.length} of {items.length} total item master records</span>
           <span>Access Level: {canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</span>
         </div>

@@ -225,21 +225,22 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? `Edit Draft Master BOM — ${bom.bomCode}` : 'Create Master BOM'}
-      size="xl"
+      size="2xl"
+      maxWidth="1150px"
     >
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex flex-col gap-4">
 
           {/* Section 1: Header Information */}
-          <div className="card" style={{ padding: '16px', background: '#f8fafc', margin: 0 }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Package size={16} color="var(--primary-600)" />
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-md">
+            <h4 className="mb-3 text-[13.5px] font-semibold text-slate-900 flex items-center gap-2">
+              <Package size={16} className="text-blue-600" />
               Master BOM Header Details
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
               <FormField label="Parent Item (Finished Good)" required>
                 <Select
                   value={parentItem}
@@ -275,7 +276,7 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
               </FormField>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <FormField label="Effective To Date" helpText="Optional expiration date">
                 <Input
                   type="date"
@@ -285,7 +286,7 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
                 />
               </FormField>
 
-              <FormField label="BOM Description" style={{ gridColumn: 'span 2' }}>
+              <FormField label="BOM Description" className="md:col-span-2">
                 <Input
                   placeholder="e.g. Standard 3-Layer Filter Assembly Structure..."
                   value={description}
@@ -295,7 +296,7 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
               </FormField>
             </div>
 
-            <FormField label="Remarks / Manufacturing Notes" style={{ marginTop: '12px' }}>
+            <FormField label="Remarks / Manufacturing Notes" className="mt-3">
               <Textarea
                 rows={2}
                 placeholder="Special assembly instructions or material notes..."
@@ -308,40 +309,39 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
 
           {/* Section 2: Component Builder Grid (Only for Create mode) */}
           {!isEdit && (
-            <div className="card" style={{ padding: '16px', margin: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h4 style={{ margin: 0, fontSize: '13.5px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Layers size={16} color="var(--primary-600)" />
+            <div className="p-4 bg-white border border-slate-200 rounded-md">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-[13.5px] font-semibold text-slate-900 flex items-center gap-2">
+                  <Layers size={16} className="text-blue-600" />
                   BOM Components & Recipe (Required per 1 Parent Unit)
                 </h4>
                 <Button type="button" variant="outline" size="sm" onClick={handleAddComponentRow} disabled={submitting}>
-                  <Plus size={14} style={{ marginRight: '4px' }} /> Add Component
+                  <Plus size={14} className="mr-1" /> Add Component
                 </Button>
               </div>
 
-              <div style={{ overflowX: 'auto', border: '1px solid var(--neutral-200)', borderRadius: '6px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <div className="overflow-x-auto border border-slate-200 rounded-md">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr style={{ background: 'var(--neutral-100)', textTransform: 'uppercase', fontSize: '10.5px', color: 'var(--neutral-600)', textAlign: 'left' }}>
-                      <th style={{ padding: '8px', width: '40px' }}>#</th>
-                      <th style={{ padding: '8px', minWidth: '220px' }}>Component Item *</th>
-                      <th style={{ padding: '8px', width: '100px', textAlign: 'right' }}>Qty / Parent *</th>
-                      <th style={{ padding: '8px', width: '120px' }}>UOM *</th>
-                      <th style={{ padding: '8px', width: '110px' }}>Tag / Position</th>
-                      <th style={{ padding: '8px', width: '100px', textAlign: 'right' }}>Est. Price (₹)</th>
-                      <th style={{ padding: '8px', width: '120px' }}>Remarks</th>
-                      <th style={{ padding: '8px', width: '50px', textAlign: 'center' }}></th>
+                    <tr className="bg-slate-100 uppercase text-[11px] text-slate-600 font-semibold text-left">
+                      <th className="p-2.5 w-10">#</th>
+                      <th className="p-2.5 min-w-[280px]">Component Item *</th>
+                      <th className="p-2.5 w-30 text-right">Qty / Parent *</th>
+                      <th className="p-2.5 w-40">UOM *</th>
+                      <th className="p-2.5 w-32">Tag / Position</th>
+                      <th className="p-2.5 w-32 text-right">Est. Price (₹)</th>
+                      <th className="p-2.5 w-44">Remarks</th>
+                      <th className="p-2.5 w-12 text-center"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {components.map((comp, idx) => (
-                      <tr key={comp.tempId || idx} style={{ borderBottom: '1px solid var(--neutral-100)' }}>
-                        <td style={{ padding: '6px 8px', color: 'var(--neutral-500)', verticalAlign: 'middle' }}>{idx + 1}</td>
-                        <td style={{ padding: '6px 8px' }}>
+                      <tr key={comp.tempId || idx} className="border-b border-slate-100">
+                        <td className="p-2 text-slate-500 align-middle font-semibold">{idx + 1}</td>
+                        <td className="p-2">
                           <Select
                             value={comp.componentItem}
                             onChange={(e) => handleComponentItemChange(idx, e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px' }}
                             required
                           >
                             <option value="">-- Select Component Item --</option>
@@ -354,65 +354,62 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
                               ))}
                           </Select>
                         </td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td className="p-2">
                           <Input
                             type="number"
                             step="0.000001"
                             min="0.000001"
                             value={comp.quantityPerParent}
                             onChange={(e) => handleComponentFieldChange(idx, 'quantityPerParent', e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px', textAlign: 'right' }}
+                            className="text-right"
                             required
                           />
                         </td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td className="p-2">
                           <Select
                             value={comp.uom}
                             onChange={(e) => handleComponentFieldChange(idx, 'uom', e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px' }}
                             required
                           >
                             <option value="">-- Select UOM --</option>
                             {uoms.map(u => (
                               <option key={u._id} value={u._id}>
-                                {u.unitSymbol || u.unitName}
+                                {u.uomCode ? `${u.uomCode} — ${u.uomName}` : u.uomName || u.uomCode || 'Unit'}
                               </option>
                             ))}
                           </Select>
                         </td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td className="p-2">
                           <Input
                             placeholder="e.g. POS-A"
                             value={comp.positionTagNo}
                             onChange={(e) => handleComponentFieldChange(idx, 'positionTagNo', e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px' }}
                           />
                         </td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td className="p-2">
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={comp.price}
                             onChange={(e) => handleComponentFieldChange(idx, 'price', e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px', textAlign: 'right' }}
+                            className="text-right"
                           />
                         </td>
-                        <td style={{ padding: '6px 8px' }}>
+                        <td className="p-2">
                           <Input
                             placeholder="Notes..."
                             value={comp.remarks}
                             onChange={(e) => handleComponentFieldChange(idx, 'remarks', e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 6px' }}
                           />
                         </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <td className="p-2 text-center align-middle">
                           <Button
                             type="button"
                             variant="ghost"
                             size="xs"
                             onClick={() => handleRemoveComponentRow(idx)}
-                            style={{ color: 'var(--danger-600)' }}
+                            className="text-red-600 hover:text-red-700"
                             title="Remove Component"
                           >
                             <Trash2 size={14} />
@@ -427,7 +424,7 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
           )}
 
           {/* Action Footer */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--neutral-200)' }}>
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 mt-2">
             <Button variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>

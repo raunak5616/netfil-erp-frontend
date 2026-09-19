@@ -3,31 +3,37 @@ import React from 'react';
 const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
   const normalizedStatus = (status || 'neutral').toLowerCase().replace(/[\s_]+/g, '-');
   
+  const greenBadge = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  const redBadge = 'bg-red-50 text-red-800 border-red-200';
+  const amberBadge = 'bg-amber-50 text-amber-800 border-amber-200';
+  const skyBadge = 'bg-sky-50 text-sky-700 border-sky-200';
+  const neutralBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+
   const statusMap = {
-    'active': 'status-badge-active',
-    'approved': 'status-badge-approved',
-    'completed': 'status-badge-completed',
-    'confirmed': 'status-badge-approved',
-    'released': 'status-badge-approved',
-    'won': 'status-badge-approved',
-    'inactive': 'status-badge-inactive',
-    'rejected': 'status-badge-rejected',
-    'cancelled': 'status-badge-cancelled',
-    'pending': 'status-badge-pending',
-    'draft': 'status-badge-draft',
-    'warning': 'status-badge-warning',
-    'in-progress': 'status-badge-in-progress',
-    'info': 'status-badge-info',
-    'sent': 'status-badge-info',
-    'quoted': 'status-badge-info'
+    'active': greenBadge,
+    'approved': greenBadge,
+    'completed': greenBadge,
+    'confirmed': greenBadge,
+    'released': greenBadge,
+    'won': greenBadge,
+    'inactive': redBadge,
+    'rejected': redBadge,
+    'cancelled': redBadge,
+    'pending': amberBadge,
+    'draft': amberBadge,
+    'warning': amberBadge,
+    'in-progress': skyBadge,
+    'info': skyBadge,
+    'sent': skyBadge,
+    'quoted': skyBadge
   };
   
-  const statusClass = statusMap[normalizedStatus] || 'status-badge-neutral';
-
+  const statusClass = statusMap[normalizedStatus] || neutralBadge;
   const displayLabel = label || status?.replace(/_/g, ' ') || 'Unknown';
+  const baseClasses = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-semibold leading-snug capitalize border';
 
   return (
-    <span className={`status-badge ${statusClass} ${className}`} style={{ textTransform: 'capitalize' }}>
+    <span className={`${baseClasses} ${statusClass} ${className}`}>
       {displayLabel}
     </span>
   );

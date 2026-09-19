@@ -275,7 +275,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--neutral-600)' }}>
-                          {typeof item.uom === 'object' ? item.uom?.unitSymbol || item.uom?.unitName : 'Units'}
+                          {typeof item.uom === 'object' ? item.uom?.uomCode || item.uom?.uomName || item.uom?.unitSymbol || item.uom?.unitName : 'Units'}
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                           ₹{(item.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}

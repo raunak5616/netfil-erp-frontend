@@ -33,24 +33,16 @@ const ConfirmDialog = ({
         </>
       }
     >
-      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+      <div className="flex gap-3.5 items-start">
         <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: variant === 'danger' ? 'var(--danger-50)' : 'var(--warning-50)',
-            color: variant === 'danger' ? 'var(--danger-700)' : 'var(--warning-700)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
+          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+            variant === 'danger' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+          }`}
         >
           <AlertTriangle size={18} />
         </div>
         <div>
-          <p style={{ fontSize: '13.5px', color: 'var(--neutral-800)', lineHeight: '1.4' }}>
+          <p className="text-xs text-slate-800 leading-relaxed">
             {message}
           </p>
         </div>

@@ -110,7 +110,7 @@ const UOMFormModal = ({ uom, isOpen, onClose, onSuccess }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? `Edit UOM (${formData.uomCode})` : 'Add New Unit of Measure (UOM)'}
-      maxWidth="500px"
+      size="md"
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
@@ -122,15 +122,15 @@ const UOMFormModal = ({ uom, isOpen, onClose, onSuccess }) => {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="form-grid">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {errorMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="sm:col-span-2">
             <Alert type="danger" message={errorMessage} onClose={() => setErrorMessage('')} />
           </div>
         )}
 
         {successMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="sm:col-span-2">
             <Alert type="success" message={successMessage} />
           </div>
         )}

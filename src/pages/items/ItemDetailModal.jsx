@@ -48,7 +48,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={`Item Details — ${item.itemCode}`}
-      maxWidth="760px"
+      size="2xl"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -69,26 +69,18 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
         </>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div className="flex flex-col gap-3.5">
         {/* Navigation Tabs Header */}
-        <div style={{ borderBottom: '1px solid var(--neutral-200)', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="border-b border-slate-200 mb-1">
+          <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => setActiveTab('general')}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === 'general' ? '2px solid var(--primary-600)' : '2px solid transparent',
-                color: activeTab === 'general' ? 'var(--primary-700)' : 'var(--neutral-600)',
-                fontWeight: activeTab === 'general' ? 600 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className={`px-3 py-2 text-xs font-medium border-b-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'general'
+                  ? 'border-primary-600 text-primary-700 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Package size={14} /> General
             </button>
@@ -96,19 +88,11 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             <button
               type="button"
               onClick={() => setActiveTab('specifications')}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === 'specifications' ? '2px solid var(--primary-600)' : '2px solid transparent',
-                color: activeTab === 'specifications' ? 'var(--primary-700)' : 'var(--neutral-600)',
-                fontWeight: activeTab === 'specifications' ? 600 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className={`px-3 py-2 text-xs font-medium border-b-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'specifications'
+                  ? 'border-primary-600 text-primary-700 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Sliders size={14} /> Specifications ({specifications.length})
             </button>
@@ -116,19 +100,11 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             <button
               type="button"
               onClick={() => setActiveTab('uom')}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === 'uom' ? '2px solid var(--primary-600)' : '2px solid transparent',
-                color: activeTab === 'uom' ? 'var(--primary-700)' : 'var(--neutral-600)',
-                fontWeight: activeTab === 'uom' ? 600 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className={`px-3 py-2 text-xs font-medium border-b-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'uom'
+                  ? 'border-primary-600 text-primary-700 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Scale size={14} /> UOM & Units
             </button>
@@ -136,19 +112,11 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             <button
               type="button"
               onClick={() => setActiveTab('inventory')}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === 'inventory' ? '2px solid var(--primary-600)' : '2px solid transparent',
-                color: activeTab === 'inventory' ? 'var(--primary-700)' : 'var(--neutral-600)',
-                fontWeight: activeTab === 'inventory' ? 600 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className={`px-3 py-2 text-xs font-medium border-b-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'inventory'
+                  ? 'border-primary-600 text-primary-700 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Layers size={14} /> Inventory Controls
             </button>
@@ -156,19 +124,11 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             <button
               type="button"
               onClick={() => setActiveTab('accounting_history')}
-              style={{
-                padding: '8px 12px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === 'accounting_history' ? '2px solid var(--primary-600)' : '2px solid transparent',
-                color: activeTab === 'accounting_history' ? 'var(--primary-700)' : 'var(--neutral-600)',
-                fontWeight: activeTab === 'accounting_history' ? 600 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              className={`px-3 py-2 text-xs font-medium border-b-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'accounting_history'
+                  ? 'border-primary-600 text-primary-700 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
             >
               <History size={14} /> Accounting & History
             </button>
@@ -177,76 +137,66 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* TAB 1: GENERAL */}
         {activeTab === 'general' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: '12px',
-                backgroundColor: 'var(--neutral-50)',
-                padding: '14px',
-                borderRadius: '6px',
-                border: '1px solid var(--neutral-200)'
-              }}
-            >
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-md border border-slate-200">
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Code
                 </div>
-                <div className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary-700)', marginTop: '2px' }}>
+                <div className="font-mono text-sm font-bold text-primary-700 mt-0.5">
                   {item.itemCode}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Name
                 </div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--neutral-900)', marginTop: '2px' }}>
+                <div className="text-sm font-semibold text-slate-900 mt-0.5">
                   {item.itemName}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold mb-1">
                   Account Status
                 </div>
                 <StatusBadge status={item.status} />
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Group
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--neutral-800)', marginTop: '2px' }}>
+                <div className="text-xs font-semibold text-slate-800 mt-0.5">
                   {item.itemGroup?.groupName ? `${item.itemGroup.groupName} (${item.itemGroup.groupCode})` : '—'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Category
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--neutral-800)', marginTop: '2px' }}>
+                <div className="text-xs font-semibold text-slate-800 mt-0.5">
                   {item.itemCategory?.categoryName ? `${item.itemCategory.categoryName} (${item.itemCategory.categoryCode})` : '—'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Type
                 </div>
-                <div style={{ fontSize: '13px', textTransform: 'capitalize', color: 'var(--neutral-800)', marginTop: '2px' }}>
+                <div className="text-xs capitalize text-slate-800 mt-0.5">
                   {item.itemType || 'Standard'}
                 </div>
               </div>
             </div>
 
-            <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '12px', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>
+            <div className="border border-slate-200 rounded-md p-3 bg-white">
+              <div className="text-[11px] text-slate-500 uppercase font-semibold mb-1">
                 Item Description & Scope
               </div>
-              <div style={{ fontSize: '13px', color: item.description ? 'var(--neutral-800)' : 'var(--neutral-400)' }}>
+              <div className={`text-xs ${item.description ? 'text-slate-800' : 'text-slate-400'}`}>
                 {item.description || 'No detailed description specified.'}
               </div>
             </div>
@@ -255,68 +205,68 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* TAB 2: SPECIFICATIONS */}
         {activeTab === 'specifications' && (
-          <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '12px', backgroundColor: '#ffffff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="border border-slate-200 rounded-md p-3 bg-white">
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-xs font-semibold text-primary-800 flex items-center gap-1.5">
                 <Sliders size={14} /> Category Technical Specifications ({specifications.length})
               </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }}>
+              <span className="text-[11.5px] text-slate-500">
                 Category: {item.itemCategory?.categoryName || 'General'}
               </span>
             </div>
 
             {loadingSpecs ? (
-              <div style={{ fontSize: '12px', color: 'var(--neutral-500)', padding: '8px' }}>
+              <div className="text-xs text-slate-500 p-2">
                 Loading category specifications...
               </div>
             ) : specifications.length === 0 ? (
-              <div style={{ fontSize: '12px', color: 'var(--neutral-400)', padding: '12px', textAlign: 'center', backgroundColor: 'var(--neutral-50)', borderRadius: '4px' }}>
+              <div className="text-xs text-slate-400 p-3 text-center bg-slate-50 rounded">
                 No specification parameters configured for this item.
               </div>
             ) : (
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
+              <div className="overflow-x-auto rounded-md border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-xs text-left">
+                  <thead className="bg-slate-50 font-semibold text-slate-700">
                     <tr>
-                      <th style={{ width: '50px' }}>Order</th>
-                      <th>Code</th>
-                      <th>Specification Name</th>
-                      <th>Configured Value</th>
-                      <th>Unit</th>
-                      <th>Flags</th>
+                      <th className="px-3 py-2 w-12">Order</th>
+                      <th className="px-3 py-2">Code</th>
+                      <th className="px-3 py-2">Specification Name</th>
+                      <th className="px-3 py-2">Configured Value</th>
+                      <th className="px-3 py-2">Unit</th>
+                      <th className="px-3 py-2">Flags</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-200 bg-white">
                     {specifications.map((s, idx) => {
                       const spec = s.specification;
                       const uomCode = spec?.unit?.uomCode || spec?.unit?.uomName || '';
                       const displayVal = typeof s.value === 'boolean' ? (s.value ? 'Yes / True' : 'No / False') : String(s.value);
                       return (
-                        <tr key={s._id || idx}>
-                          <td style={{ fontWeight: 600, color: 'var(--neutral-600)' }}>{s.printSerial ?? (idx + 1)}</td>
-                          <td className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
+                        <tr key={s._id || idx} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 font-semibold text-slate-600">{s.printSerial ?? (idx + 1)}</td>
+                          <td className="px-3 py-2 font-mono font-semibold text-primary-700">
                             {spec?.specificationCode || 'N/A'}
                           </td>
-                          <td style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                          <td className="px-3 py-2 font-semibold text-slate-900">
                             {spec?.specificationName || 'Specification'}
                           </td>
-                          <td>
-                            <span style={{ fontWeight: 700, color: 'var(--primary-800)', fontSize: '13px' }}>
+                          <td className="px-3 py-2">
+                            <span className="font-bold text-primary-800 text-xs">
                               {displayVal}
                             </span>
                           </td>
-                          <td>
+                          <td className="px-3 py-2">
                             {uomCode ? (
-                              <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--neutral-700)', padding: '1px 6px', background: 'var(--neutral-100)', borderRadius: '3px' }}>
+                              <span className="text-[11.5px] font-semibold text-slate-700 px-1.5 py-0.5 bg-slate-100 rounded">
                                 {uomCode}
                               </span>
                             ) : '—'}
                           </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              {s.isApply && <span className="badge badge-primary" style={{ fontSize: '10px' }}>Apply</span>}
-                              {s.isFix && <span className="badge badge-approved" style={{ fontSize: '10px' }}>Fix</span>}
-                              {!s.isApply && !s.isFix && <span style={{ color: 'var(--neutral-400)', fontSize: '11px' }}>—</span>}
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1">
+                              {s.isApply && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary-100 text-primary-800">Apply</span>}
+                              {s.isFix && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-100 text-emerald-800">Fix</span>}
+                              {!s.isApply && !s.isFix && <span className="text-slate-400 text-xs">—</span>}
                             </div>
                           </td>
                         </tr>
@@ -331,38 +281,38 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* TAB 3: UOM & UNITS */}
         {activeTab === 'uom' && (
-          <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', backgroundColor: '#ffffff' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', marginBottom: '10px' }}>
+          <div className="border border-slate-200 rounded-md p-3.5 bg-white">
+            <div className="text-xs font-semibold text-primary-800 mb-2.5">
               Units of Measure & Conversion Factors
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', fontSize: '13px' }}>
-              <div style={{ backgroundColor: 'var(--neutral-50)', padding: '10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Primary Inventory UOM</span>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary-800)', marginTop: '2px' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+              <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                <span className="text-[11px] uppercase font-semibold text-slate-500">Primary Inventory UOM</span>
+                <div className="font-bold text-sm text-primary-800 mt-0.5">
                   {item.inventoryUom?.uomCode} — {item.inventoryUom?.uomName}
                 </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)', marginTop: '2px' }}>
+                <div className="text-[11.5px] text-slate-500 mt-0.5">
                   Dimension: {item.inventoryUom?.dimension || 'COUNT'}
                 </div>
               </div>
 
-              <div style={{ backgroundColor: 'var(--neutral-50)', padding: '10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Purchase UOM</span>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--neutral-900)', marginTop: '2px' }}>
+              <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                <span className="text-[11px] uppercase font-semibold text-slate-500">Purchase UOM</span>
+                <div className="font-bold text-sm text-slate-900 mt-0.5">
                   {item.purchaseUom?.uomCode || item.inventoryUom?.uomCode}
                 </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)', marginTop: '2px' }}>
-                  Conversion: 1 Purchase Unit = <strong>{item.itemPerPurchaseUnit || 1}</strong> Inv Units
+                <div className="text-[11.5px] text-slate-600 mt-0.5">
+                  Conversion: 1 Purchase Unit = <strong className="font-semibold text-slate-900">{item.itemPerPurchaseUnit || 1}</strong> Inv Units
                 </div>
               </div>
 
-              <div style={{ backgroundColor: 'var(--neutral-50)', padding: '10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Sales UOM</span>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--neutral-900)', marginTop: '2px' }}>
+              <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                <span className="text-[11px] uppercase font-semibold text-slate-500">Sales UOM</span>
+                <div className="font-bold text-sm text-slate-900 mt-0.5">
                   {item.salesUom?.uomCode || item.inventoryUom?.uomCode}
                 </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)', marginTop: '2px' }}>
-                  Conversion: 1 Sales Unit = <strong>{item.itemPerSalesUnit || 1}</strong> Inv Units
+                <div className="text-[11.5px] text-slate-600 mt-0.5">
+                  Conversion: 1 Sales Unit = <strong className="font-semibold text-slate-900">{item.itemPerSalesUnit || 1}</strong> Inv Units
                 </div>
               </div>
             </div>
@@ -371,39 +321,39 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* TAB 4: INVENTORY CONTROLS */}
         {activeTab === 'inventory' && (
-          <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', backgroundColor: '#ffffff' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', marginBottom: '10px' }}>
+          <div className="border border-slate-200 rounded-md p-3.5 bg-white">
+            <div className="text-xs font-semibold text-primary-800 mb-2.5">
               Inventory Control Thresholds & Storage Bin
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', fontSize: '12.5px' }}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Reorder Level:</span>
-                <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--neutral-900)' }}>{item.reorderLevel ?? 0}</div>
+                <span className="text-slate-500 text-[11px]">Reorder Level:</span>
+                <div className="font-bold text-sm text-slate-900">{item.reorderLevel ?? 0}</div>
               </div>
 
               <div>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Reorder Quantity:</span>
-                <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--neutral-900)' }}>{item.reorderQty ?? 0}</div>
+                <span className="text-slate-500 text-[11px]">Reorder Quantity:</span>
+                <div className="font-bold text-sm text-slate-900">{item.reorderQty ?? 0}</div>
               </div>
 
               <div>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Minimum Stock:</span>
-                <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--neutral-900)' }}>{item.minInventory ?? 0}</div>
+                <span className="text-slate-500 text-[11px]">Minimum Stock:</span>
+                <div className="font-bold text-sm text-slate-900">{item.minInventory ?? 0}</div>
               </div>
 
               <div>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Maximum Stock:</span>
-                <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--neutral-900)' }}>{item.maxInventory ?? 0}</div>
+                <span className="text-slate-500 text-[11px]">Maximum Stock:</span>
+                <div className="font-bold text-sm text-slate-900">{item.maxInventory ?? 0}</div>
               </div>
 
               <div>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Lead Time (Days):</span>
-                <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--neutral-900)' }}>{item.leadTimeDays ?? 0} days</div>
+                <span className="text-slate-500 text-[11px]">Lead Time (Days):</span>
+                <div className="font-bold text-sm text-slate-900">{item.leadTimeDays ?? 0} days</div>
               </div>
 
-              <div style={{ gridColumn: 'span 3' }}>
-                <span className="text-muted" style={{ fontSize: '11px' }}>Default Storage Location / Bin:</span>
-                <div style={{ fontWeight: 600, color: item.defaultBin ? 'var(--primary-800)' : 'var(--neutral-500)' }}>
+              <div className="col-span-2 sm:col-span-3">
+                <span className="text-slate-500 text-[11px]">Default Storage Location / Bin:</span>
+                <div className={`font-semibold ${item.defaultBin ? 'text-primary-800' : 'text-slate-500'}`}>
                   {item.defaultBin?.binCode ? `${item.defaultBin.binCode} — ${item.defaultBin.binName}` : 'Unassigned / Default Warehouse'}
                 </div>
               </div>
@@ -413,30 +363,30 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* TAB 5: ACCOUNTING & HISTORY */}
         {activeTab === 'accounting_history' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', marginBottom: '8px' }}>
+          <div className="flex flex-col gap-3">
+            <div className="border border-slate-200 rounded-md p-3.5 bg-white">
+              <div className="text-xs font-semibold text-primary-800 mb-2">
                 Accounting & Tax Identification
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', fontSize: '13px' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>HSN / SAC Code:</span>
-                  <div className="font-mono" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary-700)' }}>
+                  <span className="text-slate-500 text-[11px]">HSN / SAC Code:</span>
+                  <div className="font-mono font-bold text-sm text-primary-700">
                     {item.hsnCode || 'Unassigned'}
                   </div>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-600)', alignSelf: 'center' }}>
+                <div className="sm:col-span-2 text-xs text-slate-600 self-center">
                   Harmonized System Nomenclature (HSN) code for GST/customs classification.
                 </div>
               </div>
             </div>
 
             {/* Audit Timestamps */}
-            <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '14px', backgroundColor: 'var(--neutral-50)' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-800)', marginBottom: '8px' }}>
+            <div className="border border-slate-200 rounded-md p-3.5 bg-slate-50">
+              <div className="text-xs font-semibold text-slate-800 mb-2">
                 System Audit Log
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12.5px', color: 'var(--neutral-700)' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
                 <div>
                   <strong>Created At:</strong> {formatDate(item.createdAt)}
                 </div>
@@ -447,7 +397,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             </div>
 
             {/* Backend Capabilities Note */}
-            <div style={{ fontSize: '12px', color: 'var(--neutral-500)', fontStyle: 'italic', padding: '6px 8px' }}>
+            <div className="text-xs text-slate-500 italic px-2 py-1">
               Note: Dedicated Purchase/Sales GL accounts and Item attachments are managed via transaction vouchers in NETFIL ERP.
             </div>
           </div>

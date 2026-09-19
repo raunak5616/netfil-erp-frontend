@@ -10,21 +10,21 @@ const PageHeader = ({
   children,
 }) => {
   return (
-    <div style={{ marginBottom: '16px' }}>
+    <div className="mb-4">
       {/* Breadcrumb Trail */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="breadcrumb" style={{ marginBottom: '6px' }}>
+        <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
           {breadcrumbs.map((crumb, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
             return (
               <React.Fragment key={idx}>
-                {idx > 0 && <ChevronRight size={12} color="var(--neutral-400)" />}
+                {idx > 0 && <ChevronRight size={12} className="text-slate-400" />}
                 {isLast || !crumb.path ? (
-                  <span className={`breadcrumb-item ${isLast ? 'active' : ''}`}>
+                  <span className={isLast ? 'text-slate-900 font-semibold' : 'text-slate-600'}>
                     {crumb.label}
                   </span>
                 ) : (
-                  <Link to={crumb.path} className="breadcrumb-item">
+                  <Link to={crumb.path} className="text-slate-600 hover:text-slate-900 transition-colors">
                     {crumb.label}
                   </Link>
                 )}
@@ -35,14 +35,14 @@ const PageHeader = ({
       )}
 
       {/* Main Page Title Header */}
-      <div className="page-header-container">
+      <div className="flex justify-between items-start gap-4 flex-wrap">
         <div>
-          <h1 className="page-title">{title}</h1>
-          {description && <p className="page-description">{description}</p>}
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">{title}</h1>
+          {description && <p className="text-[12.5px] text-slate-500 mt-0.5">{description}</p>}
         </div>
 
         {(actions || children) && (
-          <div className="page-actions">
+          <div className="flex items-center gap-2 flex-wrap">
             {actions}
             {children}
           </div>

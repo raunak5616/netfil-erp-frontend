@@ -359,84 +359,56 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         </>
       }
     >
-      <div style={{ marginBottom: '16px', borderBottom: '1px solid var(--neutral-200)' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="mb-4 border-b border-slate-200">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('basic')}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'basic' ? '2px solid var(--primary-600)' : '2px solid transparent',
-              color: activeTab === 'basic' ? 'var(--primary-700)' : 'var(--neutral-600)',
-              fontWeight: activeTab === 'basic' ? 600 : 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer ${
+              activeTab === 'basic' ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
           >
             1. Basic Info
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('uom')}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'uom' ? '2px solid var(--primary-600)' : '2px solid transparent',
-              color: activeTab === 'uom' ? 'var(--primary-700)' : 'var(--neutral-600)',
-              fontWeight: activeTab === 'uom' ? 600 : 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer ${
+              activeTab === 'uom' ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
           >
             2. UOM & Units
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('inventory')}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'inventory' ? '2px solid var(--primary-600)' : '2px solid transparent',
-              color: activeTab === 'inventory' ? 'var(--primary-700)' : 'var(--neutral-600)',
-              fontWeight: activeTab === 'inventory' ? 600 : 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer ${
+              activeTab === 'inventory' ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
           >
             3. Inventory Controls
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('specifications')}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'specifications' ? '2px solid var(--primary-600)' : '2px solid transparent',
-              color: activeTab === 'specifications' ? 'var(--primary-700)' : 'var(--neutral-600)',
-              fontWeight: activeTab === 'specifications' ? 600 : 500,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer ${
+              activeTab === 'specifications' ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
           >
             4. Specifications {categorySpecs.length > 0 && `(${categorySpecs.length})`}
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="form-grid">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {errorMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="col-span-full">
             <Alert type="danger" message={errorMessage} onClose={() => setErrorMessage('')} />
           </div>
         )}
 
         {successMessage && (
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="col-span-full">
             <Alert type="success" message={successMessage} />
           </div>
         )}
@@ -693,16 +665,16 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
 
         {/* TAB 4: SPECIFICATIONS */}
         {activeTab === 'specifications' && (
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="col-span-full">
             {!formData.itemCategory ? (
               <Alert type="info" message="Please select an Item Category in the 'Basic Info' tab to configure category specifications." />
             ) : categorySpecs.length === 0 ? (
-              <div style={{ padding: '16px', textTransform: 'none', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px', backgroundColor: 'var(--neutral-50)', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
+              <div className="p-4 text-center text-slate-500 text-xs bg-slate-50 rounded-md border border-slate-200">
                 No specification parameters are configured for the selected Item Category.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-600)', marginBottom: '4px' }}>
+              <div className="flex flex-col gap-3">
+                <div className="text-xs text-slate-600 mb-1">
                   Category Specifications for selected category ({categorySpecs.length} parameters):
                 </div>
 
@@ -713,26 +685,17 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                   return (
                     <div
                       key={specId}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1.2fr 1.5fr 70px 70px 70px',
-                        gap: '10px',
-                        alignItems: 'center',
-                        backgroundColor: '#ffffff',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--neutral-200)'
-                      }}
+                      className="grid grid-cols-1 md:grid-cols-[1.2fr_1.5fr_70px_70px_70px] gap-2.5 items-center bg-white p-2.5 rounded-md border border-slate-200"
                     >
                       <div>
-                        <strong style={{ fontSize: '13px', color: 'var(--neutral-900)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <strong className="text-xs font-semibold text-slate-900 inline-flex items-center gap-1">
                           {spec.specificationName}
-                          {spec.isRequiredCategorySpec && <span style={{ color: 'var(--danger-600)', fontWeight: 700 }}>*</span>}
+                          {spec.isRequiredCategorySpec && <span className="text-red-600 font-bold">*</span>}
                         </strong>
-                        <div style={{ fontSize: '11px', color: 'var(--neutral-500)', display: 'flex', alignItems: 'center', gap: '6px' }} className="font-mono">
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-mono">
                           <span>{spec.specificationCode} ({spec.dataType})</span>
                           {spec.unit && (
-                            <span style={{ backgroundColor: 'var(--neutral-100)', color: 'var(--neutral-700)', padding: '1px 5px', borderRadius: '3px', fontSize: '10.5px', fontWeight: 600 }}>
+                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10.5px] font-semibold">
                               {spec.unit?.uomCode || spec.unit?.uomName || spec.unit}
                             </span>
                           )}
@@ -783,25 +746,25 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                       </div>
 
                       {/* isApply Checkbox */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
+                      <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={!!currentData.isApply}
                           onChange={(e) => handleSpecChange(specId, 'isApply', e.target.checked)}
                           disabled={submitting}
-                          style={{ accentColor: 'var(--primary-600)' }}
+                          className="accent-blue-600 cursor-pointer"
                         />
                         <span>Apply</span>
                       </label>
 
                       {/* isFix Checkbox */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}>
+                      <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={!!currentData.isFix}
                           onChange={(e) => handleSpecChange(specId, 'isFix', e.target.checked)}
                           disabled={submitting}
-                          style={{ accentColor: 'var(--primary-600)' }}
+                          className="accent-blue-600 cursor-pointer"
                         />
                         <span>Fix</span>
                       </label>
@@ -814,7 +777,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                           value={currentData.printSerial ?? 0}
                           onChange={(e) => handleSpecChange(specId, 'printSerial', e.target.value)}
                           disabled={submitting}
-                          style={{ fontSize: '12px', padding: '4px 6px' }}
                           title="Print Serial Display Order"
                         />
                       </div>

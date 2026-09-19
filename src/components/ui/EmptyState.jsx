@@ -9,17 +9,17 @@ const EmptyState = ({
   className = '',
 }) => {
   return (
-    <div className={`empty-state ${className}`}>
-      <Icon size={36} />
-      <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--neutral-800)', marginTop: '6px' }}>
+    <div className={`text-center py-9 px-5 text-slate-500 flex flex-col items-center justify-center ${className}`}>
+      <Icon size={36} className="mx-auto text-slate-400 mb-2 opacity-50" />
+      <p className="font-semibold text-sm text-slate-800 mt-1.5">
         {title}
       </p>
       {description && (
-        <p style={{ fontSize: '12.5px', color: 'var(--neutral-500)', marginTop: '4px', maxWidth: '360px', margin: '4px auto 0' }}>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
           {description}
         </p>
       )}
-      {action && <div style={{ marginTop: '14px' }}>{action}</div>}
+      {action && <div className="mt-3.5">{action}</div>}
     </div>
   );
 };

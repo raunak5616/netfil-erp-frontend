@@ -82,16 +82,16 @@ const UOMList = () => {
     });
   }, [uoms, searchTerm, statusFilter, dimensionFilter]);
 
-  const getDimensionStyle = (dim) => {
+  const getDimensionClass = (dim) => {
     switch (dim) {
       case 'WEIGHT':
-        return { backgroundColor: '#fffbe6', color: '#873800', borderColor: '#ffe58f' };
+        return 'bg-amber-50 text-amber-900 border-amber-200';
       case 'VOLUME':
-        return { backgroundColor: '#e6f7ff', color: '#0050b3', borderColor: '#91d5ff' };
+        return 'bg-sky-50 text-sky-900 border-sky-200';
       case 'LENGTH':
-        return { backgroundColor: '#f9f0ff', color: '#531dab', borderColor: '#d3ade6' };
+        return 'bg-purple-50 text-purple-900 border-purple-200';
       default: // COUNT
-        return { backgroundColor: '#f6ffed', color: '#237804', borderColor: '#b7eb8f' };
+        return 'bg-emerald-50 text-emerald-900 border-emerald-200';
     }
   };
 
@@ -101,7 +101,7 @@ const UOMList = () => {
       header: 'Code',
       width: '120px',
       render: (val) => (
-        <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
+        <span className="font-mono font-semibold text-primary-700">
           {val}
         </span>
       ),
@@ -110,27 +110,16 @@ const UOMList = () => {
       key: 'uomName',
       header: 'UOM Name',
       width: '220px',
-      render: (val) => <strong style={{ color: 'var(--neutral-900)' }}>{val}</strong>,
+      render: (val) => <strong className="font-semibold text-slate-900">{val}</strong>,
     },
     {
       key: 'dimension',
       header: 'Dimension',
       width: '140px',
       render: (val) => {
-        const style = getDimensionStyle(val);
+        const dimClass = getDimensionClass(val);
         return (
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              fontSize: '11.5px',
-              fontWeight: 600,
-              border: `1px solid ${style.borderColor}`,
-              backgroundColor: style.backgroundColor,
-              color: style.color
-            }}
-          >
+          <span className={`inline-block px-2 py-0.5 rounded text-[11.5px] font-semibold border ${dimClass}`}>
             {val}
           </span>
         );
@@ -141,7 +130,7 @@ const UOMList = () => {
       header: 'Description',
       width: '240px',
       render: (val) => (
-        <span style={{ color: val ? 'var(--neutral-800)' : 'var(--neutral-400)', fontSize: '13px' }}>
+        <span className={`text-xs ${val ? 'text-slate-800' : 'text-slate-400'}`}>
           {val || '—'}
         </span>
       ),
@@ -158,7 +147,7 @@ const UOMList = () => {
       align: 'right',
       width: '140px',
       render: (_, row) => (
-        <div style={{ display: 'inline-flex', gap: '4px' }}>
+        <div className="inline-flex gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -189,7 +178,7 @@ const UOMList = () => {
   ];
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Units of Measure (UOM)"
         description="Manage system measurement units and physical dimension classifications."
@@ -221,25 +210,26 @@ const UOMList = () => {
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
 
-      <div className="card">
+      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
         {/* Toolbar Controls */}
-        <div className="toolbar">
-          <div className="search-input-wrap">
-            <Search size={16} />
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-md mb-4">
+          <div className="relative flex-1 w-full">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
+              className="pl-9"
               placeholder="Search by UOM code, name, dimension, or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <Filter size={16} className="text-muted" />
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+            <Filter size={16} className="text-slate-400 hidden sm:inline" />
             
             <Select
               value={dimensionFilter}
               onChange={(e) => setDimensionFilter(e.target.value)}
-              style={{ width: '150px' }}
+              className="w-full sm:w-40"
             >
               <option value="all">All Dimensions</option>
               <option value="COUNT">COUNT</option>
@@ -251,7 +241,7 @@ const UOMList = () => {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '140px' }}
+              className="w-full sm:w-36"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
@@ -274,7 +264,7 @@ const UOMList = () => {
         />
 
         {/* Footer Summary */}
-        <div className="flex-between text-muted" style={{ marginTop: '12px', fontSize: '12px' }}>
+        <div className="flex justify-between items-center text-slate-500 mt-3 text-xs border-t border-slate-100 pt-3">
           <span>Showing {filteredUOMs.length} of {uoms.length} total UOM records</span>
           <span>Access Level: {canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</span>
         </div>

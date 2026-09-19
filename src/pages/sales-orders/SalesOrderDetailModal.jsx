@@ -348,7 +348,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--neutral-600)' }}>
-                            {typeof it.uom === 'object' ? it.uom?.unitSymbol || it.uom?.unitName : 'Units'}
+                            {typeof it.uom === 'object' ? it.uom?.uomCode || it.uom?.uomName || it.uom?.unitSymbol || it.uom?.unitName : 'Units'}
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                             ₹{(it.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
