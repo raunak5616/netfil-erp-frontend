@@ -38,7 +38,7 @@ const Login = () => {
     try {
       const res = await login(username, password);
       if (res.success) {
-        navigate('/employees');
+        navigate('/dashboard');
       } else {
         setErrorMessage(res.message || 'Invalid username or password.');
       }

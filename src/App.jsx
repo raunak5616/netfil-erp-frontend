@@ -114,8 +114,8 @@ function App() {
               </Route>
 
               {/* Default Redirect */}
-              <Route path="/" element={<Navigate to="/employees" replace />} />
-              <Route path="*" element={<Navigate to="/employees" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Route>
         </Routes>
