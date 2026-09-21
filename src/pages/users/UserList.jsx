@@ -1,25 +1,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getUsers } from '../../services/userService';
+import { getUsers, updateUserStatus } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Input, Select } from '../../components/ui/FormField';
 import CreateUserModal from './CreateUserModal';
+import UserDetailModal from './UserDetailModal';
+import EditUserModal from './EditUserModal';
+import ChangePasswordModal from './ChangePasswordModal';
 import { 
   UserPlus, 
   Search, 
   Filter, 
   RefreshCw, 
-  ShieldCheck 
+  ShieldCheck,
+  Eye,
+  Edit,
+  KeyRound,
+  UserCheck,
+  UserX
 } from 'lucide-react';
 
 const UserList = () => {
   const { hasPermission } = useAuth();
 
   const canCreate = hasPermission('USER_CREATE');
+  const canEdit = hasPermission('USER_EDIT');
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +39,21 @@ const UserList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Modal state
+  // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [selectedViewUser, setSelectedViewUser] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
+  const [selectedEditUser, setSelectedEditUser] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const [selectedPasswordUser, setSelectedPasswordUser] = useState(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+
+  const [selectedStatusUser, setSelectedStatusUser] = useState(null);
+  const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
 
   const fetchUserData = async () => {
     setLoading(true);
@@ -91,11 +114,51 @@ const UserList = () => {
     });
   };
 
+  const handleOpenView = (userDoc) => {
+    setSelectedViewUser(userDoc);
+    setIsViewModalOpen(true);
+  };
+
+  const handleOpenEdit = (userDoc) => {
+    setSelectedEditUser(userDoc);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenPassword = (userDoc) => {
+    setSelectedPasswordUser(userDoc);
+    setIsPasswordModalOpen(true);
+  };
+
+  const handleToggleStatusClick = (userDoc) => {
+    setSelectedStatusUser(userDoc);
+    setIsStatusConfirmOpen(true);
+  };
+
+  const handleConfirmStatusToggle = async () => {
+    if (!selectedStatusUser) return;
+    setStatusSubmitting(true);
+    setError('');
+    try {
+      const nextStatus = !selectedStatusUser.isActive;
+      const res = await updateUserStatus(selectedStatusUser._id, nextStatus);
+      if (res.success) {
+        setIsStatusConfirmOpen(false);
+        setSelectedStatusUser(null);
+        await fetchUserData();
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      setError(err.response?.data?.message || 'Failed to update user status');
+    } finally {
+      setStatusSubmitting(false);
+    }
+  };
+
   const columns = [
     {
       key: 'username',
       header: 'Username',
-      width: '150px',
+      width: '140px',
       render: (val) => (
         <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
           {val}
@@ -105,7 +168,7 @@ const UserList = () => {
     {
       key: 'employee',
       header: 'Linked Employee',
-      width: '240px',
+      width: '220px',
       render: (emp) => (
         emp ? (
           <div>
@@ -120,7 +183,7 @@ const UserList = () => {
     {
       key: 'roles',
       header: 'Assigned Roles',
-      width: '240px',
+      width: '220px',
       render: (roles, userDoc) => {
         const rolesList = Array.isArray(roles) && roles.length > 0
           ? roles
@@ -170,8 +233,60 @@ const UserList = () => {
     {
       key: 'lastLogin',
       header: 'Last Login',
-      width: '160px',
+      width: '150px',
       render: (val) => formatDate(val),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: '170px',
+      render: (_, row) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            onClick={() => handleOpenView(row)}
+            className="p-1.5 rounded text-slate-600 hover:text-blue-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="View User Details"
+          >
+            <Eye size={15} />
+          </button>
+
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleOpenEdit(row)}
+                className="p-1.5 rounded text-slate-600 hover:text-amber-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Edit User Account"
+              >
+                <Edit size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenPassword(row)}
+                className="p-1.5 rounded text-slate-600 hover:text-purple-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Change Password"
+              >
+                <KeyRound size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleStatusClick(row)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  row.isActive
+                    ? 'text-slate-600 hover:text-red-700 hover:bg-red-50'
+                    : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
+                title={row.isActive ? 'Deactivate User Account' : 'Activate User Account'}
+              >
+                {row.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
+              </button>
+            </>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -247,7 +362,7 @@ const UserList = () => {
         {/* Footer Summary */}
         <div className="flex-between text-muted" style={{ marginTop: '12px', fontSize: '12px' }}>
           <span>Showing {filteredUsers.length} of {users.length} total user accounts</span>
-          <span>Permission Level: {canCreate ? 'Create & View Accounts' : 'View Accounts Only'}</span>
+          <span>Permission Level: {canEdit ? 'Full Management (Create, Edit, Status, Password)' : canCreate ? 'Create & View Accounts' : 'View Accounts Only'}</span>
         </div>
       </div>
 
@@ -257,6 +372,59 @@ const UserList = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchUserData}
         existingUsers={users}
+      />
+
+      {/* View User Modal */}
+      <UserDetailModal
+        user={selectedViewUser}
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedViewUser(null);
+        }}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        user={selectedEditUser}
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedEditUser(null);
+        }}
+        onSuccess={fetchUserData}
+        existingUsers={users}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        user={selectedPasswordUser}
+        isOpen={isPasswordModalOpen}
+        onClose={() => {
+          setIsPasswordModalOpen(false);
+          setSelectedPasswordUser(null);
+        }}
+        onSuccess={fetchUserData}
+      />
+
+      {/* Activate / Deactivate Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isStatusConfirmOpen}
+        onClose={() => {
+          setIsStatusConfirmOpen(false);
+          setSelectedStatusUser(null);
+        }}
+        onConfirm={handleConfirmStatusToggle}
+        loading={statusSubmitting}
+        title={selectedStatusUser?.isActive ? 'Deactivate User Account' : 'Activate User Account'}
+        message={
+          selectedStatusUser?.isActive
+            ? `Are you sure you want to deactivate user account '${selectedStatusUser?.username}'? The user will no longer be able to log into the ERP. Existing records and historical transactions will remain unchanged.`
+            : `Are you sure you want to activate user account '${selectedStatusUser?.username}'? The user will regain access to log into the ERP.`
+        }
+        confirmLabel={selectedStatusUser?.isActive ? 'Deactivate User' : 'Activate User'}
+        cancelLabel="Cancel"
+        variant={selectedStatusUser?.isActive ? 'danger' : 'primary'}
       />
     </div>
   );

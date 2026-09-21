@@ -37,27 +37,30 @@ const Modal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[1000] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-md flex items-center justify-center z-[1000] p-3 sm:p-4 animate-fadeIn">
       <div
-        className="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col border border-slate-200 w-full"
+        className="bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col border border-slate-200/90 w-full animate-scaleUp overflow-hidden"
         style={{ maxWidth: effectiveMaxWidth }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4.5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-lg">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white/95 rounded-t-2xl shrink-0">
+          <h3 className="text-base font-bold text-slate-900 tracking-tight">{title}</h3>
           <button
             type="button"
-            className="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer border border-transparent hover:border-slate-200 shrink-0"
             onClick={onClose}
             title="Close Modal"
           >
-            <X size={16} />
+            <X size={17} />
           </button>
         </div>
 
-        <div className="p-4.5 overflow-y-auto flex-1">{children}</div>
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
 
-        {footer && <div className="px-4.5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-lg">{footer}</div>}
+        {footer && (
+          <div className="px-5 sm:px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/80 rounded-b-2xl shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import React from 'react';
-import { X, UserCheck, Calendar, Mail, Phone, Briefcase, Building } from 'lucide-react';
+import { UserCheck, Calendar, Mail, Phone, Briefcase, Building } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
 
 const EmployeeDetailModal = ({ employee, isOpen, onClose, onEdit, canEdit }) => {
   if (!isOpen || !employee) return null;
@@ -14,127 +16,111 @@ const EmployeeDetailModal = ({ employee, isOpen, onClose, onEdit, canEdit }) => 
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">Employee Details — {employee.employeeCode}</h3>
-          <button className="btn btn-secondary btn-sm" onClick={onClose} style={{ padding: '4px 8px' }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--neutral-200)' }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--primary-100)',
-              color: 'var(--primary-700)',
-              fontSize: '22px',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              {employee.fullName ? employee.fullName.charAt(0).toUpperCase() : 'E'}
-            </div>
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--neutral-900)' }}>
-                {employee.fullName}
-              </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <span className="text-muted" style={{ fontSize: '13px' }}>{employee.designation}</span>
-                <span>•</span>
-                <span className={`badge ${employee.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
-                  {employee.status}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="detail-grid">
-            <div className="detail-item">
-              <div className="detail-label">Employee Code</div>
-              <div className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>
-                {employee.employeeCode}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Department</div>
-              <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Building size={14} className="text-muted" />
-                {employee.department?.departmentName || 'N/A'} ({employee.department?.departmentCode || 'N/A'})
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Designation</div>
-              <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Briefcase size={14} className="text-muted" />
-                {employee.designation || 'N/A'}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Joining Date</div>
-              <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={14} className="text-muted" />
-                {formatDate(employee.joiningDate)}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Email Address</div>
-              <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Mail size={14} className="text-muted" />
-                {employee.email ? <a href={`mailto:${employee.email}`}>{employee.email}</a> : 'N/A'}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Mobile Number</div>
-              <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Phone size={14} className="text-muted" />
-                {employee.mobile || 'N/A'}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">System Record ID</div>
-              <div className="detail-value" style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--neutral-600)' }}>
-                {employee._id}
-              </div>
-            </div>
-
-            <div className="detail-item">
-              <div className="detail-label">Record Created</div>
-              <div className="detail-value" style={{ fontSize: '13px' }}>
-                {formatDate(employee.createdAt)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Employee Details — ${employee.employeeCode}`}
+      maxWidth="540px"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
             Close
-          </button>
+          </Button>
           {canEdit && (
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => {
                 onClose();
                 onEdit(employee);
               }}
             >
               Edit Employee
-            </button>
+            </Button>
           )}
+        </>
+      }
+    >
+      <div className="flex items-center gap-4 mb-5 pb-4 border-b border-slate-200/80">
+        <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-800 text-xl font-bold flex items-center justify-center shrink-0">
+          {employee.fullName ? employee.fullName.charAt(0).toUpperCase() : 'E'}
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 leading-tight">
+            {employee.fullName}
+          </h2>
+          <div className="flex items-center gap-2 mt-1 text-xs">
+            <span className="text-slate-500 font-medium">{employee.designation}</span>
+            <span className="text-slate-300">•</span>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${employee.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
+              {employee.status}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Employee Code</div>
+          <div className="font-mono font-semibold text-slate-900">
+            {employee.employeeCode}
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Department</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+            <Building size={14} className="text-slate-400 shrink-0" />
+            <span>{employee.department?.departmentName || 'N/A'} ({employee.department?.departmentCode || 'N/A'})</span>
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Designation</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+            <Briefcase size={14} className="text-slate-400 shrink-0" />
+            <span>{employee.designation || 'N/A'}</span>
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Joining Date</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+            <Calendar size={14} className="text-slate-400 shrink-0" />
+            <span>{formatDate(employee.joiningDate)}</span>
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Email Address</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 truncate">
+            <Mail size={14} className="text-slate-400 shrink-0" />
+            {employee.email ? <a href={`mailto:${employee.email}`} className="text-blue-600 hover:underline">{employee.email}</a> : 'N/A'}
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Mobile Number</div>
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+            <Phone size={14} className="text-slate-400 shrink-0" />
+            <span>{employee.mobile || 'N/A'}</span>
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">System Record ID</div>
+          <div className="font-mono text-[11px] text-slate-600 truncate">
+            {employee._id}
+          </div>
+        </div>
+
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+          <div className="text-slate-400 font-medium mb-0.5">Record Created</div>
+          <div className="font-semibold text-slate-900">
+            {formatDate(employee.createdAt)}
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 };
 

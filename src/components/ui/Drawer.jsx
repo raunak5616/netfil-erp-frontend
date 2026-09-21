@@ -23,26 +23,30 @@ const Drawer = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 z-[1000] flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-md z-[1000] flex justify-end animate-fadeIn">
       <div
-        className="w-full bg-white h-full flex flex-col shadow-xl border-l border-slate-200"
+        className="w-full bg-white h-full flex flex-col shadow-2xl border-l border-slate-200/90 rounded-l-2xl animate-slideInRight overflow-hidden"
         style={{ maxWidth: width }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4.5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white/95 shrink-0">
+          <h3 className="text-base font-bold text-slate-900 tracking-tight">{title}</h3>
           <button
             type="button"
-            className="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer border border-transparent hover:border-slate-200 shrink-0"
             onClick={onClose}
+            title="Close Drawer"
           >
-            <X size={16} />
+            <X size={17} />
           </button>
         </div>
 
-        <div className="p-4.5 overflow-y-auto flex-1">{children}</div>
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
 
-        {footer && <div className="px-4.5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">{footer}</div>}
+        {footer && (
+          <div className="px-5 sm:px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50/80 shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

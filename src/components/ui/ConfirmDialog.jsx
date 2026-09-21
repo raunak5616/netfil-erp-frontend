@@ -33,16 +33,18 @@ const ConfirmDialog = ({
         </>
       }
     >
-      <div className="flex gap-3.5 items-start">
+      <div className="flex gap-4 items-start py-1">
         <div
-          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-            variant === 'danger' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+            variant === 'danger'
+              ? 'bg-red-50 text-red-600 border-red-100'
+              : 'bg-amber-50 text-amber-600 border-amber-100'
           }`}
         >
-          <AlertTriangle size={18} />
+          <AlertTriangle size={20} />
         </div>
-        <div>
-          <p className="text-xs text-slate-800 leading-relaxed">
+        <div className="flex-1 min-w-0 pt-0.5">
+          <p className="text-xs text-slate-700 leading-relaxed font-medium">
             {message}
           </p>
         </div>

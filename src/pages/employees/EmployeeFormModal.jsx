@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createEmployee, updateEmployee, getDepartments } from '../../services/employeeService';
-import { X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
 
 const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!employee;
@@ -46,7 +48,6 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   // Populate form data on edit or reset on create
   useEffect(() => {
     if (employee) {
-      // Format joining date to YYYY-MM-DD for date input
       let formattedDate = '';
       if (employee.joiningDate) {
         formattedDate = new Date(employee.joiningDate).toISOString().split('T')[0];
@@ -124,7 +125,6 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEditMode) {
-        // Exclude employeeCode from update request payload as backend handles header updates
         const updatePayload = {
           fullName: formData.fullName,
           department: formData.department,
@@ -161,178 +161,162 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">
-            {isEditMode ? `Edit Employee (${formData.employeeCode})` : 'Add New Employee'}
-          </h3>
-          <button className="btn btn-secondary btn-sm" onClick={onClose} style={{ padding: '4px 8px' }}>
-            <X size={16} />
-          </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditMode ? `Edit Employee (${formData.employeeCode})` : 'Add New Employee'}
+      maxWidth="540px"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} loading={submitting}>
+            {isEditMode ? 'Update Employee' : 'Create Employee'}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {errorMessage && (
+          <div className="alert alert-danger">
+            <AlertCircle size={16} />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="alert alert-success">
+            <CheckCircle2 size={16} />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        <div className="form-grid">
+          <div className="form-group">
+            <label className="form-label">
+              Employee Code {!isEditMode && <span className="required">*</span>}
+            </label>
+            <input
+              type="text"
+              name="employeeCode"
+              className="form-input"
+              placeholder="e.g. EMP002"
+              value={formData.employeeCode}
+              onChange={handleChange}
+              disabled={isEditMode || submitting}
+              style={isEditMode ? { backgroundColor: 'var(--neutral-100)' } : {}}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Full Name <span className="required">*</span>
+            </label>
+            <input
+              type="text"
+              name="fullName"
+              className="form-input"
+              placeholder="Enter full name"
+              value={formData.fullName}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Department <span className="required">*</span>
+            </label>
+            <select
+              name="department"
+              className="form-select"
+              value={formData.department}
+              onChange={handleChange}
+              disabled={submitting || loadingDepts}
+            >
+              <option value="">-- Select Department --</option>
+              {departments.map((dept) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.departmentName} ({dept.departmentCode})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Designation <span className="required">*</span>
+            </label>
+            <input
+              type="text"
+              name="designation"
+              className="form-input"
+              placeholder="e.g. Senior Engineer"
+              value={formData.designation}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Email Address</label>
+            <input
+              type="email"
+              name="email"
+              className="form-input"
+              placeholder="employee@company.com"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Mobile Number</label>
+            <input
+              type="text"
+              name="mobile"
+              className="form-input"
+              placeholder="+91 9876543210"
+              value={formData.mobile}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Joining Date <span className="required">*</span>
+            </label>
+            <input
+              type="date"
+              name="joiningDate"
+              className="form-input"
+              value={formData.joiningDate}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Status <span className="required">*</span>
+            </label>
+            <select
+              name="status"
+              className="form-select"
+              value={formData.status}
+              onChange={handleChange}
+              disabled={submitting}
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div className="modal-body">
-            {errorMessage && (
-              <div className="alert alert-danger">
-                <AlertCircle size={16} />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="alert alert-success">
-                <CheckCircle2 size={16} />
-                <span>{successMessage}</span>
-              </div>
-            )}
-
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">
-                  Employee Code {!isEditMode && <span className="required">*</span>}
-                </label>
-                <input
-                  type="text"
-                  name="employeeCode"
-                  className="form-input"
-                  placeholder="e.g. EMP002"
-                  value={formData.employeeCode}
-                  onChange={handleChange}
-                  disabled={isEditMode || submitting}
-                  style={isEditMode ? { backgroundColor: 'var(--neutral-100)' } : {}}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Full Name <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  className="form-input"
-                  placeholder="Enter full name"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Department <span className="required">*</span>
-                </label>
-                <select
-                  name="department"
-                  className="form-select"
-                  value={formData.department}
-                  onChange={handleChange}
-                  disabled={submitting || loadingDepts}
-                >
-                  <option value="">-- Select Department --</option>
-                  {departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
-                      {dept.departmentName} ({dept.departmentCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Designation <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="designation"
-                  className="form-input"
-                  placeholder="e.g. Senior Engineer"
-                  value={formData.designation}
-                  onChange={handleChange}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  className="form-input"
-                  placeholder="employee@company.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Mobile Number</label>
-                <input
-                  type="text"
-                  name="mobile"
-                  className="form-input"
-                  placeholder="+91 9876543210"
-                  value={formData.mobile}
-                  onChange={handleChange}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Joining Date <span className="required">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="joiningDate"
-                  className="form-input"
-                  value={formData.joiningDate}
-                  onChange={handleChange}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Status <span className="required">*</span>
-                </label>
-                <select
-                  name="status"
-                  className="form-select"
-                  value={formData.status}
-                  onChange={handleChange}
-                  disabled={submitting}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting}
-            >
-              {submitting ? 'Saving...' : isEditMode ? 'Update Employee' : 'Create Employee'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 };
 
