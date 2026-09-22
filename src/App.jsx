@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import EmployeeList from './pages/employees/EmployeeList';
 import DepartmentList from './pages/departments/DepartmentList';
 import UserList from './pages/users/UserList';
+import RoleList from './pages/roles/RoleList';
 import UOMList from './pages/uom/UOMList';
 import ItemList from './pages/items/ItemList';
 import ItemGroupList from './pages/item-groups/ItemGroupList';
@@ -43,6 +44,11 @@ function App() {
               {/* Protected User Accounts Route */}
               <Route element={<ProtectedRoute requiredPermission="USER_VIEW" />}>
                 <Route path="/users" element={<UserList />} />
+              </Route>
+
+              {/* Protected Role Management Route */}
+              <Route element={<ProtectedRoute requiredPermission="ROLE_VIEW" />}>
+                <Route path="/roles" element={<RoleList />} />
               </Route>
 
               {/* Protected Department Module Route */}

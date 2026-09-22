@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Lock, 
-  User, 
-  AlertCircle, 
-  Eye, 
-  EyeOff, 
-  Check, 
+import {
+  Lock,
+  User,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Check,
   KeyRound,
   ShieldCheck
 } from 'lucide-react';
@@ -59,14 +59,14 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-blue-600 selection:text-white">
-      
+
       {/* Top Bar Header */}
       <header className="w-full max-w-6xl mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2">
-          <img 
-            src="/logo.png" 
-            alt="Netfil Clean Solutions" 
-            className="h-9 w-auto object-contain" 
+          <img
+            src="/logo.png"
+            alt="Netfil Clean Solutions"
+            className="h-9 w-auto object-contain"
           />
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -77,9 +77,9 @@ const Login = () => {
 
       {/* Main Form Center Container */}
       <main className="w-full max-w-md mx-auto my-auto py-8">
-        
+
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm p-6 sm:p-8">
-          
+
           {/* Brand Header */}
           <div className="mb-6 text-left">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
@@ -100,7 +100,7 @@ const Login = () => {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            
+
             {/* Username Input */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">
@@ -223,16 +223,10 @@ const Login = () => {
                 <p className="text-xs text-slate-500">Netfil ERP Support</p>
               </div>
             </div>
-            
+
             <p className="text-xs text-slate-600 leading-relaxed">
               Passwords are managed centrally by system administrators. Please contact your IT administrator or HR manager to reset your password.
             </p>
-
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-              <div><strong>Default Demo Username:</strong> <code>admin</code></div>
-              <div><strong>Default Demo Password:</strong> <code>Admin@123</code></div>
-            </div>
-
             <div className="flex justify-end pt-1">
               <button
                 type="button"

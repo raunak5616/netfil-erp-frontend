@@ -150,6 +150,7 @@ const MainLayout = () => {
       '/dashboard': [{ label: 'Operations' }, { label: 'Dashboard' }],
       '/employees': [{ label: 'Organization' }, { label: 'Employee Master' }],
       '/users': [{ label: 'Security' }, { label: 'User Accounts' }],
+      '/roles': [{ label: 'Security' }, { label: 'Role Management' }],
       '/departments': [{ label: 'Organization' }, { label: 'Departments' }],
       '/uoms': [{ label: 'Item Master' }, { label: 'Units of Measure (UOM)' }],
       '/items': [{ label: 'Item Master' }, { label: 'Items Catalog' }],
@@ -183,6 +184,7 @@ const MainLayout = () => {
       items: [
         { label: 'Employees', path: '/employees', icon: Users, permission: 'EMPLOYEE_VIEW' },
         { label: 'User Accounts', path: '/users', icon: UserCheck, permission: 'USER_VIEW' },
+        { label: 'Role Management', path: '/roles', icon: Shield, permission: 'ROLE_VIEW' },
         { label: 'Departments', path: '/departments', icon: Building2, permission: 'DEPARTMENT_VIEW' },
       ],
     },
@@ -236,6 +238,7 @@ const MainLayout = () => {
     { label: 'Work Orders', path: '/work-orders', category: 'Production', permission: 'WORK_ORDER_VIEW' },
     { label: 'Employee Master', path: '/employees', category: 'Organization', permission: 'EMPLOYEE_VIEW' },
     { label: 'User Accounts', path: '/users', category: 'Security', permission: 'USER_VIEW' },
+    { label: 'Role Management', path: '/roles', category: 'Security', permission: 'ROLE_VIEW' },
   ].filter((item) => !item.permission || hasPermission(item.permission));
 
   const filteredQuickJumps = quickJumpItems.filter((i) =>

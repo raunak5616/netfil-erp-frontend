@@ -62,16 +62,19 @@ const DataTable = ({
                 return (
                   <tr key={rowKey} className="hover:bg-slate-50 transition-colors">
                     {columns.map((col) => {
-                      const cellValue = row[col.key];
+                      const colKey = col.key || col.accessor;
+                      const cellValue = colKey ? row[colKey] : undefined;
                       const renderedContent = col.render
                         ? col.render(cellValue, row, rowIndex)
+                        : col.cell
+                        ? col.cell(row, rowIndex)
                         : cellValue !== undefined && cellValue !== null
                         ? String(cellValue)
                         : '—';
 
                       return (
                         <td
-                          key={col.key || col.header}
+                          key={colKey || col.header}
                           className="px-3 py-2.5 border-b border-slate-200 text-slate-800 align-middle"
                           style={{ textAlign: col.align || 'left' }}
                         >
