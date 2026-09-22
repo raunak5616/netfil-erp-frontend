@@ -29,6 +29,17 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const [itemSearch, setItemSearch] = useState('');
   const [isItemDropdownOpen, setIsItemDropdownOpen] = useState(false);
 
+  const getFourDaysFromDate = (baseDateStr) => {
+    try {
+      const d = baseDateStr ? new Date(baseDateStr) : new Date();
+      if (isNaN(d.getTime())) return '';
+      d.setDate(d.getDate() + 4);
+      return d.toISOString().split('T')[0];
+    } catch (e) {
+      return '';
+    }
+  };
+
   // Form input state
   const [formData, setFormData] = useState({
     client: '',
@@ -42,7 +53,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     dimensions: { length: '', width: '', height: '', unit: 'mm' },
     specifications: [],
     remarks: '',
-    followUpDate: '',
+    followUpDate: getFourDaysFromDate(),
     status: 'draft',
     salesPerson: '',
   });
@@ -157,9 +168,10 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         setItemSearch('');
       }
     } else {
+      const today = new Date().toISOString().split('T')[0];
       setFormData({
         client: '',
-        requirementDate: new Date().toISOString().split('T')[0],
+        requirementDate: today,
         type: 'product',
         serviceDescription: '',
         itemCategory: '',
@@ -169,7 +181,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         dimensions: { length: '', width: '', height: '', unit: 'mm' },
         specifications: [],
         remarks: '',
-        followUpDate: '',
+        followUpDate: getFourDaysFromDate(today),
         status: 'draft',
         salesPerson: '',
       });
@@ -207,10 +219,13 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'requirementDate' && value && !isEditMode) {
+        updated.followUpDate = getFourDaysFromDate(value);
+      }
+      return updated;
+    });
   };
 
   const handleDimensionChange = (e) => {

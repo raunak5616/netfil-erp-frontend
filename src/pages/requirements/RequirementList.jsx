@@ -353,7 +353,7 @@ const RequirementList = () => {
                   setIsFormOpen(true);
                 }}
               >
-                + New Enquiry
+                New Enquiry
               </Button>
             )}
           </>
@@ -429,7 +429,7 @@ const RequirementList = () => {
           emptyDescription={
             searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || partyFilter !== 'all'
               ? 'Try adjusting your search criteria or filter selections.'
-              : 'Click "+ New Enquiry" above to record customer requirement.'
+              : 'Click "New Enquiry" above to record customer requirement.'
           }
         />
 
