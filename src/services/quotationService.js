@@ -31,6 +31,16 @@ export const releaseQuotation = async (quotationId) => {
   return response.data;
 };
 
+export const markQuotationLost = async (quotationId, lostData) => {
+  const response = await api.post(`/quotations/${quotationId}/mark-lost`, lostData);
+  return response.data;
+};
+
+export const addQuotationFollowUp = async (quotationId, followUpData) => {
+  const response = await api.post(`/quotations/${quotationId}/follow-up`, followUpData);
+  return response.data;
+};
+
 // Quotation Item API Endpoints
 export const getQuotationItems = async (quotationId) => {
   const response = await api.get(`/quotations/${quotationId}/items`);

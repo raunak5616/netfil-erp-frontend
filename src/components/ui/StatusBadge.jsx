@@ -7,6 +7,7 @@ const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
   const redBadge = 'bg-red-50 text-red-800 border-red-200';
   const amberBadge = 'bg-amber-50 text-amber-800 border-amber-200';
   const skyBadge = 'bg-sky-50 text-sky-700 border-sky-200';
+  const purpleBadge = 'bg-purple-50 text-purple-700 border-purple-200';
   const neutralBadge = 'bg-slate-100 text-slate-700 border-slate-200';
 
   const statusMap = {
@@ -16,12 +17,16 @@ const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
     'confirmed': greenBadge,
     'released': greenBadge,
     'won': greenBadge,
+    'converted': greenBadge,
     'inactive': redBadge,
     'rejected': redBadge,
     'cancelled': redBadge,
+    'lost': redBadge,
     'pending': amberBadge,
     'draft': amberBadge,
     'warning': amberBadge,
+    'follow-up': purpleBadge,
+    'follow_up': purpleBadge,
     'in-progress': skyBadge,
     'info': skyBadge,
     'sent': skyBadge,

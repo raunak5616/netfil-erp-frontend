@@ -387,6 +387,146 @@ const QuotationDetailModal = ({
             </div>
           </div>
 
+          {/* Linked Sales Order Card (if Converted / Completed) */}
+          {quotation.salesOrder && (
+            <div
+              style={{
+                padding: '14px',
+                background: 'var(--success-50)',
+                border: '1px solid var(--success-200)',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                display: 'flex',
+                justify: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--success-800)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Linked Sales Order Reference
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success-900)', marginTop: '2px' }} className="font-mono">
+                  {typeof quotation.salesOrder === 'object' ? quotation.salesOrder.salesOrderNo : quotation.salesOrder}
+                </div>
+                {quotation.convertedAt && (
+                  <div style={{ fontSize: '12px', color: 'var(--success-700)', marginTop: '4px' }}>
+                    Converted on {formatDate(quotation.convertedAt)} {quotation.convertedBy?.username ? `by ${quotation.convertedBy.username}` : ''}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', color: 'var(--success-800)', textTransform: 'uppercase' }}>
+                  Sales Order Status
+                </div>
+                <div style={{ marginTop: '2px' }}>
+                  <span
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      background: 'var(--success-600)',
+                      color: 'white',
+                      fontWeight: 700,
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {typeof quotation.salesOrder === 'object' ? quotation.salesOrder.status : 'CREATED'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lost Outcome Detail Card (if Lost) */}
+          {(quotation.status === 'lost' || quotation.lostReason) && (
+            <div
+              style={{
+                padding: '14px',
+                background: 'var(--danger-50)',
+                border: '1px solid var(--danger-200)',
+                borderRadius: '8px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--danger-800)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Quotation Outcome: LOST
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--danger-900)', marginBottom: '4px' }}>
+                <strong>Reason:</strong> {quotation.lostReason ? quotation.lostReason.replace(/_/g, ' ') : 'N/A'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--danger-900)', marginBottom: '6px' }}>
+                <strong>Remarks:</strong> {quotation.lostRemarks || 'No remarks provided.'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--danger-700)' }}>
+                Marked Lost on {formatDate(quotation.lostAt)} {quotation.lostBy?.username ? `by ${quotation.lostBy.username}` : ''}
+              </div>
+            </div>
+          )}
+
+          {/* Follow-up History Section */}
+          {quotation.followUps && quotation.followUps.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-900)', marginBottom: '10px' }}>
+                Follow-up History ({quotation.followUps.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {quotation.followUps.slice().reverse().map((fu, idx) => (
+                  <div
+                    key={fu._id || idx}
+                    style={{
+                      padding: '10px 12px',
+                      background: 'var(--gray-50)',
+                      border: '1px solid var(--gray-200)',
+                      borderRadius: '6px',
+                      fontSize: '12.5px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11.5px', color: 'var(--gray-600)' }}>
+                      <span>Next Follow-up: <strong style={{ color: 'var(--primary-700)' }}>{formatDate(fu.followUpDate)}</strong></span>
+                      <span>Recorded on {formatDate(fu.createdAt)} {fu.followUpBy?.username ? `by ${fu.followUpBy.username}` : ''}</span>
+                    </div>
+                    <div style={{ color: 'var(--gray-900)' }}>{fu.remarks}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Status Progression Audit Log */}
+          {quotation.statusHistory && quotation.statusHistory.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-900)', marginBottom: '10px' }}>
+                Status Audit Trail ({quotation.statusHistory.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {quotation.statusHistory.slice().reverse().map((sh, idx) => (
+                  <div
+                    key={sh._id || idx}
+                    style={{
+                      display: 'flex',
+                      justify: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      background: 'var(--neutral-50)',
+                      border: '1px solid var(--neutral-200)',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <StatusBadge status={sh.status} />
+                      {sh.remarks && <span style={{ color: 'var(--neutral-700)' }}>— {sh.remarks}</span>}
+                    </div>
+                    <div style={{ color: 'var(--neutral-500)', fontSize: '11px' }}>
+                      {formatDate(sh.performedAt)} {sh.performedBy?.username ? `by ${sh.performedBy.username}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* References & Traceability Section */}
           {references && references.amendments && references.amendments.length > 0 && (
             <div style={{ marginTop: '16px', borderTop: '1px solid var(--gray-200)', paddingTop: '12px' }}>
