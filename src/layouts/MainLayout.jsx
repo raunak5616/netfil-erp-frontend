@@ -57,7 +57,7 @@ const MainLayout = () => {
         console.error("Failed to parse expanded groups state:", e);
       }
     }
-    return { 'item-master': true, 'commercial-module': true };
+    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true };
   });
 
   // Handle window resize for mobile breakpoint
@@ -164,8 +164,8 @@ const MainLayout = () => {
       '/enquiry-mis': [{ label: 'Commercial' }, { label: 'Enquiry MIS Reports' }],
       '/quotations': [{ label: 'Commercial' }, { label: 'Quotation Register' }],
       '/sales-orders': [{ label: 'Commercial' }, { label: 'Sales Orders' }],
-      '/master-boms': [{ label: 'Engineering' }, { label: 'Master BOMs' }],
-      '/order-boms': [{ label: 'Engineering' }, { label: 'Order BOMs' }],
+      '/master-boms': [{ label: 'BOM' }, { label: 'Master BOMs' }],
+      '/order-boms': [{ label: 'BOM' }, { label: 'Order BOMs' }],
       '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
     };
     return map[path] || [{ label: 'Workspace' }];
@@ -206,7 +206,7 @@ const MainLayout = () => {
         },
         {
           id: 'commercial-module',
-          label: 'Commercial & Production',
+          label: 'Commercial & Sales',
           icon: ShoppingCart,
           isGroup: true,
           children: [
@@ -215,8 +215,24 @@ const MainLayout = () => {
             { label: 'Enquiry MIS', path: '/enquiry-mis', icon: FileText, permission: 'REQUIREMENT_VIEW' },
             { label: 'Quotation Engine', path: '/quotations', icon: Calculator, permission: 'QUOTATION_VIEW' },
             { label: 'Sales Orders', path: '/sales-orders', icon: FileCheck, permission: 'SALES_ORDER_VIEW' },
+          ],
+        },
+        {
+          id: 'bom-module',
+          label: 'BOM',
+          icon: Layers,
+          isGroup: true,
+          children: [
             { label: 'Master BOM', path: '/master-boms', icon: Layers, permission: 'BOM_VIEW' },
             { label: 'Order BOM Routing', path: '/order-boms', icon: ClipboardList, permission: 'ORDER_BOM_VIEW' },
+          ],
+        },
+        {
+          id: 'production-module',
+          label: 'Production & Shop Floor',
+          icon: Wrench,
+          isGroup: true,
+          children: [
             { label: 'Work Orders', path: '/work-orders', icon: Wrench, permission: 'WORK_ORDER_VIEW' },
           ],
         },
@@ -233,8 +249,8 @@ const MainLayout = () => {
     { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },
     { label: 'Quotation Register', path: '/quotations', category: 'Commercial', permission: 'QUOTATION_VIEW' },
     { label: 'Sales Orders', path: '/sales-orders', category: 'Commercial', permission: 'SALES_ORDER_VIEW' },
-    { label: 'Master BOMs', path: '/master-boms', category: 'Engineering', permission: 'BOM_VIEW' },
-    { label: 'Order BOMs', path: '/order-boms', category: 'Engineering', permission: 'ORDER_BOM_VIEW' },
+    { label: 'Master BOMs', path: '/master-boms', category: 'BOM', permission: 'BOM_VIEW' },
+    { label: 'Order BOMs', path: '/order-boms', category: 'BOM', permission: 'ORDER_BOM_VIEW' },
     { label: 'Work Orders', path: '/work-orders', category: 'Production', permission: 'WORK_ORDER_VIEW' },
     { label: 'Employee Master', path: '/employees', category: 'Organization', permission: 'EMPLOYEE_VIEW' },
     { label: 'User Accounts', path: '/users', category: 'Security', permission: 'USER_VIEW' },

@@ -8,7 +8,6 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
 import { 
@@ -17,7 +16,12 @@ import {
   Filter, 
   Eye, 
   Edit, 
-  RefreshCw 
+  RefreshCw,
+  Package,
+  CheckCircle2,
+  Layers,
+  Tag,
+  X
 } from 'lucide-react';
 
 const ItemList = () => {
@@ -129,7 +133,7 @@ const ItemList = () => {
       header: 'Item Code',
       width: '140px',
       render: (val) => (
-        <span className="font-mono font-semibold text-blue-700">
+        <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded border border-blue-200/80 inline-block shadow-2xs">
           {val}
         </span>
       ),
@@ -137,35 +141,50 @@ const ItemList = () => {
     {
       key: 'itemName',
       header: 'Item Name',
-      width: '220px',
-      render: (val) => <strong className="text-slate-900 font-semibold">{val}</strong>,
+      width: '240px',
+      render: (val, row) => (
+        <div className="flex flex-col">
+          <strong className="text-slate-900 font-semibold text-xs leading-snug">{val}</strong>
+          {row.hsnCode && (
+            <span className="text-[10.5px] text-slate-400 font-mono mt-0.5">HSN: {row.hsnCode}</span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'itemGroup',
       header: 'Group',
-      width: '140px',
+      width: '150px',
       render: (group) => (
-        <span className="text-xs text-slate-800 font-medium">
-          {group?.groupName || '—'}
-        </span>
+        group?.groupName ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-medium bg-purple-50 text-purple-800 border border-purple-200/60">
+            {group.groupName}
+          </span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )
       ),
     },
     {
       key: 'itemCategory',
       header: 'Category',
-      width: '140px',
+      width: '160px',
       render: (cat) => (
-        <span className="text-xs text-slate-800 font-medium">
-          {cat?.categoryName || '—'}
-        </span>
+        cat?.categoryName ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+            {cat.categoryName}
+          </span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )
       ),
     },
     {
       key: 'inventoryUom',
       header: 'UOM',
-      width: '90px',
+      width: '80px',
       render: (uom) => (
-        <span className="font-mono text-slate-500 font-semibold text-xs">
+        <span className="font-mono text-slate-600 font-semibold text-xs bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
           {uom?.uomCode || '—'}
         </span>
       ),
@@ -173,48 +192,54 @@ const ItemList = () => {
     {
       key: 'defaultBin',
       header: 'Default Bin',
-      width: '110px',
+      width: '130px',
       render: (bin) => (
-        <span className="font-mono text-slate-500 text-xs">
-          {bin?.binCode || '—'}
-        </span>
+        bin?.binCode ? (
+          <span className="font-mono text-[11px] text-amber-800 bg-amber-50/80 px-2 py-0.5 rounded border border-amber-200">
+            {bin.binCode}
+          </span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
+      width: '100px',
       render: (val) => <StatusBadge status={val} />,
     },
     {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '130px',
+      width: '140px',
       render: (_, row) => (
-        <div className="inline-flex gap-1">
+        <div className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            icon={Eye}
+            size="xs"
             onClick={() => {
               setSelectedItem(row);
               setIsDetailOpen(true);
             }}
+            title="View Details"
           >
-            View
+            <Eye size={14} className="text-slate-500" />
+            <span>View</span>
           </Button>
           {canEdit && (
             <Button
-              variant="ghost"
-              size="sm"
-              icon={Edit}
+              variant="secondary"
+              size="xs"
               onClick={() => {
                 setEditingItem(row);
                 setIsFormOpen(true);
               }}
+              title="Edit Item"
             >
-              Edit
+              <Edit size={14} className="text-blue-600" />
+              <span>Edit</span>
             </Button>
           )}
         </div>
@@ -223,61 +248,72 @@ const ItemList = () => {
   ];
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Item Master"
-        description="Manage system item master catalog, specifications, unit conversions, and inventory controls."
+        subtitle="Manage system item master catalog, specifications, unit conversions, and inventory controls."
         breadcrumbs={[
           { label: 'Home', path: '/dashboard' },
           { label: 'Item Master' },
           { label: 'Items' },
         ]}
         actions={
-          <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchItemData}>
-              Refresh
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={fetchItemData} loading={loading}>
+              <RefreshCw size={14} />
+              <span>Refresh</span>
             </Button>
             {canCreate && (
               <Button
                 variant="primary"
-                icon={Plus}
+                size="sm"
                 onClick={() => {
                   setEditingItem(null);
                   setIsFormOpen(true);
                 }}
               >
-                Add Item
+                <Plus size={14} />
+                <span>Add Item</span>
               </Button>
             )}
-          </>
+          </div>
         }
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
 
-      <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-xs mb-4">
-        {/* Toolbar Controls */}
-        <div className="flex flex-wrap gap-2.5 items-center mb-3.5">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <Input
+
+
+      {/* Main Content Card Container */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3.5">
+        {/* Horizontal Toolbar Controls */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+          {/* Search Input */}
+          <div className="relative w-full md:w-96">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
               placeholder="Search by item code, name, HSN, group, or category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter size={16} className="text-slate-400" />
+          {/* Inline Filter Dropdowns */}
+          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium shrink-0">
+              <Filter size={14} className="text-slate-400" />
+              <span>Filters:</span>
+            </div>
 
-            <Select
+            <select
               value={groupFilter}
               onChange={(e) => {
                 setGroupFilter(e.target.value);
                 setCategoryFilter('all');
               }}
-              className="w-36"
+              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Groups</option>
               {itemGroups.map((g) => (
@@ -285,12 +321,12 @@ const ItemList = () => {
                   {g.groupName}
                 </option>
               ))}
-            </Select>
+            </select>
 
-            <Select
+            <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-36"
+              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Categories</option>
               {availableCategoryFilters.map((c) => (
@@ -298,17 +334,32 @@ const ItemList = () => {
                   {c.categoryName}
                 </option>
               ))}
-            </Select>
+            </select>
 
-            <Select
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-32"
+              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
               <option value="inactive">Inactive Only</option>
-            </Select>
+            </select>
+
+            {(searchTerm || groupFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setGroupFilter('all');
+                  setCategoryFilter('all');
+                  setStatusFilter('all');
+                }}
+                className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded font-medium transition-colors whitespace-nowrap"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         </div>
 
@@ -326,9 +377,9 @@ const ItemList = () => {
         />
 
         {/* Footer Summary */}
-        <div className="flex items-center justify-between text-slate-500 mt-3 text-xs">
-          <span>Showing {filteredItems.length} of {items.length} total item master records</span>
-          <span>Access Level: {canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</span>
+        <div className="flex items-center justify-between text-slate-500 text-xs pt-1 border-t border-slate-100">
+          <span>Showing <strong>{filteredItems.length}</strong> of <strong>{items.length}</strong> total item catalog records</span>
+          <span>Access Level: <strong>{canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</strong></span>
         </div>
       </div>
 
@@ -340,6 +391,7 @@ const ItemList = () => {
         onSuccess={fetchItemData}
       />
 
+      {/* Detail View Modal */}
       <ItemDetailModal
         item={selectedItem}
         isOpen={isDetailOpen}
