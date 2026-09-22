@@ -213,7 +213,7 @@ const MainLayout = () => {
             { label: 'Party Master', path: '/clients', icon: Users, permission: 'CLIENT_VIEW' },
             { label: 'Enquiry & Requirement', path: '/requirements', icon: ClipboardList, permission: 'REQUIREMENT_VIEW' },
             { label: 'Enquiry MIS', path: '/enquiry-mis', icon: FileText, permission: 'REQUIREMENT_VIEW' },
-            { label: 'Quotation Engine', path: '/quotations', icon: Calculator, permission: 'QUOTATION_VIEW' },
+            { label: 'Quotation', path: '/quotations', icon: Calculator, permission: 'QUOTATION_VIEW' },
             { label: 'Sales Orders', path: '/sales-orders', icon: FileCheck, permission: 'SALES_ORDER_VIEW' },
           ],
         },
