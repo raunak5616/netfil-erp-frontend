@@ -30,7 +30,12 @@ const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
     'in-progress': skyBadge,
     'info': skyBadge,
     'sent': skyBadge,
-    'quoted': skyBadge
+    'quoted': skyBadge,
+    'response-pending': amberBadge,
+    'response_pending': amberBadge,
+    'received': purpleBadge,
+    'evaluated': greenBadge,
+    'closed': neutralBadge
   };
   
   const statusClass = statusMap[normalizedStatus] || neutralBadge;

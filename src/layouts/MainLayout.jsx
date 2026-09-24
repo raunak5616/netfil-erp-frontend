@@ -57,7 +57,7 @@ const MainLayout = () => {
         console.error("Failed to parse expanded groups state:", e);
       }
     }
-    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true };
+    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true };
   });
 
   // Handle window resize for mobile breakpoint
@@ -108,11 +108,17 @@ const MainLayout = () => {
     const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
+    const purchasePaths = ['/purchase-requisitions', '/purchase-enquiries'];
+    const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
+
     if (isItemMasterChild) {
       setExpandedGroups((prev) => ({ ...prev, 'item-master': true }));
     }
     if (isCommercialChild) {
       setExpandedGroups((prev) => ({ ...prev, 'commercial-module': true }));
+    }
+    if (isPurchaseChild) {
+      setExpandedGroups((prev) => ({ ...prev, 'purchase-module': true }));
     }
     // Close mobile drawer on route navigation
     setMobileOpen(false);
@@ -167,6 +173,8 @@ const MainLayout = () => {
       '/master-boms': [{ label: 'BOM' }, { label: 'Master BOMs' }],
       '/order-boms': [{ label: 'BOM' }, { label: 'Order BOMs' }],
       '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
+      '/purchase-requisitions': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Requisitions' }],
+      '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
     };
     return map[path] || [{ label: 'Workspace' }];
   };
@@ -186,6 +194,21 @@ const MainLayout = () => {
         { label: 'User Accounts', path: '/users', icon: UserCheck, permission: 'USER_VIEW' },
         { label: 'Role Management', path: '/roles', icon: Shield, permission: 'ROLE_VIEW' },
         { label: 'Departments', path: '/departments', icon: Building2, permission: 'DEPARTMENT_VIEW' },
+      ],
+    },
+    {
+      title: 'PURCHASE & PROCUREMENT',
+      items: [
+        {
+          id: 'purchase-module',
+          label: 'Purchase',
+          icon: ShoppingCart,
+          isGroup: true,
+          children: [
+            { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
+            { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
+          ],
+        },
       ],
     },
     {
@@ -242,6 +265,8 @@ const MainLayout = () => {
 
   // Quick navigation items for Cmd+K search dialog
   const quickJumpItems = [
+    { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Purchase', permission: 'PURCHASE_REQUISITION_VIEW' },
+    { label: 'Purchase Enquiries', path: '/purchase-enquiries', category: 'Purchase', permission: 'PURCHASE_ENQUIRY_VIEW' },
     { label: 'Items Catalog', path: '/items', category: 'Item Master', permission: 'ITEM_VIEW' },
     { label: 'Item Groups', path: '/item-groups', category: 'Item Master', permission: 'ITEM_GROUP_VIEW' },
     { label: 'Item Categories', path: '/item-categories', category: 'Item Master', permission: 'ITEM_CATEGORY_VIEW' },
