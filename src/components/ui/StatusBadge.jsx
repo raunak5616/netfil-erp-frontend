@@ -35,6 +35,7 @@ const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
     'response_pending': amberBadge,
     'received': purpleBadge,
     'evaluated': greenBadge,
+    'checked': skyBadge,
     'closed': neutralBadge
   };
   

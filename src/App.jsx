@@ -28,6 +28,9 @@ import PurchaseRequisitionDetail from './pages/purchaseRequisitions/PurchaseRequ
 import PurchaseEnquiryList from './pages/purchaseEnquiries/PurchaseEnquiryList';
 import PurchaseEnquiryForm from './pages/purchaseEnquiries/PurchaseEnquiryForm';
 import PurchaseEnquiryDetail from './pages/purchaseEnquiries/PurchaseEnquiryDetail';
+import PurchaseOrderList from './pages/purchaseOrders/PurchaseOrderList';
+import PurchaseOrderForm from './pages/purchaseOrders/PurchaseOrderForm';
+import PurchaseOrderDetail from './pages/purchaseOrders/PurchaseOrderDetail';
 
 function App() {
   return (
@@ -122,6 +125,18 @@ function App() {
               </Route>
               <Route element={<ProtectedRoute requiredPermission="PURCHASE_ENQUIRY_EDIT" />}>
                 <Route path="/purchase-enquiries/:id/edit" element={<PurchaseEnquiryForm />} />
+              </Route>
+
+              {/* Protected Purchase Order Module Routes */}
+              <Route element={<ProtectedRoute requiredPermission="PURCHASE_ORDER_VIEW" />}>
+                <Route path="/purchase-orders" element={<PurchaseOrderList />} />
+                <Route path="/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="PURCHASE_ORDER_CREATE" />}>
+                <Route path="/purchase-orders/create" element={<PurchaseOrderForm />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="PURCHASE_ORDER_EDIT" />}>
+                <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
               </Route>
 
               {/* Protected UOM Module Route */}

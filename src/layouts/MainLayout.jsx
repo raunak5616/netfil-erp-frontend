@@ -108,7 +108,7 @@ const MainLayout = () => {
     const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
-    const purchasePaths = ['/purchase-requisitions', '/purchase-enquiries'];
+    const purchasePaths = ['/purchase-requisitions', '/purchase-enquiries', '/purchase-orders'];
     const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -175,6 +175,7 @@ const MainLayout = () => {
       '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
       '/purchase-requisitions': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Requisitions' }],
       '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
+      '/purchase-orders': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Orders' }],
     };
     return map[path] || [{ label: 'Workspace' }];
   };
@@ -207,6 +208,7 @@ const MainLayout = () => {
           children: [
             { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
             { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
+            { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, permission: 'PURCHASE_ORDER_VIEW' },
           ],
         },
       ],
