@@ -31,6 +31,9 @@ import PurchaseEnquiryDetail from './pages/purchaseEnquiries/PurchaseEnquiryDeta
 import PurchaseOrderList from './pages/purchaseOrders/PurchaseOrderList';
 import PurchaseOrderForm from './pages/purchaseOrders/PurchaseOrderForm';
 import PurchaseOrderDetail from './pages/purchaseOrders/PurchaseOrderDetail';
+import GoodsReceiptList from './pages/goodsReceipts/GoodsReceiptList';
+import GoodsReceiptForm from './pages/goodsReceipts/GoodsReceiptForm';
+import GoodsReceiptDetail from './pages/goodsReceipts/GoodsReceiptDetail';
 
 function App() {
   return (
@@ -137,6 +140,18 @@ function App() {
               </Route>
               <Route element={<ProtectedRoute requiredPermission="PURCHASE_ORDER_EDIT" />}>
                 <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+              </Route>
+
+              {/* Protected Goods Receipt Note (GRN) Module Routes */}
+              <Route element={<ProtectedRoute requiredPermission="GOODS_RECEIPT_VIEW" />}>
+                <Route path="/goods-receipts" element={<GoodsReceiptList />} />
+                <Route path="/goods-receipts/:id" element={<GoodsReceiptDetail />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="GOODS_RECEIPT_CREATE" />}>
+                <Route path="/goods-receipts/create" element={<GoodsReceiptForm />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="GOODS_RECEIPT_EDIT" />}>
+                <Route path="/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
               </Route>
 
               {/* Protected UOM Module Route */}

@@ -176,6 +176,7 @@ const MainLayout = () => {
       '/purchase-requisitions': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Requisitions' }],
       '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
       '/purchase-orders': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Orders' }],
+      '/goods-receipts': [{ label: 'Purchase & Procurement' }, { label: 'Goods Receipts (GRN)' }],
     };
     return map[path] || [{ label: 'Workspace' }];
   };
@@ -209,6 +210,7 @@ const MainLayout = () => {
             { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
             { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
             { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, permission: 'PURCHASE_ORDER_VIEW' },
+            { label: 'Goods Receipts', path: '/goods-receipts', icon: Package, permission: 'GOODS_RECEIPT_VIEW' },
           ],
         },
       ],
@@ -269,6 +271,8 @@ const MainLayout = () => {
   const quickJumpItems = [
     { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Purchase', permission: 'PURCHASE_REQUISITION_VIEW' },
     { label: 'Purchase Enquiries', path: '/purchase-enquiries', category: 'Purchase', permission: 'PURCHASE_ENQUIRY_VIEW' },
+    { label: 'Purchase Orders', path: '/purchase-orders', category: 'Purchase', permission: 'PURCHASE_ORDER_VIEW' },
+    { label: 'Goods Receipts (GRN)', path: '/goods-receipts', category: 'Purchase', permission: 'GOODS_RECEIPT_VIEW' },
     { label: 'Items Catalog', path: '/items', category: 'Item Master', permission: 'ITEM_VIEW' },
     { label: 'Item Groups', path: '/item-groups', category: 'Item Master', permission: 'ITEM_GROUP_VIEW' },
     { label: 'Item Categories', path: '/item-categories', category: 'Item Master', permission: 'ITEM_CATEGORY_VIEW' },
