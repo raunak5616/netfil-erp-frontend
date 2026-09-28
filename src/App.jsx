@@ -34,6 +34,9 @@ import PurchaseOrderDetail from './pages/purchaseOrders/PurchaseOrderDetail';
 import GoodsReceiptList from './pages/goodsReceipts/GoodsReceiptList';
 import GoodsReceiptForm from './pages/goodsReceipts/GoodsReceiptForm';
 import GoodsReceiptDetail from './pages/goodsReceipts/GoodsReceiptDetail';
+import SupplierList from './pages/suppliers/SupplierList';
+import SupplierForm from './pages/suppliers/SupplierForm';
+import SupplierDetail from './pages/suppliers/SupplierDetail';
 
 function App() {
   return (
@@ -104,6 +107,18 @@ function App() {
               {/* Protected Work Order Module Route */}
               <Route element={<ProtectedRoute requiredPermission="WORK_ORDER_VIEW" />}>
                 <Route path="/work-orders" element={<WorkOrderList />} />
+              </Route>
+
+              {/* Protected Supplier Management Module Routes */}
+              <Route element={<ProtectedRoute requiredPermission="SUPPLIER_VIEW" />}>
+                <Route path="/suppliers" element={<SupplierList />} />
+                <Route path="/suppliers/:id" element={<SupplierDetail />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="SUPPLIER_CREATE" />}>
+                <Route path="/suppliers/create" element={<SupplierForm />} />
+              </Route>
+              <Route element={<ProtectedRoute requiredPermission="SUPPLIER_EDIT" />}>
+                <Route path="/suppliers/:id/edit" element={<SupplierForm />} />
               </Route>
 
               {/* Protected Purchase Requisition Module Routes */}

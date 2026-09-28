@@ -22,6 +22,7 @@ import {
   Search,
   Command,
   User,
+  Truck,
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -108,7 +109,7 @@ const MainLayout = () => {
     const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
-    const purchasePaths = ['/purchase-requisitions', '/purchase-enquiries', '/purchase-orders'];
+    const purchasePaths = ['/suppliers', '/purchase-requisitions', '/purchase-enquiries', '/purchase-orders'];
     const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
@@ -207,6 +208,7 @@ const MainLayout = () => {
           icon: ShoppingCart,
           isGroup: true,
           children: [
+            { label: 'Supplier Management', path: '/suppliers', icon: Truck, permission: 'SUPPLIER_VIEW' },
             { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
             { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
             { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, permission: 'PURCHASE_ORDER_VIEW' },
@@ -269,6 +271,7 @@ const MainLayout = () => {
 
   // Quick navigation items for Cmd+K search dialog
   const quickJumpItems = [
+    { label: 'Supplier Management', path: '/suppliers', category: 'Purchase', permission: 'SUPPLIER_VIEW' },
     { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Purchase', permission: 'PURCHASE_REQUISITION_VIEW' },
     { label: 'Purchase Enquiries', path: '/purchase-enquiries', category: 'Purchase', permission: 'PURCHASE_ENQUIRY_VIEW' },
     { label: 'Purchase Orders', path: '/purchase-orders', category: 'Purchase', permission: 'PURCHASE_ORDER_VIEW' },

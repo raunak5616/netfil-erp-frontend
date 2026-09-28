@@ -7,6 +7,7 @@ import {
 } from '../../services/purchaseOrderService';
 import { getPurchaseRequisitions, getPurchaseRequisitionById } from '../../services/purchaseRequisitionService';
 import { getPurchaseEnquiries, getPurchaseEnquiryById } from '../../services/purchaseEnquiryService';
+import { getSuppliers } from '../../services/supplierService';
 import { getClients } from '../../services/clientService';
 import { getDepartments } from '../../services/departmentService';
 import { getItems } from '../../services/itemService';
@@ -109,7 +110,7 @@ const PurchaseOrderForm = () => {
       const [prRes, peRes, supplierRes, deptRes, itemRes, uomRes] = await Promise.all([
         getPurchaseRequisitions({ status: 'APPROVED', limit: 100 }).catch(() => ({ success: false, purchaseRequisitions: [] })),
         getPurchaseEnquiries({ limit: 100 }).catch(() => ({ success: false, purchaseEnquiries: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100 }).catch(() => ({ success: false, clients: [], parties: [] })),
+        getSuppliers({ status: 'active', limit: 100 }).catch(() => getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100 })),
         getDepartments().catch(() => ({ success: false, departments: [] })),
         getItems().catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))
@@ -121,9 +122,9 @@ const PurchaseOrderForm = () => {
       if (peRes.success && Array.isArray(peRes.purchaseEnquiries)) {
         setEligiblePes(peRes.purchaseEnquiries.filter((p) => !['DRAFT', 'CANCELLED'].includes(p.status)));
       }
-      const rawSuppliers = supplierRes.clients || supplierRes.parties || [];
+      const rawSuppliers = supplierRes.suppliers || supplierRes.clients || supplierRes.parties || [];
       if (Array.isArray(rawSuppliers)) {
-        setSuppliers(rawSuppliers.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)));
+        setSuppliers(rawSuppliers.filter((s) => s.status === 'active'));
       }
       if (deptRes.success && Array.isArray(deptRes.departments)) {
         setDepartments(deptRes.departments.filter((d) => d.status === 'active'));
@@ -617,7 +618,7 @@ const PurchaseOrderForm = () => {
             </FormField>
 
             {/* Supplier Party Selection */}
-            <FormField label="Supplier (Party)" required>
+            <FormField label="Supplier" required>
               <Select
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
@@ -627,7 +628,7 @@ const PurchaseOrderForm = () => {
                 <option value="">-- Select Supplier --</option>
                 {suppliers.map((sup) => (
                   <option key={sup._id} value={sup._id}>
-                    {sup.companyName} ({sup.partyCode})
+                    {sup.supplierName || sup.companyName} ({sup.supplierCode || sup.partyCode})
                   </option>
                 ))}
               </Select>
