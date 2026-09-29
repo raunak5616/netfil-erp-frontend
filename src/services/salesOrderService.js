@@ -51,3 +51,18 @@ export const deleteSalesOrderItem = async (salesOrderId, itemId) => {
   const response = await api.delete(`/sales-orders/${salesOrderId}/items/${itemId}`);
   return response.data;
 };
+
+// Drawing Endpoints
+export const getSalesOrderItemDrawing = async (salesOrderId, itemId) => {
+  const response = await api.get(`/sales-orders/${salesOrderId}/items/${itemId}/drawing`, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+export const getSalesOrderDrawings = async (salesOrderId) => {
+  const response = await api.get(`/sales-orders/${salesOrderId}/drawings`, {
+    responseType: 'blob'
+  });
+  return response.data;
+};

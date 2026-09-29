@@ -3,7 +3,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { getSalesOrderById, updateSalesOrderStatus, getSalesOrderReferences } from '../../services/salesOrderService';
+import { getSalesOrderById, updateSalesOrderStatus, getSalesOrderReferences, getSalesOrderItemDrawing, getSalesOrderDrawings } from '../../services/salesOrderService';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
@@ -18,7 +18,9 @@ import {
   Package, 
   ExternalLink,
   ShieldCheck,
-  Ban
+  Ban,
+  Image as ImageIcon,
+  Printer
 } from 'lucide-react';
 
 const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated }) => {
@@ -98,6 +100,35 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
       setStatusLoading(false);
     }
   };
+
+  const checkDrawingEligible = (item) => {
+    const catName = item.itemCategory?.categoryName?.toLowerCase() || '';
+    const itemName = (item.item?.itemName || item.description || '').toLowerCase();
+    if (itemName.includes('motor') || itemName.includes('gasket') || itemName.includes('fastener') || itemName.includes('service')) return false;
+    return itemName.includes('filter') || itemName.includes('cartridge') || itemName.includes('flange') || catName.includes('filter') || catName.includes('cartridge') || catName.includes('flange');
+  };
+
+  const handleGenerateItemDrawing = async (item) => {
+    try {
+      const blob = await getSalesOrderItemDrawing(salesOrderId, item._id);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      alert('Failed to generate drawing: ' + (err.message || 'Validation error'));
+    }
+  };
+
+  const handleGenerateOrderDrawings = async () => {
+    try {
+      const blob = await getSalesOrderDrawings(salesOrderId);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      alert('Failed to generate order drawings. Ensure items have correct dimensions.');
+    }
+  };
+
+  const hasEligibleDrawings = items.some(checkDrawingEligible);
 
   if (!isOpen) return null;
 
@@ -217,6 +248,17 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                     <Edit size={14} style={{ marginRight: '6px' }} /> Edit Order
                   </Button>
                 )}
+
+                {hasEligibleDrawings && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleGenerateOrderDrawings}
+                    title="Generate Engineering Drawings for all eligible items"
+                  >
+                    <Printer size={14} style={{ marginRight: '6px' }} /> Order Drawings
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -323,6 +365,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                       <th style={{ padding: '8px 12px' }}>UOM</th>
                       <th style={{ padding: '8px 12px', textAlign: 'right' }}>Unit Price (₹)</th>
                       <th style={{ padding: '8px 12px', textAlign: 'right' }}>Line Total (₹)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>Drawing</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -355,6 +398,21 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--neutral-900)' }}>
                             ₹{(it.lineTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                            {checkDrawingEligible(it) ? (
+                              <button 
+                                onClick={() => handleGenerateItemDrawing(it)}
+                                title="Generate Technical Drawing"
+                                style={{
+                                  background: 'none', border: 'none', cursor: 'pointer', 
+                                  color: 'var(--primary-600)', padding: '4px', borderRadius: '4px'
+                                }}
+                                className="hover:bg-blue-50"
+                              >
+                                <ImageIcon size={16} />
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       ))
