@@ -127,7 +127,7 @@ const QuotationDetailModal = ({
             {quotation && `Created by ${quotation.createdBy?.username || 'System'} on ${formatDate(quotation.createdAt)}`}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
@@ -223,7 +223,7 @@ const QuotationDetailModal = ({
 
           {/* Party & Requirement Context Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-            <div className="card" style={{ padding: '14px' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Building2 size={14} /> Client / Party Details
               </div>
@@ -243,7 +243,7 @@ const QuotationDetailModal = ({
               )}
             </div>
 
-            <div className="card" style={{ padding: '14px' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <FileText size={14} /> Requirement & Sales Context
               </div>
@@ -268,8 +268,8 @@ const QuotationDetailModal = ({
               Quotation Line Items ({items.length})
             </h4>
 
-            <div className="table-container">
-              <table className="data-table" style={{ fontSize: '12.5px' }}>
+            <div className="overflow-x-auto border border-slate-200 rounded bg-white">
+              <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap" style={{ fontSize: '12.5px' }}>
                 <thead>
                   <tr>
                     <th style={{ width: '40px' }}>#</th>

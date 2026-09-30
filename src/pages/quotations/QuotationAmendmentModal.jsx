@@ -142,7 +142,7 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
 
       {activeTab === 'create' ? (
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
+          <div className="mb-4">
             <label className="form-label">Amendment Reason *</label>
             <Input
               type="text"
@@ -153,7 +153,7 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
             />
           </div>
 
-          <div style={{ marginBottom: '16px' }}>
+          <div className="mb-4">
             <h5 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '8px' }}>
               Header Commercial Updates (Optional)
             </h5>

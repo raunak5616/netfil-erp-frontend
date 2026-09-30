@@ -257,7 +257,7 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
         <FormField label="Assigned Roles" required fullWidth helperText="Search and select one or more system roles. Permissions are the union of all assigned roles.">
           <div style={{ border: '1px solid var(--neutral-300)', borderRadius: '6px', padding: '10px', backgroundColor: '#ffffff' }}>
             {/* Search bar */}
-            <div className="search-input-wrap" style={{ marginBottom: '8px' }}>
+            <div className="relative flex-1 min-w-[220px]" style={{ marginBottom: '8px' }}>
               <Search size={15} style={{ color: 'var(--neutral-400)', position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
               <Input
                 placeholder="Search roles..."
@@ -315,7 +315,7 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
                         {r.roleName}
                       </span>
                       {r.description && (
-                        <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>
+                        <span className="text-xs text-slate-500">
                           ({r.description})
                         </span>
                       )}

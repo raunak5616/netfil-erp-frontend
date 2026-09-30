@@ -109,7 +109,7 @@ const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
           )}
 
           {/* Section 1: Customer PO & Delivery Information */}
-          <div className="card" style={{ padding: '16px' }}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
             <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShoppingBag size={16} color="var(--primary-600)" />
               Customer PO & Delivery Terms
@@ -180,7 +180,7 @@ const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
 
           {/* Section 2: Draft Commercial Parameters (Only when NOT locked) */}
           {!isLocked && (
-            <div className="card" style={{ padding: '16px', background: 'var(--neutral-50)' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', background: 'var(--neutral-50)' }}>
               <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Calculator size={16} color="var(--primary-600)" />
                 Draft Commercial Parameters

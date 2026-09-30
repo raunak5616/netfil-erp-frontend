@@ -232,7 +232,7 @@ const QuotationList = () => {
               {row.quotationType}
             </span>
             <span
-              className="badge badge-primary"
+              className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"
               style={{ textTransform: 'capitalize', fontSize: '11px' }}
             >
               {row.quotationCategory}
@@ -387,7 +387,7 @@ const QuotationList = () => {
   );
 
   return (
-    <div className="page-container">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Quotation Management"
         subtitle="Create, manage, release, and amend commercial quotations for clients."
@@ -420,13 +420,13 @@ const QuotationList = () => {
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
-      <div className="card">
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
-        <div className="toolbar" style={{ padding: '16px', gap: '12px' }}>
+        <div className="flex flex-wrap items-center gap-3 mb-4" style={{ padding: '16px', gap: '12px' }}>
           <form onSubmit={handleApplySearch} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
-            <div className="search-input-wrap" style={{ flex: '1', minWidth: '220px' }}>
-              <Search size={16} />
-              <Input
+            <div className="relative flex-1 min-w-[220px]" style={{ flex: '1', minWidth: '220px' }}>
+              <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input className="pl-8"
                 placeholder="Search by Quotation No, Party, Remarks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

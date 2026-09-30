@@ -234,14 +234,14 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
       ) : (
         <div>
           {/* Header Summary Banner */}
-          <div className="card" style={{ padding: '16px', marginBottom: '16px', background: '#f8fafc', borderLeft: '4px solid var(--primary-600)' }}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', marginBottom: '16px', background: '#f8fafc', borderLeft: '4px solid var(--primary-600)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-800)' }} className="font-mono">
                     {bom.bomCode}
                   </h3>
-                  <span className="badge badge-primary" style={{ fontSize: '12px', fontWeight: 700 }}>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" style={{ fontSize: '12px', fontWeight: 700 }}>
                     Version {bom.version}
                   </span>
                   <StatusBadge status={bom.status} />
@@ -250,7 +250,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
                 <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--neutral-900)' }}>
                   <strong>Parent Finished Item:</strong>{' '}
                   <span style={{ fontWeight: 600 }}>{bom.parentItem?.itemName || 'N/A'}</span>{' '}
-                  <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }} className="font-mono">
+                  <span className="text-xs text-slate-500 font-mono">
                     ({bom.parentItem?.itemCode || 'No Code'})
                   </span>
                 </div>
@@ -313,7 +313,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
           </div>
 
           {/* Audit Meta Card */}
-          <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', background: 'white' }}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '12px 16px', marginBottom: '16px', background: 'white' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '12px' }}>
               <div>
                 <span style={{ color: 'var(--neutral-500)' }}>Effective From: </span>
@@ -371,7 +371,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
           {/* TAB 1: COMPONENT BREAKDOWN */}
           {activeTab === 'components' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="flex justify-between items-center">
                 <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase' }}>
                   Component Items List
                 </h4>
@@ -388,7 +388,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
 
               {/* Add Component Sub-Form */}
               {isAddComponentOpen && isDraft && (
-                <form onSubmit={handleAddComponentSubmit} className="card" style={{ padding: '14px', background: 'var(--neutral-50)', borderColor: 'var(--primary-300)' }}>
+                <form onSubmit={handleAddComponentSubmit} className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px', background: 'var(--neutral-50)', borderColor: 'var(--primary-300)' }}>
                   <h5 style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--primary-800)' }}>
                     Add New Component Item to Master BOM
                   </h5>
@@ -492,7 +492,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
               )}
 
               {/* Component Items Table */}
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: 0, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
                   <thead>
                     <tr style={{ background: 'var(--neutral-100)', textTransform: 'uppercase', fontSize: '10.5px', color: 'var(--neutral-600)', textAlign: 'left' }}>
@@ -574,7 +574,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
 
           {/* TAB 2: REVISION HISTORY */}
           {activeTab === 'revisions' && (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', background: 'var(--neutral-50)', borderBottom: '1px solid var(--neutral-200)' }}>
                 <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase' }}>
                   All Versions & Revisions for {bom.parentItem?.itemName || 'Parent Item'}

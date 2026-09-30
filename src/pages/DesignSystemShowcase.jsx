@@ -119,9 +119,9 @@ const DesignSystemShowcase = () => {
       {activeTab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Alert Banners */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">1. Notification & Alert Banners</h3>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+              <h3 className="text-[15px] font-semibold text-slate-900">1. Notification & Alert Banners</h3>
             </div>
             <Alert type="info" title="ERP System Status" message="Restrained enterprise design system initialized. No decorative bloat or heavy animations." />
             <Alert type="success" title="Success State" message="Employee module and design tokens loaded successfully." />
@@ -130,9 +130,9 @@ const DesignSystemShowcase = () => {
           </div>
 
           {/* Button Variants */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">2. Button Variants & Sizes</h3>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+              <h3 className="text-[15px] font-semibold text-slate-900">2. Button Variants & Sizes</h3>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -155,9 +155,9 @@ const DesignSystemShowcase = () => {
           </div>
 
           {/* Status Badges */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">3. Status Indicators & Badges</h3>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+              <h3 className="text-[15px] font-semibold text-slate-900">3. Status Indicators & Badges</h3>
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <StatusBadge status="active" />
@@ -177,10 +177,10 @@ const DesignSystemShowcase = () => {
 
       {/* TAB 2: DATA TABLE DEMO */}
       {activeTab === 'table-demo' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Enterprise Data Table Pattern</h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+            <h3 className="text-[15px] font-semibold text-slate-900">Enterprise Data Table Pattern</h3>
+            <div className="flex gap-2">
               <Button variant="secondary" size="sm" icon={Filter}>Filter</Button>
               <Button variant="primary" size="sm" icon={Plus} onClick={() => setIsConfirmOpen(true)}>
                 Test Confirm Prompt
@@ -188,10 +188,10 @@ const DesignSystemShowcase = () => {
             </div>
           </div>
 
-          <div className="toolbar">
-            <div className="search-input-wrap">
-              <Search size={16} />
-              <Input placeholder="Quick search table records..." />
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input className="pl-8" placeholder="Quick search table records..." />
             </div>
             <Select style={{ width: '180px' }}>
               <option value="all">All Categories</option>
@@ -215,9 +215,9 @@ const DesignSystemShowcase = () => {
 
       {/* TAB 3: FORM CONTROLS */}
       {activeTab === 'forms-demo' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Office ERP Form Controls</h3>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+            <h3 className="text-[15px] font-semibold text-slate-900">Office ERP Form Controls</h3>
           </div>
 
           <form onSubmit={(e) => e.preventDefault()} className="form-grid">
@@ -277,9 +277,9 @@ const DesignSystemShowcase = () => {
 
       {/* TAB 4: OVERLAYS */}
       {activeTab === 'overlays-demo' && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="card-header">
-            <h3 className="card-title">Modal, Drawer, & Confirm Dialog Overlays</h3>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+            <h3 className="text-[15px] font-semibold text-slate-900">Modal, Drawer, & Confirm Dialog Overlays</h3>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>

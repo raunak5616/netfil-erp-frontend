@@ -204,7 +204,7 @@ const RoleList = () => {
       {error && <Alert type="danger">{error}</Alert>}
 
       {/* Filter and Table Container */}
-      <div className="card space-y-4">
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />

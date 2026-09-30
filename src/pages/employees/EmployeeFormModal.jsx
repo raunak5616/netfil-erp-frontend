@@ -200,7 +200,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="text"
               name="employeeCode"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               placeholder="e.g. EMP002"
               value={formData.employeeCode}
               onChange={handleChange}
@@ -216,7 +216,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="text"
               name="fullName"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               placeholder="Enter full name"
               value={formData.fullName}
               onChange={handleChange}
@@ -230,7 +230,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             </label>
             <select
               name="department"
-              className="form-select"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               value={formData.department}
               onChange={handleChange}
               disabled={submitting || loadingDepts}
@@ -251,7 +251,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="text"
               name="designation"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               placeholder="e.g. Senior Engineer"
               value={formData.designation}
               onChange={handleChange}
@@ -264,7 +264,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="email"
               name="email"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               placeholder="employee@company.com"
               value={formData.email}
               onChange={handleChange}
@@ -277,7 +277,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="text"
               name="mobile"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               placeholder="+91 9876543210"
               value={formData.mobile}
               onChange={handleChange}
@@ -292,7 +292,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             <input
               type="date"
               name="joiningDate"
-              className="form-input"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               value={formData.joiningDate}
               onChange={handleChange}
               disabled={submitting}
@@ -305,7 +305,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
             </label>
             <select
               name="status"
-              className="form-select"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               value={formData.status}
               onChange={handleChange}
               disabled={submitting}

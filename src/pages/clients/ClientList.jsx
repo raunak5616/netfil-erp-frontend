@@ -257,12 +257,12 @@ const ClientList = () => {
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
 
-      <div className="card">
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
-        <div className="toolbar">
-          <div className="search-input-wrap">
-            <Search size={16} />
-            <Input
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input className="pl-8"
               placeholder="Search by party code, party name, contact person, mobile, email, or city..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

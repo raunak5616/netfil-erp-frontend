@@ -304,7 +304,7 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--neutral-900)' }}>
                   {selectedSOItem.item?.itemName || selectedSOItem.description}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }} className="font-mono">
+                <div className="text-xs text-slate-500 font-mono">
                   Code: {selectedSOItem.item?.itemCode || 'N/A'}
                 </div>
               </div>
@@ -375,8 +375,8 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
             <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--neutral-800)', marginBottom: '6px' }}>
               Component Snapshot Preview (Calculated for {orderQty} {uomName})
             </div>
-            <div className="table-container" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-              <table className="data-table">
+            <div className="overflow-x-auto border border-slate-200 rounded bg-white" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+              <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap">
                 <thead>
                   <tr>
                     <th>Component Item</th>

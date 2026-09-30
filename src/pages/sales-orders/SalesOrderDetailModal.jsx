@@ -153,7 +153,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
       ) : (
         <div>
           {/* Header Card */}
-          <div className="card" style={{ padding: '16px', marginBottom: '16px', background: '#f8fafc', borderLeft: '4px solid var(--primary-600)' }}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', marginBottom: '16px', background: '#f8fafc', borderLeft: '4px solid var(--primary-600)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -161,7 +161,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                     {salesOrder.salesOrderNo}
                   </h3>
                   <StatusBadge status={salesOrder.status} />
-                  <span className="badge badge-secondary" style={{ textTransform: 'capitalize' }}>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-slate-100 text-slate-700 border border-slate-200" style={{ textTransform: 'capitalize' }}>
                     {salesOrder.orderType} / {salesOrder.orderCategory}
                   </span>
                 </div>
@@ -302,7 +302,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
               {/* Customer PO & Terms Card */}
-              <div className="card" style={{ padding: '14px', background: 'white' }}>
+              <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px', background: 'white' }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Customer PO & Delivery Terms
                 </h4>
@@ -346,12 +346,12 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
               </div>
 
               {/* Snapshotted Line Items Table */}
-              <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+              <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '0', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', background: 'var(--neutral-50)', borderBottom: '1px solid var(--neutral-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase' }}>
                     Sales Order Items (Snapshot)
                   </h4>
-                  <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>
+                  <span className="text-xs text-slate-500">
                     Total Quantity: <strong>{salesOrder.totalQuantity || 0}</strong>
                   </span>
                 </div>
@@ -422,7 +422,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
               </div>
 
               {/* Commercial Breakdown Card */}
-              <div className="card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid var(--neutral-300)' }}>
+              <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', background: '#f8fafc', border: '1px solid var(--neutral-300)' }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Commercial Summary (Historical Snapshot)</span>
                   <span style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'none', fontWeight: 400 }}>
@@ -479,7 +479,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
           {/* TAB 2: TRACEABILITY & REFERENCES */}
           {activeTab === 'traceability' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="card" style={{ padding: '16px' }}>
+              <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-800)' }}>
                   Document Flow & Origin Traceability
                 </h4>

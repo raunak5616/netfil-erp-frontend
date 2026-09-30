@@ -304,8 +304,8 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
                 <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--neutral-800)', marginBottom: '6px' }}>
                   Component Requirements Snapshot (Calculated for {prodQtyNum} {uomName})
                 </div>
-                <div className="table-container" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  <table className="data-table">
+                <div className="overflow-x-auto border border-slate-200 rounded bg-white" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                  <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr>
                         <th>Component Item</th>

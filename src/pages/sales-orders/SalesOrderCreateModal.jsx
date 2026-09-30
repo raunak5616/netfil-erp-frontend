@@ -154,7 +154,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Step 1: Quotation Selector */}
-          <div className="card" style={{ padding: '16px', background: 'var(--neutral-50)' }}>
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', background: 'var(--neutral-50)' }}>
             <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Calculator size={16} color="var(--primary-600)" />
               Step 1: Select Eligible Quotation
@@ -171,7 +171,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <div className="search-input-wrap" style={{ flex: 1 }}>
+                  <div className="relative flex-1 min-w-[220px]" style={{ flex: 1 }}>
                     <Search size={14} />
                     <Input
                       placeholder="Search eligible quotation by No or Party..."
@@ -206,13 +206,13 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
           )}
 
           {selectedQuotationDetails && (
-            <div className="card" style={{ padding: '16px', borderColor: 'var(--primary-200)', background: '#f8fafc' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', borderColor: 'var(--primary-200)', background: '#f8fafc' }}>
               <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <FileText size={16} color="var(--primary-600)" />
                   Step 2: Quotation Commercial Snapshot
                 </span>
-                <span className="badge badge-success" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
                   {selectedQuotationDetails.header.status}
                 </span>
               </h4>
@@ -327,7 +327,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
 
           {/* Step 3: Customer PO & Order Details */}
           {selectedQuotationDetails && (
-            <div className="card" style={{ padding: '16px' }}>
+            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
               <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShoppingBag size={16} color="var(--primary-600)" />
                 Step 3: Customer Purchase Order & Delivery Terms

@@ -463,7 +463,7 @@ const EnquiryMis = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Enquiry MIS"
         subtitle="Commercial Requirement & Enquiry Monitoring Reports"
@@ -491,7 +491,7 @@ const EnquiryMis = () => {
           marginBottom: '20px',
         }}
       >
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--primary-500)' }}>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px 18px', borderLeft: '4px solid var(--primary-500)' }}>
           <div style={{ fontSize: '12px', color: 'var(--gray-600)', textTransform: 'uppercase', fontWeight: 600 }}>
             Total Enquiries
           </div>
@@ -500,7 +500,7 @@ const EnquiryMis = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--warning-500)' }}>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px 18px', borderLeft: '4px solid var(--warning-500)' }}>
           <div style={{ fontSize: '12px', color: 'var(--gray-600)', textTransform: 'uppercase', fontWeight: 600 }}>
             Pending Quotations
           </div>
@@ -509,7 +509,7 @@ const EnquiryMis = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--success-500)' }}>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px 18px', borderLeft: '4px solid var(--success-500)' }}>
           <div style={{ fontSize: '12px', color: 'var(--gray-600)', textTransform: 'uppercase', fontWeight: 600 }}>
             Won Enquiries
           </div>
@@ -518,7 +518,7 @@ const EnquiryMis = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--danger-500)' }}>
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px 18px', borderLeft: '4px solid var(--danger-500)' }}>
           <div style={{ fontSize: '12px', color: 'var(--gray-600)', textTransform: 'uppercase', fontWeight: 600 }}>
             Overdue Follow-ups
           </div>
@@ -529,7 +529,7 @@ const EnquiryMis = () => {
       </div>
 
       {/* Filter Control Bar */}
-      <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', marginBottom: '20px' }}>
         <form onSubmit={handleApplyFilters}>
           <div
             style={{
@@ -652,7 +652,7 @@ const EnquiryMis = () => {
             </div>
 
             {/* Filter Buttons & Overdue Toggle */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex gap-2">
               <Button
                 type="button"
                 variant={isOverdueOnly ? 'danger' : 'outline'}
@@ -801,7 +801,7 @@ const EnquiryMis = () => {
       </div>
 
       {/* Main MIS Data Table */}
-      <div className="card">
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         <DataTable
           columns={getActiveColumns()}
           data={reportData}

@@ -179,7 +179,7 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* Navigation Tabs */}
         <div style={{ borderBottom: '1px solid var(--neutral-200)', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('details')}
@@ -376,8 +376,8 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
                   No specifications currently assigned to this category.
                 </div>
               ) : (
-                <div className="table-container">
-                  <table className="data-table">
+                <div className="overflow-x-auto border border-slate-200 rounded bg-white">
+                  <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr>
                         <th style={{ width: '60px' }}>Order</th>
@@ -417,7 +417,7 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
                                   title="Toggle Mandatory Requirement"
                                 />
                               ) : (
-                                cs.required ? <span className="badge badge-danger">Required</span> : <span className="badge badge-neutral">Optional</span>
+                                cs.required ? <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-red-50 text-red-800 border border-red-200">Required</span> : <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">Optional</span>
                               )}
                             </td>
                             {canEdit && (

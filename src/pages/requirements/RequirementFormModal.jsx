@@ -409,9 +409,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             <div style={{ gridColumn: 'span 2' }}>
               <FormField label="Select Party / Customer" required helperText="Search and select existing customer party record">
                 <div style={{ position: 'relative' }}>
-                  <div className="search-input-wrap" style={{ width: '100%' }}>
-                    <Search size={16} />
-                    <Input
+                  <div className="relative flex-1 min-w-[220px]" style={{ width: '100%' }}>
+                    <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input className="pl-8"
                       placeholder="Type party code or company name to search..."
                       value={clientSearch}
                       onChange={(e) => {
@@ -591,9 +591,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
               <div style={{ gridColumn: 'span 2' }}>
                 <FormField label="Required Item / Air Filter" helperText="Select standard catalog item from Item Master (Optional if custom filter requirement)">
                   <div style={{ position: 'relative' }}>
-                    <div className="search-input-wrap" style={{ width: '100%' }}>
-                      <Search size={16} />
-                      <Input
+                    <div className="relative flex-1 min-w-[220px]" style={{ width: '100%' }}>
+                      <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input className="pl-8"
                         placeholder="Search item by code or name..."
                         value={itemSearch}
                         onChange={(e) => {

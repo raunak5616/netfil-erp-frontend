@@ -92,7 +92,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
         maxWidth="920px"
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex gap-2">
               {/* Store Actions */}
               {canRouteStore && orderBOM?.status === 'DRAFT' && (
                 <Button
@@ -232,7 +232,7 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                   <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
                     {orderBOM.parentItem?.itemName || 'N/A'}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }} className="font-mono">
+                  <div className="text-xs text-slate-500 font-mono">
                     Code: {orderBOM.parentItem?.itemCode || 'N/A'}
                   </div>
                 </div>
@@ -280,8 +280,8 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
                 </span>
               </div>
 
-              <div className="table-container">
-                <table className="data-table">
+              <div className="overflow-x-auto border border-slate-200 rounded bg-white">
+                <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap">
                   <thead>
                     <tr>
                       <th style={{ width: '40px' }}>#</th>
@@ -374,11 +374,11 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
                   {(!orderBOM.statusHistory || orderBOM.statusHistory.length === 0) ? (
-                    <div style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>No status history logged</div>
+                    <div className="text-xs text-slate-500">No status history logged</div>
                   ) : (
                     orderBOM.statusHistory.map((h, idx) => (
                       <div key={idx} style={{ fontSize: '11.5px', borderLeft: '2px solid var(--primary-500)', paddingLeft: '8px', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="flex justify-between items-center">
                           <StatusBadge status={h.status} />
                           <span style={{ color: 'var(--neutral-500)', fontSize: '11px' }}>
                             {new Date(h.performedAt).toLocaleString('en-GB')}
