@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   createQuotation,
   updateQuotation,
@@ -392,18 +392,18 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
       maxWidth="900px"
     >
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>Loading quotation form data...</div>
+        <div className="text-center p-10">Loading quotation form data...</div>
       ) : (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
           {/* Section 1: Header Information */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '12px', borderBottom: '1px solid var(--gray-200)', paddingBottom: '6px' }}>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
               1. Commercial & Party Header Information
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Party / Customer *</label>
                 <Select
@@ -509,29 +509,24 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
           </div>
 
           {/* Section 2: Quotation Line Items (Manual Unit Rate Entry) */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--gray-200)', paddingBottom: '6px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-700)', margin: 0 }}>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider m-0">
                 2. Quotation Line Items (Manual Rate Entry)
               </h4>
               <Button type="button" variant="outline" size="xs" onClick={handleAddLineItem}>
-                <Plus size={14} style={{ marginRight: '4px' }} /> Add Line Item
+                <Plus size={14} className="mr-1" /> Add Line Item
               </Button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex flex-col gap-3">
               {lineItems.map((line, idx) => (
                 <div
                   key={idx}
-                  style={{
-                    padding: '12px',
-                    border: '1px solid var(--gray-300)',
-                    borderRadius: '6px',
-                    background: 'var(--gray-50)',
-                  }}
+                  className="p-3 border border-slate-200 rounded-lg bg-slate-50 space-y-2"
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong style={{ fontSize: '12px', color: 'var(--gray-700)' }}>
+                  <div className="flex justify-between items-center">
+                    <strong className="text-xs text-slate-600">
                       Line #{idx + 1}
                     </strong>
                     {lineItems.length > 1 && (
@@ -540,16 +535,16 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                         variant="ghost"
                         size="xs"
                         onClick={() => handleRemoveLineItem(idx)}
-                        style={{ color: 'var(--danger-600)' }}
+                        className="text-red-600 hover:text-red-700"
                       >
-                        <Trash2 size={14} /> Remove
+                        <Trash2 size={14} className="mr-1" /> Remove
                       </Button>
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1.2fr', gap: '8px', alignItems: 'center' }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>Item Master</label>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                    <div className="md:col-span-1">
+                      <label className="form-label text-[11px]">Item Master</label>
                       <Select
                         value={line.item}
                         onChange={(e) => handleItemSelect(idx, e.target.value)}
@@ -603,7 +598,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                     </div>
 
                     <div>
-                      <label className="form-label" style={{ fontSize: '11px', color: 'var(--primary-700)', fontWeight: 600 }}>
+                      <label className="form-label text-[11px] text-blue-700 font-bold">
                         Rate / Unit (₹) *
                       </label>
                       <Input
@@ -613,15 +608,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                         placeholder="Manual Rate"
                         value={line.unitPrice}
                         onChange={(e) => handleLineItemChange(idx, 'unitPrice', e.target.value)}
-                        style={{ fontWeight: 600, borderColor: 'var(--primary-400)' }}
+                        className="font-bold border-blue-400"
                         required
                       />
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '8px', marginTop: '8px' }}>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mt-2">
                     <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>HSN Code</label>
+                      <label className="form-label text-[11px]">HSN Code</label>
                       <Input
                         type="text"
                         placeholder="HSN Code"
@@ -630,8 +625,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                       />
                     </div>
 
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>Item Remarks</label>
+                    <div className="md:col-span-2">
+                      <label className="form-label text-[11px]">Item Remarks</label>
                       <Input
                         type="text"
                         placeholder="Remarks / Specs"
@@ -640,9 +635,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                       />
                     </div>
 
-                    <div style={{ textAlign: 'right', alignSelf: 'center' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--gray-600)' }}>Line Total: </span>
-                      <strong style={{ fontSize: '13px', color: 'var(--gray-900)' }}>
+                    <div className="text-right flex items-center justify-end pb-2">
+                      <span className="text-[11px] text-slate-500 mr-2">Line Total: </span>
+                      <strong className="text-sm text-slate-900">
                         ₹{((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </strong>
                     </div>
@@ -653,12 +648,12 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
           </div>
 
           {/* Section 3: Commercial Adjustments & Tax Calculations */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '12px', borderBottom: '1px solid var(--gray-200)', paddingBottom: '6px' }}>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
               3. Commercial Charges & Dynamic Tax Calculations
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="form-label">P&F Amount (₹)</label>
                 <Input
@@ -700,8 +695,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', alignItems: 'center' }}>
-              <div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center mt-2">
+              <div className="lg:col-span-1">
                 <label className="form-label">Tax Rate (%)</label>
                 <Input
                   type="number"
@@ -713,35 +708,24 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                 />
               </div>
 
-              {/* Real-time calculated Commercial Summary Box */}
-              <div
-                style={{
-                  padding: '12px 16px',
-                  background: 'var(--primary-50)',
-                  border: '1px solid var(--primary-200)',
-                  borderRadius: '6px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  gap: '8px',
-                  fontSize: '12px',
-                }}
-              >
-                <div>
-                  <span style={{ color: 'var(--gray-600)' }}>Subtotal:</span>
-                  <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>₹{totals.subtotal.toFixed(2)}</div>
+              {/* Real-time calculated Commercial Summary Box - simple design applied */}
+              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-500 text-[11px] block">Subtotal:</span>
+                  <div className="text-sm font-bold text-slate-800">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--gray-600)' }}>Taxable:</span>
-                  <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>₹{totals.taxableAmount.toFixed(2)}</div>
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-500 text-[11px] block">Taxable:</span>
+                  <div className="text-sm font-bold text-slate-800">₹{totals.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--gray-600)' }}>Tax Amount:</span>
-                  <div style={{ fontWeight: 600, color: 'var(--primary-700)' }}>₹{totals.taxAmount.toFixed(2)}</div>
+                <div className="p-3 bg-sky-50 rounded-lg border border-sky-100">
+                  <span className="text-sky-700 text-[11px] block">Tax Amount:</span>
+                  <div className="text-sm font-bold text-sky-800">₹{totals.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--gray-600)' }}>Grand Total:</span>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--primary-900)' }}>
-                    ₹{totals.grandTotal.toFixed(2)}
+                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <span className="text-emerald-700 text-[11px] block">Grand Total:</span>
+                  <div className="text-base font-bold text-emerald-800">
+                    ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
               </div>
@@ -749,12 +733,12 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
           </div>
 
           {/* Section 4: Terms & Notes */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '12px', borderBottom: '1px solid var(--gray-200)', paddingBottom: '6px' }}>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
               4. Terms & Remarks
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Payment Terms</label>
                 <Input
@@ -794,8 +778,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
           </div>
 
           {/* Footer Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--gray-200)', paddingTop: '12px' }}>
-            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={submitting}>

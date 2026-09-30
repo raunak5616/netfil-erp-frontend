@@ -36,14 +36,103 @@ export const Input = ({ hasError, className = '', ...props }) => {
   );
 };
 
-export const Select = ({ hasError, className = '', children, ...props }) => {
+import ReactSelect from 'react-select';
+
+export const Select = ({ hasError, className = '', children, value, onChange, disabled, required, ...props }) => {
+  const options = [];
+  
+  const extractOptions = (nodes) => {
+    React.Children.toArray(nodes).forEach(child => {
+      if (!child) return;
+      if (child.type === 'option') {
+        options.push({ 
+          value: child.props.value, 
+          label: child.props.children, 
+          disabled: child.props.disabled 
+        });
+      } else if (child.props && child.props.children) {
+        extractOptions(child.props.children);
+      }
+    });
+  };
+  
+  extractOptions(children);
+
+  const selectedOption = options.find(opt => String(opt.value) === String(value)) || null;
+
+  const handleChange = (selected) => {
+    if (onChange) {
+      // Mock an event object to not break existing handlers
+      const mockEvent = {
+        target: {
+          value: selected ? selected.value : '',
+          name: props.name
+        }
+      };
+      onChange(mockEvent);
+    }
+  };
+
+  const customStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: '36px',
+      backgroundColor: disabled ? '#f8fafc' : 'white',
+      borderColor: hasError ? '#dc2626' : state.isFocused ? '#2563eb' : '#cbd5e1',
+      boxShadow: state.isFocused ? (hasError ? '0 0 0 2px #fee2e2' : '0 0 0 2px #dbeafe') : 'none',
+      '&:hover': {
+        borderColor: hasError ? '#dc2626' : state.isFocused ? '#2563eb' : '#cbd5e1'
+      },
+      borderRadius: '0.375rem', // rounded-md
+      fontSize: '0.75rem', // text-xs
+      padding: '0',
+      cursor: disabled ? 'not-allowed' : 'default',
+    }),
+    valueContainer: (base) => ({
+      ...base,
+      padding: '0 10px',
+    }),
+    input: (base) => ({
+      ...base,
+      margin: 0,
+      padding: 0,
+      color: '#1e293b',
+    }),
+    singleValue: (base, state) => ({
+      ...base,
+      color: state.isDisabled ? '#64748b' : '#1e293b',
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: '0.75rem',
+      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#eff6ff' : 'white',
+      color: state.isSelected ? 'white' : '#1e293b',
+      cursor: 'pointer',
+      '&:active': {
+        backgroundColor: '#2563eb',
+      }
+    }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 50,
+      borderRadius: '0.375rem',
+      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    }),
+  };
+
   return (
-    <select
-      className={`${baseFieldClasses} ${hasError ? errorFieldClasses : ''} ${className}`}
+    <ReactSelect
+      value={selectedOption}
+      onChange={handleChange}
+      options={options}
+      isDisabled={disabled}
+      styles={customStyles}
+      isSearchable={true}
+      isClearable={!required}
+      className={className}
+      placeholder="Select option..."
       {...props}
-    >
-      {children}
-    </select>
+    />
   );
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   getPurchaseOrderById,
@@ -27,7 +27,7 @@ import {
   Calendar,
   FileText,
   UserCheck,
-  DollarSign,
+  IndianRupee,
   Truck
 } from 'lucide-react';
 
@@ -990,20 +990,20 @@ const PurchaseOrderForm = () => {
           </div>
 
           {/* FINANCIAL TOTALS PREVIEW CARD */}
-          <div className="bg-slate-900 text-white rounded-xl p-5 shadow-md space-y-3 font-mono">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <DollarSign size={16} className="text-emerald-400" /> Order Financial Summary
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-3">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+              <IndianRupee size={16} className="text-blue-600" /> Order Financial Summary
             </h3>
-            <div className="space-y-1.5 text-xs text-slate-300">
+            <div className="space-y-1.5 text-xs text-slate-600">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
                 <span>₹ {computedTotals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-amber-400">
+              <div className="flex justify-between text-red-600">
                 <span>Total Discount:</span>
                 <span>- ₹ {computedTotals.totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-sky-400">
+              <div className="flex justify-between text-slate-600">
                 <span>Total Tax:</span>
                 <span>+ ₹ {computedTotals.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
@@ -1011,9 +1011,9 @@ const PurchaseOrderForm = () => {
                 <span>Freight & Other Charges:</span>
                 <span>+ ₹ {(computedTotals.freight + computedTotals.otherCharges).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="border-t border-slate-700 pt-2 flex justify-between items-center text-sm font-bold text-white">
+              <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm font-bold text-slate-900">
                 <span>Grand Total:</span>
-                <span className="text-emerald-400 text-base">₹ {computedTotals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-base text-blue-700">₹ {computedTotals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>

@@ -919,32 +919,32 @@ const GoodsReceiptForm = () => {
         </div>
 
         {/* RECEIPT QUANTITY SUMMARY CARD */}
-        <div className="bg-slate-900 text-white rounded-xl p-5 shadow-md space-y-3 font-mono">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 border-b border-slate-800 pb-2 flex items-center gap-2">
-            <CheckCircle size={16} className="text-emerald-400" /> Receipt Quantity Fulfillment Summary
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-3">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+            <CheckCircle size={16} className="text-blue-600" /> Receipt Quantity Fulfillment Summary
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-slate-300 pt-1">
-            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
-              <span className="text-slate-400 text-[11px] block">Total PO Quantity:</span>
-              <span className="text-base font-bold text-white">{summaryTotals.totalPOQty.toLocaleString('en-IN')}</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-slate-600 pt-1">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <span className="text-slate-500 text-[11px] block">Total PO Quantity:</span>
+              <span className="text-base font-bold text-slate-800">{summaryTotals.totalPOQty.toLocaleString('en-IN')}</span>
             </div>
 
-            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
-              <span className="text-amber-400 text-[11px] block">Previously Received:</span>
-              <span className="text-base font-bold text-amber-300">{summaryTotals.totalPrevReceived.toLocaleString('en-IN')}</span>
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
+              <span className="text-amber-700 text-[11px] block">Previously Received:</span>
+              <span className="text-base font-bold text-amber-800">{summaryTotals.totalPrevReceived.toLocaleString('en-IN')}</span>
             </div>
 
-            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
-              <span className="text-sky-400 text-[11px] block">Remaining Balance:</span>
-              <span className="text-base font-bold text-sky-300">{summaryTotals.totalRemaining.toLocaleString('en-IN')}</span>
+            <div className="p-3 bg-sky-50 rounded-lg border border-sky-100">
+              <span className="text-sky-700 text-[11px] block">Remaining Balance:</span>
+              <span className="text-base font-bold text-sky-800">{summaryTotals.totalRemaining.toLocaleString('en-IN')}</span>
             </div>
 
-            <div className="p-3 bg-emerald-950/60 rounded-lg border border-emerald-700/50">
-              <span className="text-emerald-400 text-[11px] block">This GRN Received:</span>
-              <span className="text-lg font-bold text-emerald-300">{summaryTotals.currentGRNQty.toLocaleString('en-IN')}</span>
+            <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+              <span className="text-emerald-700 text-[11px] block">This GRN Received:</span>
+              <span className="text-lg font-bold text-emerald-800">{summaryTotals.currentGRNQty.toLocaleString('en-IN')}</span>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 italic pt-1">
+          <p className="text-[11px] text-slate-500 italic pt-1">
             * Note: Material stock levels are posted to warehouse inventory only when this GRN is explicitly POSTED.
           </p>
         </div>
