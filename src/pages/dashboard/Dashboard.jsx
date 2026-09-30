@@ -1,192 +1,183 @@
-import React, { useState, useEffect } from 'react';
-import PendingActions from './components/PendingActions';
-import RecentPurchaseOrders from './components/RecentPurchaseOrders';
-import RecentGoodsReceipts from './components/RecentGoodsReceipts';
-import SupplierOverview from './components/SupplierOverview';
-import QuickActions from './components/QuickActions';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import {
+  getOpsDashboardSummary,
+  getRecentSalesOrders,
+  getActiveWorkOrders,
+  getSalesPipelineData
+} from '../../services/dashboardService';
 
-import { getPurchaseRequisitions } from '../../services/purchaseRequisitionService';
-import { getPurchaseEnquiries } from '../../services/purchaseEnquiryService';
-import { getPurchaseOrders } from '../../services/purchaseOrderService';
-import { getGoodsReceipts } from '../../services/goodsReceiptService';
-import { getSuppliers } from '../../services/supplierService';
+import OpsDashboardMetric from './components/OpsDashboardMetric';
+import RecentSalesOrdersTable from './components/RecentSalesOrdersTable';
+import ActiveWorkOrdersTable from './components/ActiveWorkOrdersTable';
+import SalesPipelineChart from './components/SalesPipelineChart';
+import OpsQuickActions from './components/OpsQuickActions';
 
 const Dashboard = () => {
+  const { hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState({
-    kpis: { prPending: 0, pePending: 0, poPending: 0, grnPending: 0, qiPending: 0, supActive: 0, supInactive: 0, supRecent: [] },
-    pendingActions: [],
-    recentPOs: [],
-    recentGRNs: []
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [data, setData] = useState({
+    summary: null,
+    recentSalesOrders: [],
+    activeWorkOrders: [],
+    pipeline: []
   });
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
     try {
+      const canViewSO = hasPermission('SALES_ORDER_VIEW');
+      const canViewWO = hasPermission('WORK_ORDER_VIEW');
+
       const [
-        prPendingRes,
-        pePendingRes,
-        poPendingRes,
-        grnPendingRes,
-        supRes,
-        supInactiveRes,
-        poRecentRes,
-        grnRecentRes,
-        supRecentRes
+        summaryRes,
+        salesRes,
+        woRes,
+        pipelineRes
       ] = await Promise.allSettled([
-        getPurchaseRequisitions({ limit: 10, status: 'UNDER_REVIEW' }),
-        getPurchaseEnquiries({ limit: 10, status: 'SUBMITTED' }),
-        getPurchaseOrders({ limit: 10, status: 'DRAFT' }),
-        getGoodsReceipts({ limit: 10, status: 'DRAFT' }),
-        getSuppliers({ limit: 1, status: 'active' }),
-        getSuppliers({ limit: 1, status: 'inactive' }),
-        getPurchaseOrders({ limit: 5 }),
-        getGoodsReceipts({ limit: 5 }),
-        getSuppliers({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' })
+        getOpsDashboardSummary(),
+        canViewSO ? getRecentSalesOrders() : Promise.resolve([]),
+        canViewWO ? getActiveWorkOrders() : Promise.resolve([]),
+        canViewSO ? getSalesPipelineData() : Promise.resolve([])
       ]);
 
-      const data = {
-        kpis: {
-          prPending: prPendingRes.value?.pagination?.totalCount || 0,
-          pePending: pePendingRes.value?.pagination?.totalCount || 0,
-          poPending: poPendingRes.value?.pagination?.totalCount || 0,
-          grnPending: grnPendingRes.value?.pagination?.totalCount || 0,
-          qiPending: 0,
-          supActive: supRes.value?.pagination?.totalCount || 0,
-          supInactive: supInactiveRes.value?.pagination?.totalCount || 0,
-          supRecent: supRecentRes.value?.suppliers || []
-        },
-        recentPOs: poRecentRes.value?.purchaseOrders || [],
-        recentGRNs: grnRecentRes.value?.goodsReceipts || [],
-        pendingActions: []
-      };
-
-      const actions = [];
-      if (prPendingRes.value?.purchaseRequisitions) {
-        prPendingRes.value.purchaseRequisitions.forEach(pr => {
-          actions.push({
-            module: 'Purchase Requisition',
-            referenceNumber: pr.prNumber,
-            supplier: pr.department?.departmentName || '—',
-            date: new Date(pr.prDate).toLocaleDateString(),
-            status: pr.status,
-            path: `/purchase-requisitions/${pr._id}`
-          });
-        });
-      }
-      if (pePendingRes.value?.purchaseEnquiries) {
-        pePendingRes.value.purchaseEnquiries.forEach(pe => {
-          actions.push({
-            module: 'Purchase Enquiry',
-            referenceNumber: pe.enquiryNumber,
-            supplier: pe.supplier?.supplierName || pe.supplierNameSnapshot || '—',
-            date: new Date(pe.enquiryDate).toLocaleDateString(),
-            status: pe.status,
-            path: `/purchase-enquiries/${pe._id}`
-          });
-        });
-      }
-      if (poPendingRes.value?.purchaseOrders) {
-        poPendingRes.value.purchaseOrders.forEach(po => {
-          actions.push({
-            module: 'Purchase Order',
-            referenceNumber: po.poNumber,
-            supplier: po.supplier?.supplierName || po.supplierNameSnapshot || '—',
-            date: new Date(po.poDate).toLocaleDateString(),
-            status: po.status,
-            path: `/purchase-orders/${po._id}`
-          });
-        });
-      }
-      if (grnPendingRes.value?.goodsReceipts) {
-        grnPendingRes.value.goodsReceipts.forEach(grn => {
-          actions.push({
-            module: 'Goods Receipt',
-            referenceNumber: grn.grnNumber,
-            supplier: grn.supplierNameSnapshot || '—',
-            date: new Date(grn.grnDate).toLocaleDateString(),
-            status: grn.status,
-            path: `/goods-receipts/${grn._id}`
-          });
-        });
-      }
-
-      data.pendingActions = actions.slice(0, 10);
-
-      setDashboardData(data);
+      setData({
+        summary: summaryRes.status === 'fulfilled' ? summaryRes.value : {},
+        recentSalesOrders: salesRes.status === 'fulfilled' ? salesRes.value : [],
+        activeWorkOrders: woRes.status === 'fulfilled' ? woRes.value : [],
+        pipeline: pipelineRes.status === 'fulfilled' ? pipelineRes.value : []
+      });
     } catch (err) {
-      console.error("Dashboard fetch error", err);
+      console.error('Dashboard fetch error:', err);
+      setError('Failed to load dashboard data.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [hasPermission]);
 
-  const SummaryMetric = ({ label, value, loading }) => (
-    <div className="flex justify-between items-center py-2 px-3 bg-white border border-slate-200 rounded-sm">
-      <span className="text-[11px] text-slate-700 font-medium">{label}</span>
-      {loading ? (
-        <div className="h-4 bg-slate-200 rounded w-6 animate-pulse"></div>
-      ) : (
-        <span className="text-[13px] font-bold text-slate-900">{value}</span>
-      )}
-    </div>
-  );
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
+        <span className="animate-pulse">Loading operations data...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="pb-8">
-      {/* Top Header */}
-      <div className="mb-4">
-        <h1 className="text-[19px] font-bold text-slate-900 m-0 leading-tight">Dashboard</h1>
-        <p className="text-slate-500 text-[12px] mt-0.5">
-          Procurement and operations overview
-        </p>
+    <div className="pb-8 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <h1 className="text-[22px] font-bold text-slate-900 m-0 leading-tight">Operations & Sales</h1>
+          <p className="text-slate-500 text-[13px] mt-1">High-level overview of sales pipeline and production status</p>
+        </div>
+        <button
+          onClick={() => fetchData(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-medium rounded shadow-sm hover:bg-slate-50 disabled:opacity-50"
+        >
+          {refreshing ? (
+            <svg className="animate-spin h-3.5 w-3.5 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          )}
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
 
-      {/* Today's Overview */}
+      {error && (
+        <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => fetchData()} className="text-red-700 font-medium underline text-xs">Retry</button>
+        </div>
+      )}
+
+      {/* KPI Section */}
       <div className="mb-6">
-        <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Today's Overview</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <SummaryMetric label="PR Pending Approval" value={dashboardData.kpis.prPending} loading={loading} />
-          <SummaryMetric label="PE Pending Response" value={dashboardData.kpis.pePending} loading={loading} />
-          <SummaryMetric label="PO Pending Release" value={dashboardData.kpis.poPending} loading={loading} />
-          <SummaryMetric label="GRN Pending Posting" value={dashboardData.kpis.grnPending} loading={loading} />
-          <SummaryMetric label="QI Pending Inspection" value={dashboardData.kpis.qiPending} loading={loading} />
-          <SummaryMetric label="Active Suppliers" value={dashboardData.kpis.supActive} loading={loading} />
+        <h2 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider mb-3">Key Metrics</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <OpsDashboardMetric 
+            label="Pending Quotations" 
+            value={data.summary?.qtPending} 
+            subtext="Needs follow-up" 
+            link="/quotations?status=DRAFT" 
+            hasPermission={hasPermission('QUOTATION_VIEW')} 
+          />
+          <OpsDashboardMetric 
+            label="Pending Sales Orders" 
+            value={data.summary?.soPending} 
+            subtext="Awaiting fulfillment" 
+            link="/sales-orders?status=DRAFT" 
+            hasPermission={hasPermission('SALES_ORDER_VIEW')} 
+          />
+          <OpsDashboardMetric 
+            label="Active Work Orders" 
+            value={data.summary?.woActive} 
+            subtext="Currently in progress" 
+            link="/work-orders?status=IN_PROGRESS" 
+            hasPermission={hasPermission('WORK_ORDER_VIEW')} 
+          />
+          <OpsDashboardMetric 
+            label="Active Clients" 
+            value={data.summary?.clientsActive} 
+            subtext="Approved customers" 
+            link="/clients?status=active" 
+            hasPermission={hasPermission('CLIENT_VIEW')} 
+          />
+          <OpsDashboardMetric 
+            label="Master Items" 
+            value={data.summary?.itemsActive} 
+            subtext="Active in inventory" 
+            link="/items" 
+            hasPermission={hasPermission('ITEM_VIEW')} 
+          />
         </div>
       </div>
 
-      {/* Pending Work */}
-      <div className="mb-6">
-        <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Pending Work</h2>
-        <PendingActions actions={dashboardData.pendingActions} loading={loading} />
+      {/* Sales Pipeline Chart & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+        {hasPermission('SALES_ORDER_VIEW') && (
+          <div className="lg:col-span-8">
+            <h2 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider mb-3">Sales Pipeline (30 Days)</h2>
+            <SalesPipelineChart data={data.pipeline} />
+          </div>
+        )}
+        <div className={hasPermission('SALES_ORDER_VIEW') ? "lg:col-span-4" : "lg:col-span-12"}>
+          <h2 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider mb-3">Quick Actions</h2>
+          <OpsQuickActions />
+        </div>
       </div>
 
-      {/* Recent Tables */}
+      {/* Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div>
-          <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Recent Purchase Orders</h2>
-          <RecentPurchaseOrders orders={dashboardData.recentPOs} loading={loading} />
-        </div>
-        <div>
-          <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Recent Goods Receipts</h2>
-          <RecentGoodsReceipts grns={dashboardData.recentGRNs} loading={loading} />
-        </div>
-      </div>
-
-      {/* Bottom Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Quick Actions</h2>
-          <QuickActions />
-        </div>
-        <div>
-          <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Supplier Summary</h2>
-          <SupplierOverview kpis={dashboardData.kpis} loading={loading} />
-        </div>
+        {hasPermission('SALES_ORDER_VIEW') && (
+          <div>
+            <h2 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider mb-3">Recent Sales Orders</h2>
+            <RecentSalesOrdersTable orders={data.recentSalesOrders} />
+          </div>
+        )}
+        {hasPermission('WORK_ORDER_VIEW') && (
+          <div>
+            <h2 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider mb-3">Active Work Orders</h2>
+            <ActiveWorkOrdersTable workOrders={data.activeWorkOrders} />
+          </div>
+        )}
       </div>
     </div>
   );
