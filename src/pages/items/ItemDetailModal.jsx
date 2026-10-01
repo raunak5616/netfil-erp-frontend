@@ -190,6 +190,32 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   {item.itemType || 'Standard'}
                 </div>
               </div>
+
+              {item.filterGrade && (
+                <div className="col-span-1 sm:col-span-3 bg-blue-50 border border-blue-100 rounded-md p-3 mt-1">
+                  <div className="text-[11px] text-blue-800 uppercase font-bold mb-2 flex items-center gap-1.5">
+                    <Layers size={14} /> Filter Standard Grade Reference
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-semibold">Grade</div>
+                      <div className="text-sm font-bold text-blue-900 mt-0.5">{item.filterGrade.filterGrade || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-semibold">EUROVENT</div>
+                      <div className="text-sm font-bold text-blue-900 mt-0.5">{item.filterGrade.eurovent || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-semibold">ISO</div>
+                      <div className="text-sm font-bold text-blue-900 mt-0.5">{item.filterGrade.iso || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-semibold">Variants</div>
+                      <div className="text-sm font-bold text-blue-900 mt-0.5">{item.filterGrade.variants?.length || 0} configurations</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border border-slate-200 rounded-md p-3 bg-white">
@@ -243,7 +269,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                       const displayVal = typeof s.value === 'boolean' ? (s.value ? 'Yes / True' : 'No / False') : String(s.value);
                       return (
                         <tr key={s._id || idx} className="hover:bg-slate-50">
-                          <td className="px-3 py-2 font-semibold text-slate-600">{s.printSerial ?? (idx + 1)}</td>
+                          <td className="px-3 py-2 font-semibold text-slate-600">{idx + 1}</td>
                           <td className="px-3 py-2 font-mono font-semibold text-primary-700">
                             {spec?.specificationCode || 'N/A'}
                           </td>

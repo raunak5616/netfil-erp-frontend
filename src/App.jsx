@@ -14,6 +14,7 @@ import ItemList from './pages/items/ItemList';
 import ItemGroupList from './pages/item-groups/ItemGroupList';
 import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 import SpecificationList from './pages/specifications/SpecificationList';
+import FilterGradeList from './pages/filterGrades/FilterGradeList';
 import ClientList from './pages/clients/ClientList';
 import RequirementList from './pages/requirements/RequirementList';
 import EnquiryMis from './pages/requirements/EnquiryMis';
@@ -37,6 +38,7 @@ import GoodsReceiptDetail from './pages/goodsReceipts/GoodsReceiptDetail';
 import SupplierList from './pages/suppliers/SupplierList';
 import SupplierForm from './pages/suppliers/SupplierForm';
 import SupplierDetail from './pages/suppliers/SupplierDetail';
+import StoreList from './pages/store/StoreList';
 
 function App() {
   return (
@@ -169,6 +171,11 @@ function App() {
                 <Route path="/goods-receipts/:id/edit" element={<GoodsReceiptForm />} />
               </Route>
 
+              {/* Protected Store Management Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="STORE_VIEW" />}>
+                <Route path="/stores" element={<StoreList />} />
+              </Route>
+
               {/* Protected UOM Module Route */}
               <Route element={<ProtectedRoute requiredPermission="UOM_VIEW" />}>
                 <Route path="/uoms" element={<UOMList />} />
@@ -187,6 +194,11 @@ function App() {
               {/* Protected Specifications Module Route */}
               <Route element={<ProtectedRoute requiredPermission="SPECIFICATION_VIEW" />}>
                 <Route path="/specifications" element={<SpecificationList />} />
+              </Route>
+
+              {/* Protected Filter Grades Module Route */}
+              <Route element={<ProtectedRoute requiredPermission="FILTER_GRADE_VIEW" />}>
+                <Route path="/filter-grades" element={<FilterGradeList />} />
               </Route>
 
               {/* Protected Items Module Route */}

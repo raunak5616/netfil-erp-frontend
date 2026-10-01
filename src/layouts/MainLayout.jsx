@@ -58,7 +58,7 @@ const MainLayout = () => {
         console.error("Failed to parse expanded groups state:", e);
       }
     }
-    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true };
+    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true, 'store-module': true };
   });
 
   // Handle window resize for mobile breakpoint
@@ -109,8 +109,11 @@ const MainLayout = () => {
     const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
 
-    const purchasePaths = ['/suppliers', '/purchase-requisitions', '/purchase-enquiries', '/purchase-orders'];
+    const purchasePaths = ['/suppliers', '/purchase-enquiries', '/purchase-orders', '/goods-receipts'];
     const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
+
+    const storePaths = ['/purchase-requisitions', '/stores'];
+    const isStoreChild = storePaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
       setExpandedGroups((prev) => ({ ...prev, 'item-master': true }));
@@ -120,6 +123,9 @@ const MainLayout = () => {
     }
     if (isPurchaseChild) {
       setExpandedGroups((prev) => ({ ...prev, 'purchase-module': true }));
+    }
+    if (isStoreChild) {
+      setExpandedGroups((prev) => ({ ...prev, 'store-module': true }));
     }
     // Close mobile drawer on route navigation
     setMobileOpen(false);
@@ -164,6 +170,7 @@ const MainLayout = () => {
       '/item-groups': [{ label: 'Item Master' }, { label: 'Item Groups' }],
       '/item-categories': [{ label: 'Item Master' }, { label: 'Item Categories' }],
       '/specifications': [{ label: 'Item Master' }, { label: 'Specifications' }],
+      '/filter-grades': [{ label: 'Item Master' }, { label: 'Filter Grades' }],
       '/clients': [{ label: 'Commercial' }, { label: 'Party Master' }],
       '/parties': [{ label: 'Commercial' }, { label: 'Party Master' }],
       '/requirements': [{ label: 'Commercial' }, { label: 'Client Requirements' }],
@@ -174,7 +181,8 @@ const MainLayout = () => {
       '/master-boms': [{ label: 'BOM' }, { label: 'Master BOMs' }],
       '/order-boms': [{ label: 'BOM' }, { label: 'Order BOMs' }],
       '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
-      '/purchase-requisitions': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Requisitions' }],
+      '/stores': [{ label: 'Store' }, { label: 'Store Management' }],
+      '/purchase-requisitions': [{ label: 'Store' }, { label: 'Purchase Requisitions' }],
       '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
       '/purchase-orders': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Orders' }],
       '/goods-receipts': [{ label: 'Purchase & Procurement' }, { label: 'Goods Receipts (GRN)' }],
@@ -209,10 +217,24 @@ const MainLayout = () => {
           isGroup: true,
           children: [
             { label: 'Supplier Management', path: '/suppliers', icon: Truck, permission: 'SUPPLIER_VIEW' },
-            { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
             { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
             { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, permission: 'PURCHASE_ORDER_VIEW' },
             { label: 'Goods Receipts', path: '/goods-receipts', icon: Package, permission: 'GOODS_RECEIPT_VIEW' },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'STORE',
+      items: [
+        {
+          id: 'store-module',
+          label: 'Store',
+          icon: Package,
+          isGroup: true,
+          children: [
+            { label: 'Store Management', path: '/stores', icon: Package, permission: 'STORE_VIEW' },
+            { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
           ],
         },
       ],
@@ -230,6 +252,7 @@ const MainLayout = () => {
             { label: 'Item Groups', path: '/item-groups', icon: Layers, permission: 'ITEM_GROUP_VIEW' },
             { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
             { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
+            { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
             { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
           ],
         },
@@ -272,7 +295,8 @@ const MainLayout = () => {
   // Quick navigation items for Cmd+K search dialog
   const quickJumpItems = [
     { label: 'Supplier Management', path: '/suppliers', category: 'Purchase', permission: 'SUPPLIER_VIEW' },
-    { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Purchase', permission: 'PURCHASE_REQUISITION_VIEW' },
+    { label: 'Store Management', path: '/stores', category: 'Store', permission: 'STORE_VIEW' },
+    { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Store', permission: 'PURCHASE_REQUISITION_VIEW' },
     { label: 'Purchase Enquiries', path: '/purchase-enquiries', category: 'Purchase', permission: 'PURCHASE_ENQUIRY_VIEW' },
     { label: 'Purchase Orders', path: '/purchase-orders', category: 'Purchase', permission: 'PURCHASE_ORDER_VIEW' },
     { label: 'Goods Receipts (GRN)', path: '/goods-receipts', category: 'Purchase', permission: 'GOODS_RECEIPT_VIEW' },

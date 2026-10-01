@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createItem, updateItem, getItemSpecifications, assignItemSpecification, updateItemSpecification, removeItemSpecification } from '../../services/itemService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { getItemCategories, getCategorySpecifications } from '../../services/itemCategoryService';
+import { getFilterGrades } from '../../services/filterGradeService';
 import { getUOMs } from '../../services/uomService';
 import { getBins } from '../../services/binService';
 import Modal from '../../components/ui/Modal';
@@ -33,10 +34,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     defaultBin: '',
     description: '',
     itemType: 'standard',
+    filterGrade: '',
     status: 'active',
   });
 
-  // Specification state: map of specId -> { value, isApply, isFix, printSerial, existingSpecId }
+  // Specification state: map of specId -> { value, isApply, isFix, existingSpecId }
   const [specsData, setSpecsData] = useState({});
 
   // Options master data lists
@@ -44,6 +46,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
   const [itemCategories, setItemCategories] = useState([]);
   const [uoms, setUoms] = useState([]);
   const [bins, setBins] = useState([]);
+  const [filterGrades, setFilterGrades] = useState([]);
   const [categorySpecs, setCategorySpecs] = useState([]);
 
   const [loadingData, setLoadingData] = useState(false);
@@ -59,11 +62,12 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
       setLoadingData(true);
       setErrorMessage('');
       try {
-        const [groupRes, catRes, uomRes, binRes] = await Promise.all([
+        const [groupRes, catRes, uomRes, binRes, fgRes] = await Promise.all([
           getItemGroups(),
           getItemCategories(),
           getUOMs(),
           getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
+          getFilterGrades().catch(() => ({ success: true, filterGrades: [] }))
         ]);
 
         const groupsArray = groupRes.itemGroups || groupRes.groups;
@@ -79,6 +83,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         }
         if (binRes.success && Array.isArray(binRes.bins)) {
           setBins(binRes.bins.filter((b) => b.status === 'active'));
+        }
+        if (fgRes.success && Array.isArray(fgRes.filterGrades)) {
+          setFilterGrades(fgRes.filterGrades.filter((f) => f.status === 'active'));
         }
       } catch (err) {
         console.error("Failed to load Item master option lists:", err);
@@ -111,6 +118,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         defaultBin: item.defaultBin?._id || item.defaultBin || '',
         description: item.description || '',
         itemType: item.itemType || 'standard',
+        filterGrade: item.filterGrade?._id || item.filterGrade || '',
         status: item.status || 'active',
       });
 
@@ -124,7 +132,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
               value: s.value,
               isApply: s.isApply || false,
               isFix: s.isFix || false,
-              printSerial: s.printSerial || 0,
               isExisting: true
             };
           });
@@ -152,6 +159,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         defaultBin: '',
         description: '',
         itemType: 'standard',
+        filterGrade: '',
         status: 'active',
       });
       setSpecsData({});
@@ -310,7 +318,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                   value: specVal.value,
                   isApply: !!specVal.isApply,
                   isFix: !!specVal.isFix,
-                  printSerial: Number(specVal.printSerial || 0),
                 });
               } else {
                 await assignItemSpecification(savedItem._id, {
@@ -318,7 +325,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                   value: specVal.value,
                   isApply: !!specVal.isApply,
                   isFix: !!specVal.isFix,
-                  printSerial: Number(specVal.printSerial || 0),
                 });
               }
             } catch (specErr) {
@@ -482,6 +488,76 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                 <option value="component">Component / Sub-Assembly</option>
               </Select>
             </FormField>
+
+            {/* Check if selected category implies this is a filter (by code or name) */}
+            {formData.itemCategory && (() => {
+              const selectedCat = itemCategories.find(c => c._id === formData.itemCategory);
+              const isFilterCategory = selectedCat && (
+                (selectedCat.categoryCode || '').toUpperCase().includes('FILTER') ||
+                (selectedCat.categoryName || '').toUpperCase().includes('FILTER') ||
+                (selectedCat.categoryCode || '').toUpperCase().includes('CART') // e.g., Filter Cartridges
+              );
+              if (isFilterCategory) {
+                const selectedFg = filterGrades.find(fg => fg._id === formData.filterGrade);
+                return (
+                  <div className="col-span-full border border-blue-200 bg-blue-50 p-4 rounded-md mt-2">
+                    <FormField label="Filter Grade Standard" helperText="Select standard filter grade for this filter item">
+                      <Select
+                        name="filterGrade"
+                        value={formData.filterGrade}
+                        onChange={handleChange}
+                        disabled={submitting || loadingData}
+                      >
+                        <option value="">-- No Filter Grade / Custom --</option>
+                        {filterGrades.map((fg) => (
+                          <option key={fg._id} value={fg._id}>
+                            {fg.filterGrade} {fg.eurovent ? `(${fg.eurovent})` : ''}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    
+                    {selectedFg && (
+                      <div className="mt-3 text-xs">
+                        <div className="flex gap-4 mb-2 font-semibold text-blue-900">
+                          <span>EUROVENT: {selectedFg.eurovent || 'N/A'}</span>
+                          <span>ISO: {selectedFg.iso || 'N/A'}</span>
+                        </div>
+                        <div className="overflow-x-auto rounded border border-blue-200">
+                          <table className="w-full text-left bg-white">
+                            <thead className="bg-blue-100 text-blue-800">
+                              <tr>
+                                <th className="px-2 py-1">Class</th>
+                                <th className="px-2 py-1">Type</th>
+                                <th className="px-2 py-1">Temp</th>
+                                <th className="px-2 py-1">Media</th>
+                                <th className="px-2 py-1">Efficiency</th>
+                                <th className="px-2 py-1">Initial PD</th>
+                                <th className="px-2 py-1">Final PD</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-blue-100 text-slate-700">
+                              {(selectedFg.variants || []).map((v, i) => (
+                                <tr key={i}>
+                                  <td className="px-2 py-1">{v.filterClass}</td>
+                                  <td className="px-2 py-1">{v.filterType}</td>
+                                  <td className="px-2 py-1">{v.temperature}</td>
+                                  <td className="px-2 py-1">{v.media}</td>
+                                  <td className="px-2 py-1">{v.efficiency}</td>
+                                  <td className="px-2 py-1">{v.initialPressureDrop}</td>
+                                  <td className="px-2 py-1">{v.finalPressureDrop}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <FormField label="Status" required>
               <Select
@@ -680,12 +756,12 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
 
                 {categorySpecs.map((spec) => {
                   const specId = spec._id;
-                  const currentData = specsData[specId] || { value: '', isApply: false, isFix: false, printSerial: 0 };
+                  const currentData = specsData[specId] || { value: '', isApply: false, isFix: false };
 
                   return (
                     <div
                       key={specId}
-                      className="grid grid-cols-1 md:grid-cols-[1.2fr_1.5fr_70px_70px_70px] gap-2.5 items-center bg-white p-2.5 rounded-md border border-slate-200"
+                      className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_70px_70px] gap-2.5 items-center bg-white p-2.5 rounded-md border border-slate-200"
                     >
                       <div>
                         <strong className="text-xs font-semibold text-slate-900 inline-flex items-center gap-1">
@@ -768,18 +844,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                         />
                         <span>Fix</span>
                       </label>
-
-                      {/* printSerial Input */}
-                      <div>
-                        <Input
-                          type="number"
-                          placeholder="Order"
-                          value={currentData.printSerial ?? 0}
-                          onChange={(e) => handleSpecChange(specId, 'printSerial', e.target.value)}
-                          disabled={submitting}
-                          title="Print Serial Display Order"
-                        />
-                      </div>
                     </div>
                   );
                 })}
