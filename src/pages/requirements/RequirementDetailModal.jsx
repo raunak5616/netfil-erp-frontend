@@ -16,7 +16,7 @@ import {
   Tag
 } from 'lucide-react';
 
-const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, canEdit }) => {
+const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreateQuotation, canEdit }) => {
   if (!isOpen || !requirement) return null;
 
   const party = typeof requirement.client === 'object' ? requirement.client : null;
@@ -94,9 +94,21 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, canEdit 
       maxWidth="720px"
       footer={
         <>
-          {canEdit && (
+          {onCreateQuotation && (
             <Button
               variant="primary"
+              icon={FileText}
+              onClick={() => {
+                onClose();
+                onCreateQuotation(requirement);
+              }}
+            >
+              Create Quotation
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              variant="secondary"
               icon={Edit}
               onClick={() => {
                 onClose();
@@ -106,7 +118,7 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, canEdit 
               Edit Requirement
             </Button>
           )}
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Close
           </Button>
         </>

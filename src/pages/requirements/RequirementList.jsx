@@ -10,6 +10,7 @@ import Alert from '../../components/ui/Alert';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import RequirementFormModal from './RequirementFormModal';
 import RequirementDetailModal from './RequirementDetailModal';
+import QuotationFormModal from '../quotations/QuotationFormModal';
 import { 
   Plus, 
   Search, 
@@ -17,6 +18,7 @@ import {
   Eye, 
   Edit, 
   RefreshCw,
+  FileText,
   Calendar,
   Building2,
   Package,
@@ -49,6 +51,10 @@ const RequirementList = () => {
   const [editingRequirement, setEditingRequirement] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState(null);
+
+  // Quotation Modal state
+  const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
+  const [quotationRequirement, setQuotationRequirement] = useState(null);
 
   const fetchRequirementsData = async () => {
     setLoading(true);
@@ -328,7 +334,7 @@ const RequirementList = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '160px',
+      width: '210px',
       render: (_, row) => (
         <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
           <Button
@@ -342,6 +348,20 @@ const RequirementList = () => {
           >
             View
           </Button>
+          {hasPermission('QUOTATION_CREATE') && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={FileText}
+              onClick={() => {
+                setQuotationRequirement(row);
+                setIsQuotationFormOpen(true);
+              }}
+              title="Create Quotation from this Enquiry"
+            >
+              Quotation
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="ghost"
@@ -491,8 +511,28 @@ const RequirementList = () => {
           setEditingRequirement(req);
           setIsFormOpen(true);
         }}
+        onCreateQuotation={(req) => {
+          setQuotationRequirement(req);
+          setIsQuotationFormOpen(true);
+        }}
         canEdit={canEdit}
       />
+
+      {isQuotationFormOpen && (
+        <QuotationFormModal
+          isOpen={isQuotationFormOpen}
+          initialRequirement={quotationRequirement}
+          onClose={() => {
+            setIsQuotationFormOpen(false);
+            setQuotationRequirement(null);
+          }}
+          onSuccess={() => {
+            setIsQuotationFormOpen(false);
+            setQuotationRequirement(null);
+            fetchRequirementsData();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -19,7 +19,7 @@ import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import { Plus, Trash2, Calculator, Layers, Package } from 'lucide-react';
 import QuotationRateSuggestion from './QuotationRateSuggestion';
 
-const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) => {
+const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, initialRequirement = null }) => {
   const isEdit = Boolean(quotation && quotation._id);
 
   const [loading, setLoading] = useState(false);
@@ -33,14 +33,19 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
   const [uoms, setUoms] = useState([]);
   const [salesPersons, setSalesPersons] = useState([]);
 
+  // Initial Requirement Resolution
+  const initialReqObj = typeof initialRequirement === 'object' ? initialRequirement : null;
+  const initialReqId = initialReqObj?._id || (typeof initialRequirement === 'string' ? initialRequirement : '');
+  const initialClientId = initialReqObj?.client?._id || initialReqObj?.client || '';
+
   // Form Header Data
   const [formData, setFormData] = useState({
-    client: '',
-    requirement: '',
+    client: initialClientId,
+    requirement: initialReqId,
     quotationType: 'domestic',
     quotationCategory: 'product',
-    attentionPerson: '',
-    salesPerson: '',
+    attentionPerson: initialReqObj?.client?.contactPerson || '',
+    salesPerson: initialReqObj?.salesPerson?._id || initialReqObj?.salesPerson || '',
     quotationDate: new Date().toISOString().split('T')[0],
     validTill: '',
     currency: 'INR',
@@ -56,7 +61,6 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
   });
 
   // Line Items List
-  // Each item object: { _id, item, itemCategory, description, quantity, uom, unitPrice, hsnCode, remarks }
   const [lineItems, setLineItems] = useState([
     {
       item: '',
@@ -70,33 +74,110 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     },
   ]);
 
+  // Robust Enquiry Line Item Auto-Population Handler
+  const populateLineItemsFromRequirement = (selectedReq, allItems = items, allUoms = uoms) => {
+    if (!selectedReq) return;
+
+    const clientId = typeof selectedReq.client === 'object' ? selectedReq.client?._id : selectedReq.client;
+    const salesPersonId = typeof selectedReq.salesPerson === 'object' ? selectedReq.salesPerson?._id : selectedReq.salesPerson;
+
+    setFormData((prev) => ({
+      ...prev,
+      client: clientId || prev.client,
+      requirement: selectedReq._id || prev.requirement,
+      salesPerson: salesPersonId || prev.salesPerson,
+      attentionPerson: (typeof selectedReq.client === 'object' ? selectedReq.client?.contactPerson : '') || prev.attentionPerson,
+    }));
+
+    // Resolve catalog item object (if requirement has catalog item reference)
+    const itemObj = (typeof selectedReq.item === 'object' ? selectedReq.item : allItems.find((i) => i._id === selectedReq.item)) || null;
+
+    const itemId = itemObj?._id || (typeof selectedReq.item === 'string' ? selectedReq.item : null) || '';
+    const itemCatId = itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
+    const uomId = selectedReq.uom?._id || selectedReq.uom || itemObj?.salesUom?._id || itemObj?.salesUom || itemObj?.inventoryUom?._id || itemObj?.inventoryUom || allUoms[0]?._id || '';
+    const hsnCode = itemObj?.hsnCode || '';
+
+    let description = '';
+    if (itemObj) {
+      description = itemObj.itemName;
+    } else if (selectedReq.type === 'service' && selectedReq.serviceDescription) {
+      description = selectedReq.serviceDescription;
+    } else {
+      description = 'Custom Air Filter Requirement';
+    }
+
+    const qty = selectedReq.quantity !== null && selectedReq.quantity !== undefined ? Number(selectedReq.quantity) : 1;
+    const dims = selectedReq.dimensions || {};
+    const specs = Array.isArray(selectedReq.specifications) ? selectedReq.specifications : [];
+
+    // Detailed Technical Snapshot in remarks
+    let remarksText = selectedReq.remarks || '';
+    if (itemObj?.filterGrade) {
+      const fg = typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade : null;
+      const fgName = fg ? fg.filterGrade : itemObj.filterGrade;
+      const eurovent = fg?.eurovent || '';
+      const iso = fg?.iso || '';
+      const fgStr = [fgName ? `Grade: ${fgName}` : '', eurovent ? `EU: ${eurovent}` : '', iso ? `ISO: ${iso}` : ''].filter(Boolean).join(' / ');
+      if (fgStr && !remarksText.includes('Grade:')) {
+        remarksText = remarksText ? `${fgStr} | ${remarksText}` : fgStr;
+      }
+    }
+
+    if (dims && (dims.length || dims.width)) {
+      const dimStr = `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`;
+      if (!remarksText.includes('Dim:')) {
+        remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+      }
+    }
+
+    setLineItems([
+      {
+        item: itemId,
+        itemCategory: itemCatId,
+        description: description,
+        quantity: qty,
+        uom: uomId,
+        unitPrice: 0, // Rate strictly blank / 0 for manual entry
+        hsnCode: hsnCode,
+        dimensions: dims,
+        specifications: specs,
+        remarks: remarksText,
+      },
+    ]);
+  };
+
   // Load Master Selectors on Mount
   useEffect(() => {
     const loadMasters = async () => {
       setLoading(true);
       try {
-          const [rRes, iRes, uRes, eRes] = await Promise.all([
-            getRequirements().catch(() => ({ success: false, requirements: [] })),
-            getItems().catch(() => ({ success: false, items: [] })),
-            getUOMs().catch(() => ({ success: false, uoms: [] })),
-            getEmployees().catch(() => ({ success: false, employees: [] })),
-          ]);
-  
-          if (rRes.success && Array.isArray(rRes.requirements)) setRequirements(rRes.requirements);
-          if (iRes.success && Array.isArray(iRes.items)) setItems(iRes.items);
-          if (uRes.success && Array.isArray(uRes.uoms)) setUoms(uRes.uoms);
-          if (eRes.success && Array.isArray(eRes.employees)) setSalesPersons(eRes.employees);
-  
-          // If Editing, load complete quotation detail with items
-          if (isEdit) {
-            const detailRes = await getQuotationById(quotation._id);
-            if (detailRes.success && detailRes.quotation) {
-              const q = detailRes.quotation;
-              setFormData({
-                client: q.client?._id || q.client || '',
-                clientName: q.client?.companyName || '',
-                clientCode: q.client?.clientCode || '',
-                requirement: q.requirement?._id || q.requirement || '',
+        const [rRes, iRes, uRes, eRes] = await Promise.all([
+          getRequirements().catch(() => ({ success: false, requirements: [] })),
+          getItems().catch(() => ({ success: false, items: [] })),
+          getUOMs().catch(() => ({ success: false, uoms: [] })),
+          getEmployees().catch(() => ({ success: false, employees: [] })),
+        ]);
+
+        const reqsList = (rRes.success && Array.isArray(rRes.requirements)) ? rRes.requirements : [];
+        const itemsList = (iRes.success && Array.isArray(iRes.items)) ? iRes.items : [];
+        const uomsList = (uRes.success && Array.isArray(uRes.uoms)) ? uRes.uoms : [];
+        const empList = (eRes.success && Array.isArray(eRes.employees)) ? eRes.employees : [];
+
+        setRequirements(reqsList);
+        setItems(itemsList);
+        setUoms(uomsList);
+        setSalesPersons(empList);
+
+        // If Editing, load complete quotation detail with items
+        if (isEdit) {
+          const detailRes = await getQuotationById(quotation._id);
+          if (detailRes.success && detailRes.quotation) {
+            const q = detailRes.quotation;
+            setFormData({
+              client: q.client?._id || q.client || '',
+              clientName: q.client?.companyName || '',
+              clientCode: q.client?.clientCode || '',
+              requirement: q.requirement?._id || q.requirement || '',
               quotationType: q.quotationType || 'domestic',
               quotationCategory: q.quotationCategory || 'product',
               attentionPerson: q.attentionPerson || '',
@@ -131,6 +212,13 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
               );
             }
           }
+        } else {
+          // If creating a new quotation with a pre-selected requirement or initialRequirement
+          const targetReqId = initialReqId || formData.requirement;
+          const matchedReq = initialReqObj || reqsList.find((r) => r._id === targetReqId);
+          if (matchedReq) {
+            populateLineItemsFromRequirement(matchedReq, itemsList, uomsList);
+          }
         }
       } catch (err) {
         console.error('Failed to load master options for Quotation form:', err);
@@ -145,15 +233,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     }
   }, [isOpen, isEdit, quotation?._id]);
 
-  // Filtered Requirements based on selected Client
-  const availableRequirements = React.useMemo(() => {
-    if (!formData.client) return [];
-    return requirements.filter((r) => {
-      const clientId = typeof r.client === 'object' ? r.client?._id : r.client;
-      return clientId === formData.client;
-    });
-  }, [requirements, formData.client]);
-
+  // Client Selection Async Handler
   const loadClientOptions = async (inputValue) => {
     try {
       const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
@@ -171,9 +251,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     }
   };
 
-  // Handle Client Selection
   const handleClientChange = (e, selectedOption) => {
-    const clientId = e.target.value;
+    const clientId = e?.target?.value || '';
     setFormData((prev) => ({
       ...prev,
       client: clientId,
@@ -182,38 +261,22 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     }));
   };
 
-  // Handle Requirement Selection -> Populate catalog item & defaults from Requirement
+  // Filter available requirements for selected client
+  const availableRequirements = useMemo(() => {
+    if (!formData.client) return [];
+    return requirements.filter((r) => {
+      const clientId = typeof r.client === 'object' ? r.client?._id : r.client;
+      return clientId === formData.client;
+    });
+  }, [requirements, formData.client]);
+
+  // Handle Requirement Selection from dropdown
   const handleRequirementChange = (reqId) => {
     const selectedReq = requirements.find((r) => r._id === reqId);
-    setFormData((prev) => ({
-      ...prev,
-      requirement: reqId,
-      salesPerson: selectedReq?.salesPerson?._id || selectedReq?.salesPerson || prev.salesPerson,
-    }));
-
-    // If requirement has item, populate initial line item default
-    if (selectedReq && selectedReq.item) {
-      const itemObj = (typeof selectedReq.item === 'object' ? selectedReq.item : items.find((i) => i._id === selectedReq.item)) || null;
-      const itemId = itemObj?._id || (typeof selectedReq.item === 'string' ? selectedReq.item : selectedReq.item?._id);
-      const itemName = itemObj?.itemName || '';
-      const itemCatId = itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
-      const uomId = selectedReq.uom?._id || selectedReq.uom || itemObj?.salesUom?._id || itemObj?.salesUom || itemObj?.inventoryUom?._id || itemObj?.inventoryUom || '';
-      const hsnCode = itemObj?.hsnCode || '';
-
-      if (itemId) {
-        setLineItems([
-          {
-            item: itemId,
-            itemCategory: itemCatId,
-            description: itemName || 'Catalog Item',
-            quantity: selectedReq.quantity || 1,
-            uom: uomId,
-            unitPrice: 0, // CRITICAL: Manual rate entry required, 0 default
-            hsnCode: hsnCode,
-            remarks: selectedReq.remarks || (selectedReq.dimensions && (selectedReq.dimensions.length || selectedReq.dimensions.width) ? `Dim: ${selectedReq.dimensions.length || '—'}×${selectedReq.dimensions.width || '—'} ${selectedReq.dimensions.unit || 'mm'}` : ''),
-          },
-        ]);
-      }
+    if (selectedReq) {
+      populateLineItemsFromRequirement(selectedReq);
+    } else {
+      setFormData((prev) => ({ ...prev, requirement: reqId }));
     }
   };
 
