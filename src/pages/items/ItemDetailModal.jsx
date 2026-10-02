@@ -214,6 +214,64 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                       <div className="text-sm font-bold text-blue-900 mt-0.5">{item.filterGrade.variants?.length || 0} configurations</div>
                     </div>
                   </div>
+                  
+                  {item.filterGradeVariant ? (() => {
+                    const selectedVariantObj = item.filterGrade.variants?.find(
+                      v => [v.filterClass, v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
+                    );
+                    
+                    if (!selectedVariantObj) return (
+                      <div className="mt-3 pt-3 border-t border-blue-100">
+                        <div className="text-xs text-red-600 font-semibold flex items-center gap-1.5">
+                          Variant not selected or valid
+                        </div>
+                      </div>
+                    );
+
+                    return (
+                      <div className="mt-3 pt-3 border-t border-blue-100">
+                        <div className="text-[11px] text-blue-800 uppercase font-bold mb-2 flex items-center gap-1.5">
+                          Selected Technical Specification
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-4 bg-white p-3 rounded border border-blue-100">
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Class</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterClass || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Type</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterType || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Temperature</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.temperature || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Media</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.media || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Efficiency</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.efficiency || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Initial PD</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.initialPressureDrop || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Final PD</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.finalPressureDrop || '—'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <div className="mt-3 pt-3 border-t border-blue-100">
+                        <div className="text-xs text-orange-600 font-semibold flex items-center gap-1.5">
+                          Variant not selected
+                        </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
