@@ -16,7 +16,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
+import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import RequirementDetailModal from './RequirementDetailModal';
 import {
   FileText,
@@ -82,14 +82,12 @@ const EnquiryMis = () => {
   useEffect(() => {
     const loadMasterOptions = async () => {
       try {
-        const [clientRes, catRes, itemRes, empRes] = await Promise.all([
-          getClients().catch(() => ({ success: false, clients: [] })),
+        const [catRes, itemRes, empRes] = await Promise.all([
           getItemCategories().catch(() => ({ success: false, itemCategories: [] })),
           getItems().catch(() => ({ success: false, items: [] })),
           getEmployees().catch(() => ({ success: false, employees: [] })),
         ]);
 
-        if (clientRes.success && Array.isArray(clientRes.clients)) setClients(clientRes.clients);
         if (catRes.success && Array.isArray(catRes.itemCategories)) setCategories(catRes.itemCategories);
         if (itemRes.success && Array.isArray(itemRes.items)) setItems(itemRes.items);
         if (empRes.success && Array.isArray(empRes.employees)) setSalesPersons(empRes.employees);
@@ -176,6 +174,22 @@ const EnquiryMis = () => {
       setReportData([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      if (res.success && Array.isArray(res.clients)) {
+        return res.clients.map((c) => ({
+          value: c._id,
+          label: c.companyName,
+          secondaryLabel: c.clientCode,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
     }
   };
 
@@ -554,17 +568,13 @@ const EnquiryMis = () => {
             {/* Party Filter */}
             <div>
               <label className="form-label" style={{ fontSize: '12px' }}>Party / Client</label>
-              <Select
+              <AsyncSelect
                 value={selectedClient}
-                onChange={(e) => setSelectedClient(e.target.value)}
-              >
-                <option value="all">All Parties</option>
-                {clients.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.companyName} ({c.clientCode})
-                  </option>
-                ))}
-              </Select>
+                onChange={(e) => setSelectedClient(e.target.value || 'all')}
+                loadOptions={loadClientOptions}
+                placeholder="All Parties"
+                initialLabel={selectedClient === 'all' ? 'All Parties' : undefined}
+              />
             </div>
 
             {/* Status Filter */}

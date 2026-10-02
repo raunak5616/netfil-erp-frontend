@@ -11,7 +11,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
+import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import QuotationFormModal from './QuotationFormModal';
 import QuotationDetailModal from './QuotationDetailModal';
 import QuotationAmendmentModal from './QuotationAmendmentModal';
@@ -84,19 +84,12 @@ const QuotationList = () => {
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
 
-      const [qRes, clientRes] = await Promise.all([
-        getQuotations(params),
-        getClients().catch(() => ({ success: false, clients: [] })),
-      ]);
+      const qRes = await getQuotations(params);
 
       if (qRes.success && Array.isArray(qRes.quotations)) {
         setQuotations(qRes.quotations);
       } else {
         setError('Unexpected API response format');
-      }
-
-      if (clientRes.success && Array.isArray(clientRes.clients)) {
-        setClients(clientRes.clients);
       }
     } catch (err) {
       console.error('Failed to fetch Quotations:', err);
@@ -109,6 +102,22 @@ const QuotationList = () => {
   useEffect(() => {
     fetchQuotationsData();
   }, [clientFilter, statusFilter, typeFilter, categoryFilter]);
+
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      if (res.success && Array.isArray(res.clients)) {
+        return res.clients.map((c) => ({
+          value: c._id,
+          label: c.companyName,
+          secondaryLabel: c.clientCode,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
@@ -433,18 +442,14 @@ const QuotationList = () => {
               />
             </div>
 
-            <Select
+            <AsyncSelect
               value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-              style={{ width: '180px' }}
-            >
-              <option value="all">All Parties</option>
-              {clients.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.companyName}
-                </option>
-              ))}
-            </Select>
+              onChange={(e) => setClientFilter(e.target.value || 'all')}
+              loadOptions={loadClientOptions}
+              placeholder="All Parties"
+              style={{ width: '220px' }}
+              initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
+            />
 
             <Select
               value={statusFilter}

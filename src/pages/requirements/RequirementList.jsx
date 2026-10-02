@@ -7,7 +7,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
+import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import RequirementFormModal from './RequirementFormModal';
 import RequirementDetailModal from './RequirementDetailModal';
 import { 
@@ -54,19 +54,12 @@ const RequirementList = () => {
     setLoading(true);
     setError('');
     try {
-      const [reqRes, partyRes] = await Promise.all([
-        getRequirements(),
-        getClients().catch(() => ({ success: false, clients: [] })),
-      ]);
+      const reqRes = await getRequirements();
 
       if (reqRes.success && Array.isArray(reqRes.requirements)) {
         setRequirements(reqRes.requirements);
       } else {
         setError('Unexpected API response format');
-      }
-
-      if (partyRes.success && Array.isArray(partyRes.clients)) {
-        setClients(partyRes.clients);
       }
     } catch (err) {
       console.error('Failed to fetch Requirements:', err);
@@ -138,6 +131,22 @@ const RequirementList = () => {
       );
     });
   }, [requirements, searchTerm, statusFilter, typeFilter, partyFilter]);
+
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      if (res.success && Array.isArray(res.clients)) {
+        return res.clients.map((c) => ({
+          value: c._id,
+          label: c.companyName,
+          secondaryLabel: c.clientCode,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -215,7 +224,7 @@ const RequirementList = () => {
     {
       key: 'requirement',
       header: 'Requirement Summary',
-      width: '280px',
+      width: '300px',
       render: (_, row) => {
         if (row.type === 'service') {
           return (
@@ -232,11 +241,41 @@ const RequirementList = () => {
         const uomObj = typeof row.uom === 'object' ? row.uom : null;
 
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-              {itemObj ? itemObj.itemName : 'Custom Air Filter Requirement'}
-            </span>
-            <div style={{ fontSize: '12px', color: 'var(--neutral-600)', display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {itemObj ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    CATALOG ITEM
+                  </span>
+                  <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                    {itemObj.itemName}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)' }} className="font-mono">
+                  Code: <strong>{itemObj.itemCode}</strong>
+                  {itemObj.filterGrade?.filterGrade && (
+                    <span className="ml-2 text-slate-700 font-sans font-semibold">
+                      • Grade: {itemObj.filterGrade.filterGrade}
+                      {itemObj.filterGrade.eurovent ? ` (${itemObj.filterGrade.eurovent})` : ''}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    CUSTOM
+                  </span>
+                  <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                    Custom Air Filter Requirement
+                  </span>
+                </div>
+              </>
+            )}
+
+            <div style={{ fontSize: '12px', color: 'var(--neutral-600)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {row.quantity !== null && (
                 <span>
                   Qty: <strong>{row.quantity}</strong> {uomObj ? uomObj.uomCode : ''}
@@ -244,7 +283,7 @@ const RequirementList = () => {
               )}
               {row.dimensions && (row.dimensions.length || row.dimensions.width) && (
                 <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
-                  Dim: {row.dimensions.length || '—'}×{row.dimensions.width || '—'} {row.dimensions.unit || 'mm'}
+                  Dim: {row.dimensions.length || '—'}×{row.dimensions.width || '—'}{row.dimensions.height ? `×${row.dimensions.height}` : ''} {row.dimensions.unit || 'mm'}
                 </span>
               )}
             </div>
@@ -255,7 +294,7 @@ const RequirementList = () => {
     {
       key: 'status',
       header: 'Status',
-      width: '150px',
+      width: '140px',
       render: (val, row) => {
         const config = getStatusBadgeConfig(val);
 
@@ -264,22 +303,14 @@ const RequirementList = () => {
         }
 
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <StatusBadge status={config.badgeStatus} label={config.label} />
+          <div className="w-[130px]">
             <Select
+              size="sm"
               value={val}
               onChange={(e) => handleStatusChange(row, e.target.value)}
               disabled={actionLoading === row._id}
-              style={{
-                fontSize: '11px',
-                padding: '2px 4px',
-                height: '24px',
-                width: 'auto',
-                minWidth: '22px',
-                borderRadius: '4px',
-                borderColor: 'var(--neutral-300)',
-              }}
               title="Quick status transition"
+              required
             >
               <option value="draft">Draft</option>
               <option value="quotation_pending">Quotation Pending</option>
@@ -364,59 +395,59 @@ const RequirementList = () => {
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls & Filtering */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1 min-w-[220px]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+          <div className="relative flex-1 min-w-[240px]">
             <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
+            <Input
+              className="pl-8"
               placeholder="Search by Enquiry No, Party name/code, item name, or service description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <Filter size={16} className="text-muted" />
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
+            <Filter size={16} className="text-slate-400 shrink-0" />
 
             {/* Party Filter Dropdown */}
-            <Select
-              value={partyFilter}
-              onChange={(e) => setPartyFilter(e.target.value)}
-              style={{ width: '180px' }}
-            >
-              <option value="all">All Parties</option>
-              {clients.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.companyName}
-                </option>
-              ))}
-            </Select>
+            <div className="w-[200px] sm:w-[220px]">
+              <AsyncSelect
+                value={partyFilter}
+                onChange={(e) => setPartyFilter(e.target.value || 'all')}
+                loadOptions={loadClientOptions}
+                placeholder="All Parties"
+                initialLabel={partyFilter === 'all' ? 'All Parties' : undefined}
+              />
+            </div>
 
             {/* Type Filter */}
-            <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ width: '140px' }}
-            >
-              <option value="all">All Types</option>
-              <option value="product">Product</option>
-              <option value="service">Service</option>
-            </Select>
+            <div className="w-[120px]">
+              <Select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Types</option>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+              </Select>
+            </div>
 
             {/* Status Filter */}
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '160px' }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="quotation_pending">Quotation Pending</option>
-              <option value="quoted">Quoted</option>
-              <option value="follow_up">Follow Up</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
+            <div className="w-[140px]">
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="quotation_pending">Quotation Pending</option>
+                <option value="quoted">Quoted</option>
+                <option value="follow_up">Follow Up</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+            </div>
           </div>
         </div>
 

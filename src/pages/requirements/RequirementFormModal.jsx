@@ -306,6 +306,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       if (!formData.quantity || Number(formData.quantity) <= 0) {
         return 'Quantity must be a valid number greater than 0.';
       }
+      if (!Number.isInteger(Number(formData.quantity))) {
+        return 'Required Quantity cannot be a fractional/decimal number.';
+      }
     }
 
     return null;
@@ -369,9 +372,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     }
   };
 
-  // Find currently selected Party object for preview
-  const selectedPartyObj = clients.find((c) => c._id === formData.client);
-  const selectedItemObj = items.find((i) => i._id === formData.item);
+  // Find currently selected Party object and Item object for preview
+  const selectedPartyObj = clients.find((c) => c._id === formData.client) || (typeof requirement?.client === 'object' && requirement?.client?._id === formData.client ? requirement.client : null);
+  const selectedItemObj = items.find((i) => i._id === formData.item) || (typeof requirement?.item === 'object' && requirement?.item?._id === formData.item ? requirement.item : null);
 
   return (
     <Modal
@@ -673,14 +676,31 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                       </div>
                     )}
                   </div>
+
+                  {selectedItemObj && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--primary-800)', backgroundColor: 'var(--primary-50)', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--primary-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        Catalog Item Selected: <strong>{selectedItemObj.itemName}</strong> ({selectedItemObj.itemCode})
+                        {selectedItemObj.filterGrade && (
+                          <div style={{ fontSize: '11px', color: 'var(--neutral-600)', marginTop: '2px' }}>
+                            Filter Grade: <strong>{typeof selectedItemObj.filterGrade === 'object' ? selectedItemObj.filterGrade.filterGrade : selectedItemObj.filterGrade}</strong>
+                            {typeof selectedItemObj.filterGrade === 'object' && selectedItemObj.filterGrade.eurovent ? ` (${selectedItemObj.filterGrade.eurovent})` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <button type="button" onClick={clearItem} className="text-red-600 hover:text-red-800 text-xs font-semibold px-2 py-1 bg-white border border-red-200 rounded shadow-xs">
+                        Change Item
+                      </button>
+                    </div>
+                  )}
                 </FormField>
               </div>
 
               <FormField label="Required Quantity" required>
                 <Input
                   type="number"
-                  step="any"
-                  min="0.000001"
+                  step="1"
+                  min="1"
                   name="quantity"
                   placeholder="e.g. 50"
                   value={formData.quantity}

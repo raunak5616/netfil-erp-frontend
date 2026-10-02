@@ -36,9 +36,43 @@ export const Input = ({ hasError, className = '', ...props }) => {
   );
 };
 
-import ReactSelect from 'react-select';
+import ReactSelect, { components } from 'react-select';
+import { ChevronDown, X } from 'lucide-react';
 
-export const Select = ({ hasError, className = '', children, value, onChange, disabled, required, ...props }) => {
+const CustomDropdownIndicator = (props) => {
+  const isOpen = props.selectProps.menuIsOpen;
+  const isSm = props.selectProps.size === 'sm';
+  return (
+    <components.DropdownIndicator {...props}>
+      <div
+        className={`flex items-center justify-center border-l transition-colors ${
+          isSm ? 'px-1.5' : 'px-2.5'
+        } h-full ${
+          isOpen
+            ? 'bg-blue-600 text-white border-blue-600'
+            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 hover:text-slate-800'
+        }`}
+      >
+        <ChevronDown
+          size={isSm ? 12 : 14}
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </div>
+    </components.DropdownIndicator>
+  );
+};
+
+const CustomClearIndicator = (props) => {
+  return (
+    <components.ClearIndicator {...props}>
+      <div className="p-1 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+        <X size={13} />
+      </div>
+    </components.ClearIndicator>
+  );
+};
+
+export const Select = ({ hasError, className = '', children, value, onChange, disabled, required, size, ...props }) => {
   const options = [];
   
   const extractOptions = (nodes) => {
@@ -73,24 +107,41 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
     }
   };
 
+  const isCurrentlyClearable = !required && selectedOption && selectedOption.value !== 'all' && selectedOption.value !== '';
+
   const customStyles = {
+    container: (base) => ({
+      ...base,
+      ...(props.style?.width ? { width: props.style.width } : {}),
+      ...(props.style?.minWidth ? { minWidth: props.style.minWidth } : {}),
+      ...(props.style?.maxWidth ? { maxWidth: props.style.maxWidth } : {}),
+    }),
     control: (base, state) => ({
       ...base,
-      minHeight: '36px',
+      minHeight: size === 'sm' ? '28px' : '36px',
+      height: size === 'sm' ? '28px' : '36px',
       backgroundColor: disabled ? '#f8fafc' : 'white',
       borderColor: hasError ? '#dc2626' : state.isFocused ? '#2563eb' : '#cbd5e1',
       boxShadow: state.isFocused ? (hasError ? '0 0 0 2px #fee2e2' : '0 0 0 2px #dbeafe') : 'none',
       '&:hover': {
         borderColor: hasError ? '#dc2626' : state.isFocused ? '#2563eb' : '#cbd5e1'
       },
-      borderRadius: '0.375rem', // rounded-md
-      fontSize: '0.75rem', // text-xs
+      borderRadius: '0.375rem',
+      fontSize: size === 'sm' ? '0.7rem' : '0.75rem',
       padding: '0',
+      overflow: 'hidden',
       cursor: disabled ? 'not-allowed' : 'default',
     }),
     valueContainer: (base) => ({
       ...base,
-      padding: '0 10px',
+      padding: size === 'sm' ? '0 6px' : '0 10px',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+    }),
+    indicatorsContainer: (base) => ({
+      ...base,
+      height: '100%',
     }),
     input: (base) => ({
       ...base,
@@ -122,6 +173,25 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
       ...base,
       zIndex: 9999,
     }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      display: 'none'
+    }),
+    clearIndicator: (base) => ({
+      ...base,
+      padding: '0 4px',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      cursor: 'pointer'
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      padding: '0',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center'
+    }),
   };
 
   return (
@@ -131,8 +201,13 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
       options={options}
       isDisabled={disabled}
       styles={customStyles}
+      components={{ 
+        IndicatorSeparator: () => null,
+        DropdownIndicator: CustomDropdownIndicator,
+        ClearIndicator: CustomClearIndicator
+      }}
       isSearchable={true}
-      isClearable={!required}
+      isClearable={isCurrentlyClearable}
       className={className}
       placeholder="Select option..."
       menuPortalTarget={document.body}

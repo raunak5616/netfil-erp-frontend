@@ -182,7 +182,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     }));
   };
 
-  // Handle Requirement Selection -> Optionally populate defaults from Requirement
+  // Handle Requirement Selection -> Populate catalog item & defaults from Requirement
   const handleRequirementChange = (reqId) => {
     const selectedReq = requirements.find((r) => r._id === reqId);
     setFormData((prev) => ({
@@ -193,18 +193,24 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
 
     // If requirement has item, populate initial line item default
     if (selectedReq && selectedReq.item) {
-      const targetItem = items.find((i) => i._id === (selectedReq.item._id || selectedReq.item));
-      if (targetItem) {
+      const itemObj = (typeof selectedReq.item === 'object' ? selectedReq.item : items.find((i) => i._id === selectedReq.item)) || null;
+      const itemId = itemObj?._id || (typeof selectedReq.item === 'string' ? selectedReq.item : selectedReq.item?._id);
+      const itemName = itemObj?.itemName || '';
+      const itemCatId = itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
+      const uomId = selectedReq.uom?._id || selectedReq.uom || itemObj?.salesUom?._id || itemObj?.salesUom || itemObj?.inventoryUom?._id || itemObj?.inventoryUom || '';
+      const hsnCode = itemObj?.hsnCode || '';
+
+      if (itemId) {
         setLineItems([
           {
-            item: targetItem._id,
-            itemCategory: targetItem.itemCategory?._id || targetItem.itemCategory || '',
-            description: targetItem.itemName,
+            item: itemId,
+            itemCategory: itemCatId,
+            description: itemName || 'Catalog Item',
             quantity: selectedReq.quantity || 1,
-            uom: selectedReq.uom?._id || selectedReq.uom || targetItem.inventoryUom || '',
+            uom: uomId,
             unitPrice: 0, // CRITICAL: Manual rate entry required, 0 default
-            hsnCode: targetItem.hsnCode || '',
-            remarks: selectedReq.remarks || '',
+            hsnCode: hsnCode,
+            remarks: selectedReq.remarks || (selectedReq.dimensions && (selectedReq.dimensions.length || selectedReq.dimensions.width) ? `Dim: ${selectedReq.dimensions.length || '—'}×${selectedReq.dimensions.width || '—'} ${selectedReq.dimensions.unit || 'mm'}` : ''),
           },
         ]);
       }

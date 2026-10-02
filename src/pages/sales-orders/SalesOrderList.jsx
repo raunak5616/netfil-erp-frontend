@@ -7,7 +7,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
+import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 
 import SalesOrderCreateModal from './SalesOrderCreateModal';
 import SalesOrderDetailModal from './SalesOrderDetailModal';
@@ -73,20 +73,13 @@ const SalesOrderList = () => {
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
 
-      const [soRes, clientRes] = await Promise.all([
-        getSalesOrders(params),
-        getClients().catch(() => ({ success: false, clients: [] }))
-      ]);
+      const soRes = await getSalesOrders(params);
 
       if (soRes.success && Array.isArray(soRes.salesOrders)) {
         setSalesOrders(soRes.salesOrders);
         if (soRes.total !== undefined) setTotalRecords(soRes.total);
       } else {
         setError('Unexpected response format from server');
-      }
-
-      if (clientRes.success && Array.isArray(clientRes.clients)) {
-        setClients(clientRes.clients);
       }
     } catch (err) {
       console.error('Failed to fetch Sales Orders:', err);
@@ -99,6 +92,22 @@ const SalesOrderList = () => {
   useEffect(() => {
     fetchSalesOrdersData();
   }, [clientFilter, statusFilter, typeFilter, categoryFilter, page, limit]);
+
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      if (res.success && Array.isArray(res.clients)) {
+        return res.clients.map((c) => ({
+          value: c._id,
+          label: c.companyName,
+          secondaryLabel: c.clientCode,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
@@ -260,6 +269,7 @@ const SalesOrderList = () => {
                   borderRadius: '4px'
                 }}
                 title="Quick status transition"
+                required
               >
                 <option value="draft">Draft</option>
                 <option value="confirmed">Confirmed</option>
@@ -366,21 +376,17 @@ const SalesOrderList = () => {
               />
             </div>
 
-            <Select
+            <AsyncSelect
               value={clientFilter}
               onChange={(e) => {
-                setClientFilter(e.target.value);
+                setClientFilter(e.target.value || 'all');
                 setPage(1);
               }}
-              style={{ width: '180px' }}
-            >
-              <option value="all">All Parties</option>
-              {clients.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.companyName}
-                </option>
-              ))}
-            </Select>
+              loadOptions={loadClientOptions}
+              placeholder="All Parties"
+              style={{ width: '220px' }}
+              initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
+            />
 
             <Select
               value={statusFilter}
