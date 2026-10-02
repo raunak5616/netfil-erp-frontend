@@ -118,6 +118,10 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
       borderRadius: '0.375rem',
       boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
     }),
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999,
+    }),
   };
 
   return (
@@ -131,10 +135,14 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
       isClearable={!required}
       className={className}
       placeholder="Select option..."
+      menuPortalTarget={document.body}
+      menuPosition="fixed"
       {...props}
     />
   );
 };
+
+export { AsyncSelect } from './AsyncSelectField';
 
 export const Textarea = ({ hasError, className = '', rows = 3, ...props }) => {
   return (

@@ -15,8 +15,9 @@ import { getEmployees } from '../../services/employeeService';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
-import { Input, Select } from '../../components/ui/FormField';
+import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import { Plus, Trash2, Calculator, Layers, Package } from 'lucide-react';
+import QuotationRateSuggestion from './QuotationRateSuggestion';
 
 const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) => {
   const isEdit = Boolean(quotation && quotation._id);
@@ -74,28 +75,28 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     const loadMasters = async () => {
       setLoading(true);
       try {
-        const [cRes, rRes, iRes, uRes, eRes] = await Promise.all([
-          getClients().catch(() => ({ success: false, clients: [] })),
-          getRequirements().catch(() => ({ success: false, requirements: [] })),
-          getItems().catch(() => ({ success: false, items: [] })),
-          getUOMs().catch(() => ({ success: false, uoms: [] })),
-          getEmployees().catch(() => ({ success: false, employees: [] })),
-        ]);
-
-        if (cRes.success && Array.isArray(cRes.clients)) setClients(cRes.clients);
-        if (rRes.success && Array.isArray(rRes.requirements)) setRequirements(rRes.requirements);
-        if (iRes.success && Array.isArray(iRes.items)) setItems(iRes.items);
-        if (uRes.success && Array.isArray(uRes.uoms)) setUoms(uRes.uoms);
-        if (eRes.success && Array.isArray(eRes.employees)) setSalesPersons(eRes.employees);
-
-        // If Editing, load complete quotation detail with items
-        if (isEdit) {
-          const detailRes = await getQuotationById(quotation._id);
-          if (detailRes.success && detailRes.quotation) {
-            const q = detailRes.quotation;
-            setFormData({
-              client: q.client?._id || q.client || '',
-              requirement: q.requirement?._id || q.requirement || '',
+          const [rRes, iRes, uRes, eRes] = await Promise.all([
+            getRequirements().catch(() => ({ success: false, requirements: [] })),
+            getItems().catch(() => ({ success: false, items: [] })),
+            getUOMs().catch(() => ({ success: false, uoms: [] })),
+            getEmployees().catch(() => ({ success: false, employees: [] })),
+          ]);
+  
+          if (rRes.success && Array.isArray(rRes.requirements)) setRequirements(rRes.requirements);
+          if (iRes.success && Array.isArray(iRes.items)) setItems(iRes.items);
+          if (uRes.success && Array.isArray(uRes.uoms)) setUoms(uRes.uoms);
+          if (eRes.success && Array.isArray(eRes.employees)) setSalesPersons(eRes.employees);
+  
+          // If Editing, load complete quotation detail with items
+          if (isEdit) {
+            const detailRes = await getQuotationById(quotation._id);
+            if (detailRes.success && detailRes.quotation) {
+              const q = detailRes.quotation;
+              setFormData({
+                client: q.client?._id || q.client || '',
+                clientName: q.client?.companyName || '',
+                clientCode: q.client?.clientCode || '',
+                requirement: q.requirement?._id || q.requirement || '',
               quotationType: q.quotationType || 'domestic',
               quotationCategory: q.quotationCategory || 'product',
               attentionPerson: q.attentionPerson || '',
@@ -153,14 +154,31 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
     });
   }, [requirements, formData.client]);
 
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      if (res.success && Array.isArray(res.clients)) {
+        return res.clients.map((c) => ({
+          value: c._id,
+          label: c.companyName,
+          secondaryLabel: c.clientCode,
+          contactPerson: c.contactPerson,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   // Handle Client Selection
-  const handleClientChange = (clientId) => {
-    const selectedC = clients.find((c) => c._id === clientId);
+  const handleClientChange = (e, selectedOption) => {
+    const clientId = e.target.value;
     setFormData((prev) => ({
       ...prev,
       client: clientId,
       requirement: '',
-      attentionPerson: selectedC?.contactPerson || prev.attentionPerson,
+      attentionPerson: selectedOption?.contactPerson || prev.attentionPerson,
     }));
   };
 
@@ -406,18 +424,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Party / Customer *</label>
-                <Select
+                <AsyncSelect
                   value={formData.client}
-                  onChange={(e) => handleClientChange(e.target.value)}
+                  onChange={handleClientChange}
+                  loadOptions={loadClientOptions}
+                  initialLabel={formData.clientName}
+                  initialSecondaryLabel={formData.clientCode}
+                  placeholder="Search and select party..."
                   required
-                >
-                  <option value="">Select Party / Customer</option>
-                  {clients.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.companyName} ({c.clientCode})
-                    </option>
-                  ))}
-                </Select>
+                />
               </div>
 
               <div>
@@ -611,6 +626,13 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null }) =>
                         className="font-bold border-blue-400"
                         required
                       />
+                      {formData.client && line.item && (
+                        <QuotationRateSuggestion
+                          customerId={formData.client}
+                          itemId={line.item}
+                          onSelectRate={(rate) => handleLineItemChange(idx, 'unitPrice', rate)}
+                        />
+                      )}
                     </div>
                   </div>
 

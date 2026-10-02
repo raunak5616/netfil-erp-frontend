@@ -6,6 +6,11 @@ export const getQuotations = async (params = {}) => {
   return response.data;
 };
 
+export const getQuotationSuggestions = async (customerId, itemId) => {
+  const response = await api.get('/quotations/suggestions', { params: { customerId, itemId } });
+  return response.data;
+};
+
 export const getQuotationById = async (quotationId) => {
   const response = await api.get(`/quotations/${quotationId}`);
   return response.data;
