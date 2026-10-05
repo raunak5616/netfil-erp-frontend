@@ -235,7 +235,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const availableCategories = itemCategories.filter((cat) => {
     if (!formData.itemGroup) return true;
     const catGroupId = cat.itemGroup?._id || cat.itemGroup;
-    return catGroupId === formData.itemGroup;
+    return String(catGroupId) === String(formData.itemGroup);
   });
 
   const handleChange = (e) => {
@@ -258,10 +258,16 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
       // Reset category if selected group changes and category is no longer valid
       if (name === 'itemGroup') {
-        const validCat = itemCategories.find(
-          (c) => (c.itemGroup?._id || c.itemGroup) === value && c._id === prev.itemCategory
+        const validCategories = itemCategories.filter(
+          (c) => String(c.itemGroup?._id || c.itemGroup) === String(value)
         );
-        if (!validCat) {
+        const validCat = validCategories.find((c) => c._id === prev.itemCategory);
+        if (validCat) {
+          next.itemCategory = validCat._id;
+        } else if (validCategories.length === 1) {
+          // Auto-select if only 1 category exists under this group
+          next.itemCategory = validCategories[0]._id;
+        } else {
           next.itemCategory = '';
         }
       }
