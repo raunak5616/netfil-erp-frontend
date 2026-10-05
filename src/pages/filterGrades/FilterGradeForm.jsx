@@ -12,6 +12,7 @@ const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
   const initialVariant = {
     filterClass: '',
     filterType: '',
+    mountingType: '',
     temperature: '',
     media: '',
     efficiency: '',
@@ -224,11 +225,14 @@ const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
                       placeholder="e.g. Fine, Absolute, HEPA"
                     />
                   </FormField>
-                  <FormField label="Filter Type" fullWidth>
+                  <FormField label="Construction / Type" fullWidth>
                     <Input
-                      value={variant.filterType}
-                      onChange={(e) => handleVariantChange(index, 'filterType', e.target.value)}
-                      placeholder="e.g. Flange / Box"
+                      value={variant.mountingType || variant.filterType}
+                      onChange={(e) => {
+                        handleVariantChange(index, 'mountingType', e.target.value);
+                        handleVariantChange(index, 'filterType', e.target.value);
+                      }}
+                      placeholder="e.g. Flange or Box"
                     />
                   </FormField>
                   <FormField label="Temperature (°C)" fullWidth>

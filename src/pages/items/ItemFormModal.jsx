@@ -526,7 +526,15 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               </Select>
             </FormField>
 
-            <FormField label="Item Category" required helperText="Select category belonging to the chosen group.">
+            <FormField
+              label="Item Category"
+              required
+              helperText={
+                formData.itemGroup && availableCategories.length === 0
+                  ? "⚠️ No categories created under this group. Please select another group or create a category first."
+                  : "Select category belonging to the chosen group."
+              }
+            >
               <Select
                 name="itemCategory"
                 value={formData.itemCategory}
@@ -559,8 +567,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
             {/* Filter Grade Configuration: Enabled only when Product Type is FILTER */}
             {formData.productType === 'FILTER' && (() => {
               const selectedFg = filterGrades.find(fg => fg._id === formData.filterGrade);
+              const getVariantKey = (v) => [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
               const selectedVariantObj = selectedFg?.variants?.find(
-                v => [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
+                v => getVariantKey(v) === formData.filterGradeVariant || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
               );
               
               return (
@@ -592,10 +601,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                         >
                           <option value="">-- Select Variant --</option>
                           {(selectedFg.variants || []).map((v, i) => {
-                            const vKey = [v.filterClass, v.filterType, v.temperature, v.media].join('||');
+                            const vKey = getVariantKey(v);
+                            const typeDisplay = v.mountingType || v.filterType;
                             return (
                               <option key={i} value={vKey}>
-                                {v.filterClass} | {v.filterType} | {v.temperature} | {v.media}
+                                {v.filterClass} | {typeDisplay} | {v.temperature} | {v.media}
                               </option>
                             );
                           })}
@@ -615,8 +625,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                           <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterClass || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Type</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterType || '—'}</div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Construction</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.mountingType || selectedVariantObj.filterType || '—'}</div>
                         </div>
                         <div>
                           <div className="text-[10px] text-blue-600 uppercase font-semibold">Temperature</div>

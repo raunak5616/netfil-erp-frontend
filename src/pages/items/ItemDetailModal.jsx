@@ -226,7 +226,8 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   
                   {item.filterGradeVariant ? (() => {
                     const selectedVariantObj = item.filterGrade.variants?.find(
-                      v => [v.filterClass, v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
+                      v => [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
+                           || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
                     );
                     
                     if (!selectedVariantObj) return (
@@ -248,8 +249,8 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                             <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterClass || '—'}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Type</div>
-                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterType || '—'}</div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Construction</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.mountingType || selectedVariantObj.filterType || '—'}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-blue-600 uppercase font-semibold">Temperature</div>
