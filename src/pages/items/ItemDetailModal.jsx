@@ -184,6 +184,15 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
               <div>
                 <div className="text-[11px] text-slate-500 uppercase font-semibold">
+                  Product Type
+                </div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">
+                  {item.productType === 'FILTER' ? 'Filter' : item.productType === 'COIL' ? 'Coil' : item.productType === 'AHU' ? 'AHU' : 'Raw Item'}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-slate-500 uppercase font-semibold">
                   Item Type
                 </div>
                 <div className="text-xs capitalize text-slate-800 mt-0.5">

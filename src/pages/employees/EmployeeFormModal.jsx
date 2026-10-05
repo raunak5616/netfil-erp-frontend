@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createEmployee, updateEmployee, getDepartments } from '../../services/employeeService';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Upload, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 
@@ -17,6 +17,10 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
     joiningDate: '',
     status: 'active',
   });
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [removeDocument, setRemoveDocument] = useState(false);
+  const [fileError, setFileError] = useState('');
 
   const [departments, setDepartments] = useState([]);
   const [loadingDepts, setLoadingDepts] = useState(false);
@@ -75,6 +79,10 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
         status: 'active',
       });
     }
+
+    setSelectedFile(null);
+    setRemoveDocument(false);
+    setFileError('');
     setErrorMessage('');
     setSuccessMessage('');
   }, [employee, isOpen]);
@@ -87,6 +95,47 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
       ...prev,
       [name]: name === 'employeeCode' ? value.toUpperCase() : value,
     }));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setFileError('Only PDF files are allowed.');
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFileError('Employee document must not exceed 5 MB.');
+      setSelectedFile(null);
+      return;
+    }
+
+    setFileError('');
+    setSelectedFile(file);
+    setRemoveDocument(false);
+  };
+
+  const handleRemoveSelectedFile = () => {
+    setSelectedFile(null);
+    setFileError('');
+  };
+
+  const handleRemoveExistingDocument = () => {
+    setSelectedFile(null);
+    setRemoveDocument(true);
+    setFileError('');
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   const validate = () => {
@@ -108,6 +157,9 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       return 'Please enter a valid email address.';
     }
+    if (fileError) {
+      return fileError;
+    }
     return null;
   };
 
@@ -124,17 +176,28 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
     setSuccessMessage('');
 
     try {
+      const data = new FormData();
+      if (!isEditMode) {
+        data.append('employeeCode', formData.employeeCode);
+      }
+      data.append('fullName', formData.fullName);
+      data.append('department', formData.department);
+      data.append('designation', formData.designation);
+      if (formData.email) data.append('email', formData.email);
+      if (formData.mobile) data.append('mobile', formData.mobile);
+      data.append('joiningDate', formData.joiningDate);
+      data.append('status', formData.status);
+
+      if (selectedFile) {
+        data.append('document', selectedFile);
+      }
+
+      if (isEditMode && removeDocument) {
+        data.append('removeDocument', 'true');
+      }
+
       if (isEditMode) {
-        const updatePayload = {
-          fullName: formData.fullName,
-          department: formData.department,
-          designation: formData.designation,
-          email: formData.email || undefined,
-          mobile: formData.mobile || undefined,
-          joiningDate: formData.joiningDate,
-          status: formData.status,
-        };
-        const res = await updateEmployee(employee._id, updatePayload);
+        const res = await updateEmployee(employee._id, data);
         if (res.success) {
           setSuccessMessage('Employee updated successfully!');
           setTimeout(() => {
@@ -143,7 +206,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
           }, 800);
         }
       } else {
-        const res = await createEmployee(formData);
+        const res = await createEmployee(data);
         if (res.success) {
           setSuccessMessage('Employee created successfully!');
           setTimeout(() => {
@@ -165,7 +228,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? `Edit Employee (${formData.employeeCode})` : 'Add New Employee'}
-      maxWidth="540px"
+      maxWidth="580px"
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
@@ -314,6 +377,90 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
               <option value="inactive">Inactive</option>
             </select>
           </div>
+        </div>
+
+        {/* Employee Document (PDF) Upload Section */}
+        <div className="pt-3 border-t border-slate-200">
+          <label className="form-label font-semibold text-slate-800 flex items-center justify-between">
+            <span>Employee Document (PDF)</span>
+            <span className="text-[11px] font-normal text-slate-500">Maximum size: 5 MB</span>
+          </label>
+
+          {fileError && (
+            <div className="text-red-600 text-xs mb-2 flex items-center gap-1">
+              <AlertCircle size={14} />
+              <span>{fileError}</span>
+            </div>
+          )}
+
+          {selectedFile ? (
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded text-xs">
+              <div className="flex items-center gap-2 truncate">
+                <FileText size={16} className="text-red-600 shrink-0" />
+                <span className="font-medium text-slate-800 truncate">{selectedFile.name}</span>
+                <span className="text-slate-400">—</span>
+                <span className="text-slate-500 shrink-0">{formatFileSize(selectedFile.size)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveSelectedFile}
+                className="text-red-600 hover:text-red-700 text-xs font-semibold px-2 py-1"
+                disabled={submitting}
+              >
+                [ Remove ]
+              </button>
+            </div>
+          ) : isEditMode && employee?.employeeDocument && !removeDocument ? (
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded text-xs">
+              <div className="flex items-center gap-2 truncate">
+                <FileText size={16} className="text-blue-600 shrink-0" />
+                <span className="font-medium text-slate-800 truncate">
+                  {employee.employeeDocument.fileName || 'employee_document.pdf'}
+                </span>
+                <span className="text-slate-400">—</span>
+                <span className="text-slate-500 shrink-0">
+                  {formatFileSize(employee.employeeDocument.fileSize)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer text-blue-600 hover:text-blue-700 text-xs font-semibold px-1 py-0.5">
+                  [ Replace ]
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={submitting}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveExistingDocument}
+                  className="text-red-600 hover:text-red-700 text-xs font-semibold px-1 py-0.5"
+                  disabled={submitting}
+                >
+                  [ Remove ]
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-2.5 bg-white border border-dashed border-slate-300 rounded text-xs">
+              <span className="text-slate-500">
+                {isEditMode && removeDocument ? 'Document will be removed on update' : 'No document uploaded'}
+              </span>
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-700 text-xs font-medium transition-colors">
+                <Upload size={14} />
+                <span>{isEditMode && removeDocument ? 'Upload PDF' : 'Choose PDF'}</span>
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={submitting}
+                />
+              </label>
+            </div>
+          )}
         </div>
       </form>
     </Modal>

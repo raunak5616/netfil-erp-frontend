@@ -4,18 +4,23 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Attach Bearer token from localStorage to every outgoing request
+// Attach Bearer token from localStorage to every outgoing request & handle FormData content-type
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('netfil_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (config.data instanceof FormData) {
+      // Allow browser / Axios to automatically set multipart/form-data boundary header
+      delete config.headers['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+
     return config;
   },
   (error) => {
@@ -31,7 +36,7 @@ api.interceptors.response.use(
       // Clear credentials if token is invalid or expired
       localStorage.removeItem('netfil_token');
       localStorage.removeItem('netfil_user');
-      
+
       // If not on login page, redirect to login
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

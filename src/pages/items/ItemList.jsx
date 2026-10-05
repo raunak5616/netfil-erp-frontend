@@ -10,6 +10,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
+import ItemTypeSelectionModal from './ItemTypeSelectionModal';
 import { 
   Plus, 
   Search, 
@@ -38,11 +39,14 @@ const ItemList = () => {
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
+  const [productTypeFilter, setProductTypeFilter] = useState('all');
   const [groupFilter, setGroupFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Modal states
+  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
+  const [selectedProductType, setSelectedProductType] = useState('RAW_ITEM');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -95,6 +99,12 @@ const ItemList = () => {
       // Status filter
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
 
+      // Product Type filter
+      if (productTypeFilter !== 'all') {
+        const itemPType = item.productType || (item.filterGrade ? 'FILTER' : 'RAW_ITEM');
+        if (itemPType !== productTypeFilter) return false;
+      }
+
       // Group filter
       if (groupFilter !== 'all') {
         const groupId = item.itemGroup?._id || item.itemGroup;
@@ -125,7 +135,7 @@ const ItemList = () => {
         hsn.includes(term)
       );
     });
-  }, [items, searchTerm, statusFilter, groupFilter, categoryFilter]);
+  }, [items, searchTerm, statusFilter, productTypeFilter, groupFilter, categoryFilter]);
 
   const columns = [
     {
@@ -150,6 +160,26 @@ const ItemList = () => {
           )}
         </div>
       ),
+    },
+    {
+      key: 'productType',
+      header: 'Product Type',
+      width: '120px',
+      render: (val, row) => {
+        const type = val || (row.filterGrade ? 'FILTER' : 'RAW_ITEM');
+        const labels = {
+          RAW_ITEM: { text: 'Raw Item', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+          FILTER: { text: 'Filter', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+          COIL: { text: 'Coil', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+          AHU: { text: 'AHU', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+        };
+        const style = labels[type] || labels.RAW_ITEM;
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${style.color}`}>
+            {style.text}
+          </span>
+        );
+      },
     },
     {
       key: 'itemGroup',
@@ -268,8 +298,7 @@ const ItemList = () => {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setEditingItem(null);
-                  setIsFormOpen(true);
+                  setIsTypeSelectionOpen(true);
                 }}
               >
                 <Plus size={14} />
@@ -281,8 +310,6 @@ const ItemList = () => {
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
-
-
 
       {/* Main Content Card Container */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3.5">
@@ -306,6 +333,18 @@ const ItemList = () => {
               <Filter size={14} className="text-slate-400" />
               <span>Filters:</span>
             </div>
+
+            <select
+              value={productTypeFilter}
+              onChange={(e) => setProductTypeFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Product Types</option>
+              <option value="RAW_ITEM">Raw Item</option>
+              <option value="FILTER">Filter</option>
+              <option value="COIL">Coil</option>
+              <option value="AHU">AHU</option>
+            </select>
 
             <select
               value={groupFilter}
@@ -346,11 +385,12 @@ const ItemList = () => {
               <option value="inactive">Inactive Only</option>
             </select>
 
-            {(searchTerm || groupFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
+            {(searchTerm || productTypeFilter !== 'all' || groupFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
               <button
                 type="button"
                 onClick={() => {
                   setSearchTerm('');
+                  setProductTypeFilter('all');
                   setGroupFilter('all');
                   setCategoryFilter('all');
                   setStatusFilter('all');
@@ -370,8 +410,8 @@ const ItemList = () => {
           loading={loading}
           emptyTitle="No Item records found"
           emptyDescription={
-            searchTerm || statusFilter !== 'all' || groupFilter !== 'all' || categoryFilter !== 'all'
-              ? 'Try adjusting your search query or status/group filters.'
+            searchTerm || statusFilter !== 'all' || productTypeFilter !== 'all' || groupFilter !== 'all' || categoryFilter !== 'all'
+              ? 'Try adjusting your search query or status/group/type filters.'
               : 'Click "Add Item" above to create your first item master record.'
           }
         />
@@ -383,9 +423,22 @@ const ItemList = () => {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Type Selection Modal */}
+      <ItemTypeSelectionModal
+        isOpen={isTypeSelectionOpen}
+        onClose={() => setIsTypeSelectionOpen(false)}
+        onSelectType={(type) => {
+          setSelectedProductType(type);
+          setIsTypeSelectionOpen(false);
+          setEditingItem(null);
+          setIsFormOpen(true);
+        }}
+      />
+
+      {/* Item Form Modal */}
       <ItemFormModal
         item={editingItem}
+        initialProductType={selectedProductType}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSuccess={fetchItemData}

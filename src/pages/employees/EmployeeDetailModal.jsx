@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserCheck, Calendar, Mail, Phone, Briefcase, Building } from 'lucide-react';
+import { Calendar, Mail, Phone, Briefcase, Building, FileText, CheckCircle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 
@@ -13,6 +13,14 @@ const EmployeeDetailModal = ({ employee, isOpen, onClose, onEdit, canEdit }) => 
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   return (
@@ -106,18 +114,24 @@ const EmployeeDetailModal = ({ employee, isOpen, onClose, onEdit, canEdit }) => 
           </div>
         </div>
 
-        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-          <div className="text-slate-400 font-medium mb-0.5">System Record ID</div>
-          <div className="font-mono text-[11px] text-slate-600 truncate">
-            {employee._id}
-          </div>
-        </div>
-
-        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-          <div className="text-slate-400 font-medium mb-0.5">Record Created</div>
-          <div className="font-semibold text-slate-900">
-            {formatDate(employee.createdAt)}
-          </div>
+        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 sm:col-span-2">
+          <div className="text-slate-400 font-medium mb-1">Employee Document</div>
+          {employee.employeeDocument ? (
+            <div className="flex items-center justify-between p-2 bg-white rounded border border-slate-200">
+              <div className="flex items-center gap-2 truncate">
+                <FileText size={16} className="text-blue-600 shrink-0" />
+                <span className="font-semibold text-slate-900 truncate">{employee.employeeDocument.fileName || 'employee_document.pdf'}</span>
+                <span className="text-slate-400">—</span>
+                <span className="text-slate-500 font-mono text-[11px] shrink-0">{formatFileSize(employee.employeeDocument.fileSize)}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium border border-emerald-200 shrink-0">
+                <CheckCircle size={12} />
+                <span>Google Drive</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-slate-500 italic">No document uploaded</div>
+          )}
         </div>
       </div>
     </Modal>

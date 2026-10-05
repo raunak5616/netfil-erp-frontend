@@ -10,7 +10,14 @@ import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
 
-const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
+const PRODUCT_TYPE_TO_ITEM_TYPE = {
+  RAW_ITEM: 'raw_material',
+  FILTER: 'finished_goods',
+  COIL: 'finished_goods',
+  AHU: 'finished_goods',
+};
+
+const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 'RAW_ITEM' }) => {
   const isEditMode = !!item;
 
   const [activeTab, setActiveTab] = useState('basic'); // 'basic' | 'uom' | 'inventory' | 'specifications'
@@ -33,7 +40,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     leadTimeDays: 0,
     defaultBin: '',
     description: '',
-    itemType: 'standard',
+    itemType: PRODUCT_TYPE_TO_ITEM_TYPE[initialProductType] || 'raw_material',
+    productType: initialProductType || 'RAW_ITEM',
     filterGrade: '',
     filterGradeVariant: '',
     status: 'active',
@@ -118,7 +126,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         leadTimeDays: item.leadTimeDays ?? 0,
         defaultBin: item.defaultBin?._id || item.defaultBin || '',
         description: item.description || '',
-        itemType: item.itemType || 'standard',
+        itemType: item.itemType || PRODUCT_TYPE_TO_ITEM_TYPE[item.productType || 'RAW_ITEM'] || 'raw_material',
+        productType: item.productType || (item.filterGrade ? 'FILTER' : 'RAW_ITEM'),
         filterGrade: item.filterGrade?._id || item.filterGrade || '',
         filterGradeVariant: item.filterGradeVariant || '',
         status: item.status || 'active',
@@ -142,6 +151,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
       }).catch(console.error);
 
     } else {
+      const pType = initialProductType || 'RAW_ITEM';
       setFormData({
         itemCode: 'AUTO',
         itemName: '',
@@ -160,7 +170,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         leadTimeDays: 0,
         defaultBin: '',
         description: '',
-        itemType: 'standard',
+        itemType: PRODUCT_TYPE_TO_ITEM_TYPE[pType] || 'raw_material',
+        productType: pType,
         filterGrade: '',
         filterGradeVariant: '',
         status: 'active',
@@ -171,7 +182,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     setActiveTab('basic');
     setErrorMessage('');
     setSuccessMessage('');
-  }, [item, isOpen]);
+  }, [item, isOpen, initialProductType]);
 
   // Load category specifications when selected category changes
   useEffect(() => {
@@ -207,6 +218,19 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
+  // Filtered groups: exclude system-generated groups and filter by applicable product types
+  const availableGroups = itemGroups.filter((group) => {
+    if (group.groupType === 'SYSTEM' || (group.groupCode && group.groupCode.startsWith('GP-'))) {
+      return false;
+    }
+    if (group.applicableProductTypes && group.applicableProductTypes.length > 0) {
+      if (!group.applicableProductTypes.includes(formData.productType)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   // Filtered categories belonging to selected Item Group
   const availableCategories = itemCategories.filter((cat) => {
     if (!formData.itemGroup) return true;
@@ -221,6 +245,16 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         ...prev,
         [name]: name === 'itemCode' ? value.toUpperCase() : value,
       };
+
+      if (name === 'productType') {
+        if (PRODUCT_TYPE_TO_ITEM_TYPE[value]) {
+          next.itemType = PRODUCT_TYPE_TO_ITEM_TYPE[value];
+        }
+        if (value !== 'FILTER') {
+          next.filterGrade = '';
+          next.filterGradeVariant = '';
+        }
+      }
 
       // Reset category if selected group changes and category is no longer valid
       if (name === 'itemGroup') {
@@ -237,7 +271,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         if (!prev.purchaseUom) next.purchaseUom = value;
         if (!prev.salesUom) next.salesUom = value;
       }
-      
+
       if (name === 'filterGrade') {
         next.filterGradeVariant = '';
       }
@@ -271,13 +305,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     }
     
     // Filter validation
-    const selectedCat = itemCategories.find(c => c._id === formData.itemCategory);
-    const isFilterCategory = selectedCat && (
-      (selectedCat.categoryCode || '').toUpperCase().includes('FILTER') ||
-      (selectedCat.categoryName || '').toUpperCase().includes('FILTER') ||
-      (selectedCat.categoryCode || '').toUpperCase().includes('CART')
-    );
-    if (isFilterCategory && formData.filterGrade && !formData.filterGradeVariant) {
+    if (formData.productType === 'FILTER' && formData.filterGrade && !formData.filterGradeVariant) {
       return 'Filter Grade Variant is required when a Filter Grade is selected.';
     }
 
@@ -371,7 +399,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditMode ? `Edit Item (${formData.itemCode})` : 'Add New Item'}
+      title={isEditMode ? `Edit Item (${formData.itemCode})` : `Add New Item — ${formData.productType === 'RAW_ITEM' ? 'Raw Item' : formData.productType === 'FILTER' ? 'Filter' : formData.productType === 'COIL' ? 'Coil' : 'AHU'}`}
       maxWidth="720px"
       footer={
         <>
@@ -441,6 +469,20 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
         {/* TAB 1: BASIC INFO */}
         {activeTab === 'basic' && (
           <>
+            <FormField label="Product Type" required helperText="Select master item product type.">
+              <Select
+                name="productType"
+                value={formData.productType}
+                onChange={handleChange}
+                disabled={submitting}
+              >
+                <option value="RAW_ITEM">Raw Item</option>
+                <option value="FILTER">Filter</option>
+                <option value="COIL">Coil</option>
+                <option value="AHU">AHU</option>
+              </Select>
+            </FormField>
+
             <FormField label="Item Code" required helperText="Enter code or leave 'AUTO' for auto-generated code.">
               <Input
                 name="itemCode"
@@ -470,7 +512,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
                 disabled={submitting || loadingData}
               >
                 <option value="">-- Select Item Group --</option>
-                {itemGroups.map((g) => (
+                {availableGroups.map((g) => (
                   <option key={g._id} value={g._id}>
                     {g.groupCode} — {g.groupName}
                   </option>
@@ -494,117 +536,109 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess }) => {
               </Select>
             </FormField>
 
-            <FormField label="Item Type">
+            <FormField label="Item Type" helperText={!isEditMode ? "Automatically set based on Product Type selection." : "Classification of item in ERP."}>
               <Select
                 name="itemType"
                 value={formData.itemType}
                 onChange={handleChange}
-                disabled={submitting}
+                disabled={submitting || !isEditMode}
               >
-                <option value="standard">Standard Item</option>
                 <option value="raw_material">Raw Material</option>
                 <option value="finished_goods">Finished Goods</option>
+                <option value="standard">Standard Item</option>
                 <option value="component">Component / Sub-Assembly</option>
               </Select>
             </FormField>
 
-            {/* Check if selected category implies this is a filter (by code or name) */}
-            {formData.itemCategory && (() => {
-              const selectedCat = itemCategories.find(c => c._id === formData.itemCategory);
-              const isFilterCategory = selectedCat && (
-                (selectedCat.categoryCode || '').toUpperCase().includes('FILTER') ||
-                (selectedCat.categoryName || '').toUpperCase().includes('FILTER') ||
-                (selectedCat.categoryCode || '').toUpperCase().includes('CART') // e.g., Filter Cartridges
+            {/* Filter Grade Configuration: Enabled only when Product Type is FILTER */}
+            {formData.productType === 'FILTER' && (() => {
+              const selectedFg = filterGrades.find(fg => fg._id === formData.filterGrade);
+              const selectedVariantObj = selectedFg?.variants?.find(
+                v => [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
               );
-              if (isFilterCategory) {
-                const selectedFg = filterGrades.find(fg => fg._id === formData.filterGrade);
-                const selectedVariantObj = selectedFg?.variants?.find(
-                  v => [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
-                );
-                
-                return (
-                  <div className="col-span-full border border-blue-200 bg-blue-50 p-4 rounded-md mt-2">
-                    <FormField label="Filter Grade Standard" helperText="Select standard filter grade for this filter item">
-                      <Select
-                        name="filterGrade"
-                        value={formData.filterGrade}
-                        onChange={handleChange}
-                        disabled={submitting || loadingData}
-                      >
-                        <option value="">-- No Filter Grade / Custom --</option>
-                        {filterGrades.map((fg) => (
-                          <option key={fg._id} value={fg._id}>
-                            {fg.filterGrade} {fg.eurovent ? `(${fg.eurovent})` : ''}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    
-                    {selectedFg && (
-                      <div className="mt-4">
-                        <FormField label="Filter Grade Variant" required helperText="Select the specific technical variant for this grade">
-                          <Select
-                            name="filterGradeVariant"
-                            value={formData.filterGradeVariant}
-                            onChange={handleChange}
-                            disabled={submitting || loadingData}
-                          >
-                            <option value="">-- Select Variant --</option>
-                            {(selectedFg.variants || []).map((v, i) => {
-                              const vKey = [v.filterClass, v.filterType, v.temperature, v.media].join('||');
-                              return (
-                                <option key={i} value={vKey}>
-                                  {v.filterClass} | {v.filterType} | {v.temperature} | {v.media}
-                                </option>
-                              );
-                            })}
-                          </Select>
-                        </FormField>
+              
+              return (
+                <div className="col-span-full border border-blue-200 bg-blue-50 p-4 rounded-md mt-2">
+                  <FormField label="Filter Grade Standard" helperText="Select standard filter grade for this filter item">
+                    <Select
+                      name="filterGrade"
+                      value={formData.filterGrade}
+                      onChange={handleChange}
+                      disabled={submitting || loadingData}
+                    >
+                      <option value="">-- No Filter Grade / Custom --</option>
+                      {filterGrades.map((fg) => (
+                        <option key={fg._id} value={fg._id}>
+                          {fg.filterGrade} {fg.eurovent ? `(${fg.eurovent})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  
+                  {selectedFg && (
+                    <div className="mt-4">
+                      <FormField label="Filter Grade Variant" required helperText="Select the specific technical variant for this grade">
+                        <Select
+                          name="filterGradeVariant"
+                          value={formData.filterGradeVariant}
+                          onChange={handleChange}
+                          disabled={submitting || loadingData}
+                        >
+                          <option value="">-- Select Variant --</option>
+                          {(selectedFg.variants || []).map((v, i) => {
+                            const vKey = [v.filterClass, v.filterType, v.temperature, v.media].join('||');
+                            return (
+                              <option key={i} value={vKey}>
+                                {v.filterClass} | {v.filterType} | {v.temperature} | {v.media}
+                              </option>
+                            );
+                          })}
+                        </Select>
+                      </FormField>
+                    </div>
+                  )}
+                  
+                  {selectedVariantObj && (
+                    <div className="mt-4 text-xs">
+                      <div className="text-[11px] text-blue-800 uppercase font-bold mb-1.5 border-b border-blue-200 pb-1">
+                        Selected Technical Specification
                       </div>
-                    )}
-                    
-                    {selectedVariantObj && (
-                      <div className="mt-4 text-xs">
-                        <div className="text-[11px] text-blue-800 uppercase font-bold mb-1.5 border-b border-blue-200 pb-1">
-                          Selected Technical Specification
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-4 mt-2 bg-white p-3 rounded border border-blue-100">
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Class</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterClass || '—'}</div>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-4 mt-2 bg-white p-3 rounded border border-blue-100">
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Class</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterClass || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Type</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterType || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Temperature</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.temperature || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Media</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.media || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Efficiency</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.efficiency || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Initial PD</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.initialPressureDrop || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-blue-600 uppercase font-semibold">Final PD</div>
-                            <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.finalPressureDrop || '—'}</div>
-                          </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Type</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.filterType || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Temperature</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.temperature || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Media</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.media || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Efficiency</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.efficiency || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Initial PD</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.initialPressureDrop || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-blue-600 uppercase font-semibold">Final PD</div>
+                          <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.finalPressureDrop || '—'}</div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              }
-              return null;
+                    </div>
+                  )}
+                </div>
+              );
             })()}
+
 
             <FormField label="Status" required>
               <Select
