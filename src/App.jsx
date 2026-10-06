@@ -15,6 +15,7 @@ import ItemGroupList from './pages/item-groups/ItemGroupList';
 import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 import SpecificationList from './pages/specifications/SpecificationList';
 import FilterGradeList from './pages/filterGrades/FilterGradeList';
+import FlangeDesignList from './pages/flange-designs/FlangeDesignList';
 import ClientList from './pages/clients/ClientList';
 import RequirementList from './pages/requirements/RequirementList';
 import EnquiryMis from './pages/requirements/EnquiryMis';
@@ -199,6 +200,7 @@ function App() {
               {/* Protected Filter Grades Module Route */}
               <Route element={<ProtectedRoute requiredPermission="FILTER_GRADE_VIEW" />}>
                 <Route path="/filter-grades" element={<FilterGradeList />} />
+                <Route path="/flange-designs" element={<FlangeDesignList />} />
               </Route>
 
               {/* Protected Items Module Route */}

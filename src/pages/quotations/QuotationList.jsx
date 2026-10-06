@@ -3,6 +3,7 @@ import {
   getQuotations,
   updateQuotationStatus,
   releaseQuotation,
+  printQuotationPdf,
 } from '../../services/quotationService';
 import { getClients } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +35,7 @@ import {
   FileX,
   MessageSquare,
   ShoppingBag,
+  Printer,
 } from 'lucide-react';
 
 const QuotationList = () => {
@@ -297,12 +299,10 @@ const QuotationList = () => {
 
           const actionItems = [
             {
-              label: 'View Details',
-              icon: Eye,
-              onClick: () => {
-                setSelectedQuotation(row);
-                setIsDetailOpen(true);
-              },
+              label: 'Print Quotation',
+              icon: Printer,
+              color: 'var(--primary-700)',
+              onClick: () => printQuotationPdf(row._id),
             },
             {
               label: 'Add Follow-up',

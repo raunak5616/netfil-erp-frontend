@@ -253,6 +253,7 @@ const MainLayout = () => {
             { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
             { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
             { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
+            { label: 'Flange Designs', path: '/flange-designs', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
             { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
           ],
         },

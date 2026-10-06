@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getQuotationById, releaseQuotation, getQuotationReferences } from '../../services/quotationService';
+import { getQuotationById, releaseQuotation, getQuotationReferences, printQuotationPdf } from '../../services/quotationService';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -16,6 +16,7 @@ import {
   FileDiff,
   Tag,
   DollarSign,
+  Printer,
 } from 'lucide-react';
 
 const QuotationDetailModal = ({
@@ -128,6 +129,16 @@ const QuotationDetailModal = ({
           </div>
 
           <div className="flex gap-2">
+            {quotation && (
+              <Button
+                variant="outline"
+                onClick={() => printQuotationPdf(quotation._id)}
+                title="Print Quotation PDF"
+              >
+                <Printer size={14} style={{ marginRight: '4px' }} /> Print Quotation
+              </Button>
+            )}
+
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>

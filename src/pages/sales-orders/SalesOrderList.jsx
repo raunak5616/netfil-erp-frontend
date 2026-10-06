@@ -7,6 +7,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
+import ActionDropdown from '../../components/ui/ActionDropdown';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 
 import SalesOrderCreateModal from './SalesOrderCreateModal';
@@ -20,10 +21,10 @@ import {
   Eye,
   Edit,
   RefreshCw,
-  FileCheck,
   CheckCircle2,
-  Building2,
-  Calendar
+  Clock,
+  Ban,
+  RotateCcw
 } from 'lucide-react';
 
 const SalesOrderList = () => {
@@ -34,7 +35,6 @@ const SalesOrderList = () => {
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
 
   const [salesOrders, setSalesOrders] = useState([]);
-  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
@@ -50,7 +50,7 @@ const SalesOrderList = () => {
 
   // Pagination States
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
+  const [limit] = useState(25);
   const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal States
@@ -91,7 +91,7 @@ const SalesOrderList = () => {
 
   useEffect(() => {
     fetchSalesOrdersData();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, page, limit]);
+  }, [clientFilter, statusFilter, typeFilter, categoryFilter, page]);
 
   const loadClientOptions = async (inputValue) => {
     try {
@@ -115,10 +115,30 @@ const SalesOrderList = () => {
     fetchSalesOrdersData();
   };
 
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setClientFilter('all');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setCategoryFilter('all');
+    setFromDate('');
+    setToDate('');
+    setPage(1);
+  };
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    clientFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    typeFilter !== 'all' ||
+    categoryFilter !== 'all' ||
+    fromDate !== '' ||
+    toDate !== '';
+
   const handleQuickStatusChange = async (so, newStatus) => {
     if (so.status === newStatus) return;
 
-    const confirmMsg = `Are you sure you want to change status of Sales Order "${so.salesOrderNo}" to ${newStatus.toUpperCase()}?`;
+    const confirmMsg = `Are you sure you want to change status of Sales Order "${so.salesOrderNo}" to ${newStatus.toUpperCase().replace('_', ' ')}?`;
     if (!window.confirm(confirmMsg)) return;
 
     setActionLoading(so._id);
@@ -150,16 +170,7 @@ const SalesOrderList = () => {
               setSelectedSOId(row._id);
               setIsDetailOpen(true);
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              fontWeight: 700,
-              color: 'var(--primary-700)',
-              textAlign: 'left'
-            }}
-            className="font-mono hover:underline"
+            className="font-mono font-bold text-blue-700 hover:text-blue-900 hover:underline text-left whitespace-nowrap"
             title="View Details"
           >
             {val}
@@ -170,19 +181,23 @@ const SalesOrderList = () => {
         key: 'salesOrderDate',
         header: 'Order Date',
         sortable: true,
-        render: (val) => (val ? new Date(val).toLocaleDateString('en-GB') : '-')
+        render: (val) => (
+          <span className="text-slate-700 whitespace-nowrap">
+            {val ? new Date(val).toLocaleDateString('en-GB') : '-'}
+          </span>
+        )
       },
       {
         key: 'client',
         header: 'Party / Customer',
         sortable: true,
         render: (_, row) => (
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+          <div className="max-w-[240px]">
+            <div className="font-semibold text-slate-900 leading-tight truncate" title={row.client?.companyName}>
               {row.client?.companyName || 'N/A'}
             </div>
             {row.client?.clientCode && (
-              <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }} className="font-mono">
+              <div className="text-[11px] font-mono text-slate-500 mt-0.5">
                 {row.client.clientCode}
               </div>
             )}
@@ -193,7 +208,7 @@ const SalesOrderList = () => {
         key: 'quotation',
         header: 'Quotation Ref',
         render: (_, row) => (
-          <span style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--neutral-700)' }}>
+          <span className="font-mono text-[11.5px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block whitespace-nowrap">
             {row.quotation?.quotationNo || '-'}
           </span>
         )
@@ -202,12 +217,12 @@ const SalesOrderList = () => {
         key: 'customerPoNumber',
         header: 'Customer PO No',
         render: (val, row) => (
-          <div>
-            <div style={{ fontWeight: 500, color: 'var(--neutral-800)' }} className="font-mono">
+          <div className="whitespace-nowrap">
+            <div className="font-mono font-medium text-slate-800">
               {val || 'N/A'}
             </div>
             {row.customerPoDate && (
-              <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
+              <div className="text-[11px] text-slate-500 mt-0.5">
                 {new Date(row.customerPoDate).toLocaleDateString('en-GB')}
               </div>
             )}
@@ -218,16 +233,18 @@ const SalesOrderList = () => {
         key: 'orderType',
         header: 'Type / Category',
         render: (_, row) => (
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          <div className="flex items-center gap-1.5 flex-wrap whitespace-nowrap">
             <span
-              className={`badge ${row.orderType === 'export' ? 'badge-warning' : 'badge-secondary'}`}
-              style={{ textTransform: 'capitalize', fontSize: '11px' }}
+              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold capitalize border ${
+                row.orderType === 'export'
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
             >
               {row.orderType}
             </span>
             <span
-              className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"
-              style={{ textTransform: 'capitalize', fontSize: '11px' }}
+              className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold capitalize bg-blue-50 text-blue-700 border border-blue-200"
             >
               {row.orderCategory}
             </span>
@@ -240,7 +257,7 @@ const SalesOrderList = () => {
         sortable: true,
         align: 'right',
         render: (val) => (
-          <strong style={{ color: 'var(--neutral-900)' }}>
+          <strong className="text-slate-900 font-bold whitespace-nowrap">
             ₹{(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </strong>
         )
@@ -249,84 +266,80 @@ const SalesOrderList = () => {
         key: 'status',
         header: 'Status',
         sortable: true,
-        render: (val, row) => {
-          if (!canConfirm || ['completed', 'cancelled'].includes(row.status)) {
-            return <StatusBadge status={val} />;
-          }
-
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <StatusBadge status={val} />
-              <Select
-                value={val}
-                onChange={(e) => handleQuickStatusChange(row, e.target.value)}
-                disabled={actionLoading === row._id}
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 4px',
-                  height: '24px',
-                  width: 'auto',
-                  borderRadius: '4px'
-                }}
-                title="Quick status transition"
-                required
-              >
-                <option value="draft">Draft</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </Select>
-            </div>
-          );
-        }
+        render: (val) => <StatusBadge status={val} />
       },
       {
         key: 'actions',
         header: 'Actions',
         align: 'right',
-        width: '180px',
-        render: (_, row) => (
-          <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => {
+        width: '130px',
+        render: (_, row) => {
+          const actionItems = [
+            {
+              label: 'View Details',
+              icon: Eye,
+              onClick: () => {
                 setSelectedSOId(row._id);
                 setIsDetailOpen(true);
-              }}
-              title="View Details"
-            >
-              <Eye size={14} style={{ marginRight: '3px' }} /> View
-            </Button>
+              }
+            },
+            {
+              label: 'Edit Order',
+              icon: Edit,
+              show: canEdit && !['cancelled', 'completed'].includes(row.status),
+              onClick: () => {
+                setEditingSO(row);
+                setIsEditOpen(true);
+              }
+            },
+            {
+              label: 'Confirm Order',
+              icon: CheckCircle2,
+              color: 'var(--success-600)',
+              show: canConfirm && row.status === 'draft',
+              onClick: () => handleQuickStatusChange(row, 'confirmed')
+            },
+            {
+              label: 'Mark In Progress',
+              icon: Clock,
+              color: 'var(--info-600)',
+              show: canConfirm && row.status === 'confirmed',
+              onClick: () => handleQuickStatusChange(row, 'in_progress')
+            },
+            {
+              label: 'Mark Completed',
+              icon: CheckCircle2,
+              color: 'var(--success-600)',
+              show: canConfirm && ['confirmed', 'in_progress'].includes(row.status),
+              onClick: () => handleQuickStatusChange(row, 'completed')
+            },
+            {
+              label: 'Cancel Order',
+              icon: Ban,
+              danger: true,
+              divider: true,
+              show: canConfirm && ['draft', 'confirmed', 'in_progress'].includes(row.status),
+              onClick: () => handleQuickStatusChange(row, 'cancelled')
+            }
+          ];
 
-            {canEdit && !['cancelled', 'completed'].includes(row.status) && (
+          return (
+            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
               <Button
                 variant="ghost"
                 size="xs"
                 onClick={() => {
-                  setEditingSO(row);
-                  setIsEditOpen(true);
+                  setSelectedSOId(row._id);
+                  setIsDetailOpen(true);
                 }}
-                title="Edit Sales Order"
+                title="View Details"
               >
-                <Edit size={14} style={{ marginRight: '3px' }} /> Edit
+                <Eye size={13} className="mr-1" /> View
               </Button>
-            )}
-
-            {canConfirm && row.status === 'draft' && (
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => handleQuickStatusChange(row, 'confirmed')}
-                disabled={actionLoading === row._id}
-                title="Confirm Sales Order"
-              >
-                <CheckCircle2 size={14} style={{ marginRight: '3px' }} color="var(--success-600)" /> Confirm
-              </Button>
-            )}
-          </div>
-        )
+              <ActionDropdown items={actionItems} />
+            </div>
+          );
+        }
       }
     ],
     [canEdit, canConfirm, actionLoading]
@@ -345,7 +358,7 @@ const SalesOrderList = () => {
               onClick={fetchSalesOrdersData}
               disabled={loading}
             >
-              <RefreshCw size={14} className={loading ? 'spin' : ''} style={{ marginRight: '6px' }} />
+              <RefreshCw size={14} className={loading ? 'spin mr-1.5' : 'mr-1.5'} />
               Refresh
             </Button>
             {canCreate && (
@@ -354,7 +367,7 @@ const SalesOrderList = () => {
                 size="sm"
                 onClick={() => setIsCreateOpen(true)}
               >
-                <Plus size={14} style={{ marginRight: '6px' }} /> Create Sales Order
+                <Plus size={14} className="mr-1.5" /> Create Sales Order
               </Button>
             )}
           </>
@@ -364,102 +377,136 @@ const SalesOrderList = () => {
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
-        {/* Toolbar Controls */}
-        <div className="flex flex-wrap items-center gap-3 mb-4" style={{ padding: '16px', gap: '12px' }}>
-          <form onSubmit={handleApplySearch} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
-            <div className="relative flex-1 min-w-[220px]" style={{ flex: '1', minWidth: '220px' }}>
-              <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
+        {/* Filter Controls Toolbar */}
+        <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 mb-4">
+          <form onSubmit={handleApplySearch} className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[230px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input
+                className="pl-9 text-xs h-[36px]"
                 placeholder="Search by SO No, Party, PO No, Remarks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <AsyncSelect
-              value={clientFilter}
-              onChange={(e) => {
-                setClientFilter(e.target.value || 'all');
-                setPage(1);
-              }}
-              loadOptions={loadClientOptions}
-              placeholder="All Parties"
-              style={{ width: '220px' }}
-              initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
-            />
+            {/* Client / Party AsyncSelect */}
+            <div className="min-w-[200px] flex-1 max-w-[260px]">
+              <AsyncSelect
+                value={clientFilter}
+                onChange={(e) => {
+                  setClientFilter(e.target.value || 'all');
+                  setPage(1);
+                }}
+                loadOptions={loadClientOptions}
+                placeholder="All Parties"
+                initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
+              />
+            </div>
 
-            <Select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              style={{ width: '140px' }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
+            {/* Status Dropdown */}
+            <div className="w-[150px]">
+              <Select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+            </div>
 
-            <Select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setPage(1);
-              }}
-              style={{ width: '130px' }}
-            >
-              <option value="all">All Types</option>
-              <option value="domestic">Domestic</option>
-              <option value="export">Export</option>
-            </Select>
+            {/* Type Dropdown */}
+            <div className="w-[130px]">
+              <Select
+                value={typeFilter}
+                onChange={(e) => {
+                  setTypeFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Types</option>
+                <option value="domestic">Domestic</option>
+                <option value="export">Export</option>
+              </Select>
+            </div>
 
-            <Select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setPage(1);
-              }}
-              style={{ width: '130px' }}
-            >
-              <option value="all">All Categories</option>
-              <option value="product">Product</option>
-              <option value="service">Service</option>
-              <option value="spare">Spare</option>
-            </Select>
+            {/* Category Dropdown (Expanded width to prevent truncation) */}
+            <div className="w-[150px]">
+              <Select
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Categories</option>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+                <option value="spare">Spare</option>
+              </Select>
+            </div>
 
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              style={{ width: '140px' }}
-              title="From Date"
-            />
+            {/* Date Pickers */}
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-[135px] h-[36px] text-xs"
+                title="From Date"
+              />
+              <span className="text-slate-400 text-xs font-semibold">-</span>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-[135px] h-[36px] text-xs"
+                title="To Date"
+              />
+            </div>
 
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              style={{ width: '140px' }}
-              title="To Date"
-            />
-
-            <Button type="submit" variant="primary" size="sm">
-              <Filter size={14} style={{ marginRight: '4px' }} /> Filter
-            </Button>
+            {/* Action & Filter Buttons */}
+            <div className="flex items-center gap-2 ml-auto">
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetFilters}
+                  title="Reset Filters"
+                  className="text-slate-600 hover:text-slate-900"
+                >
+                  <RotateCcw size={14} className="mr-1" /> Reset
+                </Button>
+              )}
+              <Button type="submit" variant="primary" size="sm" className="h-[36px] px-4">
+                <Filter size={14} className="mr-1.5" /> Filter
+              </Button>
+            </div>
           </form>
         </div>
 
-        {/* Data Table */}
+        {/* Data Table with Pagination */}
         <DataTable
           columns={columns}
           data={salesOrders}
           loading={loading}
           emptyTitle="No Sales Orders found"
           emptyDescription="Click '+ Create Sales Order' to convert an accepted quotation into a manufacturing sales order."
+          pagination={{
+            currentPage: page,
+            totalPages: Math.ceil(totalRecords / limit) || 1,
+            totalRecords,
+            onPageChange: (newPage) => setPage(newPage)
+          }}
         />
       </div>
 
@@ -514,3 +561,4 @@ const SalesOrderList = () => {
 };
 
 export default SalesOrderList;
+

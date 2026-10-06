@@ -23,6 +23,8 @@ import {
   Printer
 } from 'lucide-react';
 
+import TechnicalDrawingModal from './TechnicalDrawingModal';
+
 const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated }) => {
   const { hasPermission } = useAuth();
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
@@ -33,6 +35,9 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
   const [items, setItems] = useState([]);
   const [references, setReferences] = useState(null);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'traceability'
+
+  const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
+  const [drawingTargetItem, setDrawingTargetItem] = useState(null);
 
   const [statusLoading, setStatusLoading] = useState(false);
   const [error, setError] = useState('');
@@ -102,10 +107,12 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
   };
 
   const checkDrawingEligible = (item) => {
-    const catName = item.itemCategory?.categoryName?.toLowerCase() || '';
-    const itemName = (item.item?.itemName || item.description || '').toLowerCase();
-    if (itemName.includes('motor') || itemName.includes('gasket') || itemName.includes('fastener') || itemName.includes('service')) return false;
-    return itemName.includes('filter') || itemName.includes('cartridge') || itemName.includes('flange') || catName.includes('filter') || catName.includes('cartridge') || catName.includes('flange');
+    if (!item) return false;
+    const desc = (item.description || item.item?.itemName || '').toLowerCase();
+    if (desc.includes('motor') || desc.includes('gasket') || desc.includes('fastener') || desc.includes('service charge')) {
+      return false;
+    }
+    return true;
   };
 
   const handleGenerateItemDrawing = async (item) => {
@@ -402,17 +409,19 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                           <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                             {checkDrawingEligible(it) ? (
                               <button 
-                                onClick={() => handleGenerateItemDrawing(it)}
-                                title="Generate Technical Drawing"
-                                style={{
-                                  background: 'none', border: 'none', cursor: 'pointer', 
-                                  color: 'var(--primary-600)', padding: '4px', borderRadius: '4px'
+                                onClick={() => {
+                                  setDrawingTargetItem(it);
+                                  setIsDrawingModalOpen(true);
                                 }}
-                                className="hover:bg-blue-50"
+                                title="Configure & Generate Technical Drawing"
+                                className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
                               >
-                                <ImageIcon size={16} />
+                                <ImageIcon size={14} className="text-blue-600" />
+                                <span>{it.flangeDesignSnapshot?.designCode || (it.constructionType === 'BOX' ? 'BOX' : 'Drawing')}</span>
                               </button>
-                            ) : null}
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -541,6 +550,20 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
               Close
             </Button>
           </div>
+
+          {/* Technical Drawing Selection & Generation Modal */}
+          {isDrawingModalOpen && drawingTargetItem && (
+            <TechnicalDrawingModal
+              isOpen={isDrawingModalOpen}
+              salesOrderId={salesOrderId}
+              item={drawingTargetItem}
+              onClose={() => {
+                setIsDrawingModalOpen(false);
+                setDrawingTargetItem(null);
+                fetchDetails();
+              }}
+            />
+          )}
         </div>
       )}
     </Modal>

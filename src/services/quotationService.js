@@ -108,3 +108,12 @@ export const getQuotationMIS = async (params = {}) => {
   const response = await api.get('/quotations/mis', { params });
   return response.data;
 };
+
+export const printQuotationPdf = async (quotationId) => {
+  const response = await api.get(`/quotations/${quotationId}/pdf`, {
+    responseType: 'blob'
+  });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  window.open(url, '_blank');
+};
