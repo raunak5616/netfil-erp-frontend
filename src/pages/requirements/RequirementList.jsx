@@ -243,53 +243,55 @@ const RequirementList = () => {
           );
         }
 
-        const itemObj = typeof row.item === 'object' ? row.item : null;
-        const uomObj = typeof row.uom === 'object' ? row.uom : null;
+        const itemsArr = Array.isArray(row.items) && row.items.length > 0 ? row.items : null;
+        const itemCount = itemsArr ? itemsArr.length : 1;
+        const firstItem = itemsArr ? itemsArr[0] : row;
+        const itemObj = typeof firstItem?.item === 'object' ? firstItem.item : (typeof row.item === 'object' ? row.item : null);
+        const uomObj = typeof firstItem?.uom === 'object' ? firstItem.uom : (typeof row.uom === 'object' ? row.uom : null);
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            {itemObj ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                    CATALOG ITEM
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {itemCount > 1 ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">
+                  {itemCount} ITEMS
+                </span>
+              ) : itemObj ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                  CATALOG ITEM
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  CUSTOM
+                </span>
+              )}
+
+              <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                {itemObj ? itemObj.itemName : (itemCount > 1 ? `Multi-Item Enquiry (${itemCount} items)` : 'Air Filter Requirement')}
+              </span>
+            </div>
+
+            {itemObj && (
+              <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)' }} className="font-mono">
+                Code: <strong>{itemObj.itemCode}</strong>
+                {itemObj.filterGrade?.filterGrade && (
+                  <span className="ml-2 text-slate-700 font-sans font-semibold">
+                    • Grade: {itemObj.filterGrade.filterGrade}
                   </span>
-                  <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-                    {itemObj.itemName}
-                  </span>
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)' }} className="font-mono">
-                  Code: <strong>{itemObj.itemCode}</strong>
-                  {itemObj.filterGrade?.filterGrade && (
-                    <span className="ml-2 text-slate-700 font-sans font-semibold">
-                      • Grade: {itemObj.filterGrade.filterGrade}
-                      {itemObj.filterGrade.eurovent ? ` (${itemObj.filterGrade.eurovent})` : ''}
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                    CUSTOM
-                  </span>
-                  <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-                    Custom Air Filter Requirement
-                  </span>
-                </div>
-              </>
+                )}
+              </div>
             )}
 
             <div style={{ fontSize: '12px', color: 'var(--neutral-600)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {row.quantity !== null && (
+              {firstItem?.quantity !== null && firstItem?.quantity !== undefined && (
                 <span>
-                  Qty: <strong>{row.quantity}</strong> {uomObj ? uomObj.uomCode : ''}
+                  Qty: <strong>{firstItem.quantity}</strong> {uomObj ? uomObj.uomCode : ''}
+                  {itemCount > 1 ? ` (Item 1 of ${itemCount})` : ''}
                 </span>
               )}
-              {row.dimensions && (row.dimensions.length || row.dimensions.width) && (
+              {firstItem?.dimensions && (firstItem.dimensions.bodyWidth || firstItem.dimensions.width) && (
                 <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
-                  Dim: {row.dimensions.length || '—'}×{row.dimensions.width || '—'}{row.dimensions.height ? `×${row.dimensions.height}` : ''} {row.dimensions.unit || 'mm'}
+                  Dim: {firstItem.dimensions.bodyWidth || firstItem.dimensions.width}×{firstItem.dimensions.bodyHeight || firstItem.dimensions.height}×{firstItem.dimensions.depth || firstItem.dimensions.length || '0'} {firstItem.dimensions.unit || 'mm'}
                 </span>
               )}
             </div>

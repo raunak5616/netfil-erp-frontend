@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -13,19 +13,30 @@ import {
   Phone, 
   Mail, 
   MapPin,
-  Tag
+  Tag,
+  Maximize2,
+  Image as ImageIcon,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreateQuotation, canEdit }) => {
   if (!isOpen || !requirement) return null;
 
   const party = typeof requirement.client === 'object' ? requirement.client : null;
-  const item = typeof requirement.item === 'object' ? requirement.item : null;
-  const category = typeof requirement.itemCategory === 'object' ? requirement.itemCategory : null;
-  const uom = typeof requirement.uom === 'object' ? requirement.uom : null;
   const salesPerson = typeof requirement.salesPerson === 'object' ? requirement.salesPerson : null;
   const createdBy = typeof requirement.createdBy === 'object' ? requirement.createdBy : null;
   const updatedBy = typeof requirement.updatedBy === 'object' ? requirement.updatedBy : null;
+
+  // Track expanded state for items in detail view
+  const [expandedItems, setExpandedItems] = useState({});
+
+  const toggleExpand = (idx) => {
+    setExpandedItems((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -55,7 +66,6 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
     }
   };
 
-  // Map backend status enum to label and Badge variant
   const getStatusDisplay = (st) => {
     switch (st) {
       case 'draft':
@@ -79,6 +89,22 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
 
   const statusInfo = getStatusDisplay(requirement.status);
 
+  // Normalize items array
+  const itemList = Array.isArray(requirement.items) && requirement.items.length > 0
+    ? requirement.items
+    : [{
+        itemCategory: requirement.itemCategory,
+        item: requirement.item,
+        quantity: requirement.quantity,
+        uom: requirement.uom,
+        constructionType: requirement.constructionType,
+        flangeDesign: requirement.flangeDesign,
+        flangeDesignSnapshot: requirement.flangeDesignSnapshot,
+        dimensions: requirement.dimensions,
+        specifications: requirement.specifications,
+        remarks: requirement.remarks,
+      }];
+
   return (
     <Modal
       isOpen={isOpen}
@@ -91,7 +117,7 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
           </span>
         </div>
       }
-      maxWidth="720px"
+      maxWidth="780px"
       footer={
         <>
           {onCreateQuotation && (
@@ -163,7 +189,7 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
               Enquiry Type
             </div>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-800)', textTransform: 'capitalize' }}>
-              {requirement.type || 'Product'} Enquiry
+              {requirement.type || 'Product'} Enquiry ({itemList.length} {itemList.length === 1 ? 'Item' : 'Items'})
             </div>
           </div>
         </div>
@@ -216,173 +242,199 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
           </div>
         </div>
 
-        {/* SECTION 2: PRODUCT & TECHNICAL SPECIFICATIONS */}
+        {/* SECTION 2: PRODUCT & TECHNICAL SPECIFICATIONS (MULTIPLE ITEMS SUPPORT) */}
         {requirement.type === 'product' ? (
-          <>
-            {/* CATALOG ITEM MASTER DATA (If Catalog Item selected) */}
-            {item && (
-              <div style={{ border: '1px solid var(--primary-200)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--primary-50)' }}>
-                <div style={{ backgroundColor: '#eff6ff', padding: '8px 12px', fontSize: '12px', fontWeight: 700, color: 'var(--primary-900)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--primary-200)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Package size={14} className="text-blue-700" />
-                    <span>CATALOG PRODUCT / ITEM DETAILS</span>
-                  </div>
-                  <span className="text-[10.5px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300 font-bold">
-                    ITEM MASTER REFERENCE
-                  </span>
-                </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Package size={14} /> Enquiry Items ({itemList.length})
+            </div>
 
-                <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', backgroundColor: '#ffffff' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', fontWeight: 600 }}>Item Name</div>
-                    <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--neutral-900)' }}>
-                      {item.itemName}
+            {itemList.map((reqItem, idx) => {
+              const itemObj = typeof reqItem.item === 'object' ? reqItem.item : null;
+              const catObj = typeof reqItem.itemCategory === 'object' ? reqItem.itemCategory : null;
+              const uomObj = typeof reqItem.uom === 'object' ? reqItem.uom : null;
+              const flangeObj = typeof reqItem.flangeDesign === 'object' ? reqItem.flangeDesign : null;
+              const isCollapsed = expandedItems[idx] === false;
+
+              let summaryTitle = itemObj ? itemObj.itemName : `Filter Requirement ${idx + 1}`;
+              const constTypeStr = (reqItem.constructionType || reqItem.dimensions?.constructionType || 'FLANGE').toUpperCase();
+              const dimsStr = reqItem.dimensions?.bodyWidth ? `${reqItem.dimensions.bodyWidth}×${reqItem.dimensions.bodyHeight}×${reqItem.dimensions.depth || '0'}mm` : '';
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    border: '1px solid var(--neutral-300)',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#ffffff',
+                  }}
+                >
+                  {/* ITEM CARD ACCORDION HEADER */}
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      backgroundColor: '#f8fafc',
+                      borderBottom: !isCollapsed ? '1px solid var(--neutral-200)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => toggleExpand(idx)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', fontFamily: 'monospace' }}>
+                        Item #{idx + 1}
+                      </span>
+                      <span style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--neutral-900)' }}>
+                        {summaryTitle}
+                      </span>
+                      {dimsStr && (
+                        <span style={{ fontSize: '11.5px', color: 'var(--neutral-600)', fontFamily: 'monospace' }}>
+                          ({dimsStr})
+                        </span>
+                      )}
+                      <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', backgroundColor: constTypeStr === 'FLANGE' ? '#e0f2fe' : '#f3e8ff', color: constTypeStr === 'FLANGE' ? '#0369a1' : '#6b21a8' }}>
+                        {constTypeStr}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary-800)' }}>
+                        Qty: {reqItem.quantity !== null && reqItem.quantity !== undefined ? reqItem.quantity : '—'} {uomObj ? uomObj.uomCode : ''}
+                      </span>
+                      {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                     </div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', fontWeight: 600 }}>Item Code</div>
-                    <div className="font-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary-700)' }}>
-                      {item.itemCode}
-                    </div>
-                  </div>
+                  {/* ITEM CARD EXPANDED DETAILS */}
+                  {!isCollapsed && (
+                    <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* CATALOG ITEM DETAILS */}
+                      {itemObj && (
+                        <div style={{ border: '1px solid var(--primary-200)', borderRadius: '6px', overflow: 'hidden', backgroundColor: 'var(--primary-50)' }}>
+                          <div style={{ backgroundColor: '#eff6ff', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, color: 'var(--primary-900)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--primary-200)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Package size={13} className="text-blue-700" />
+                              <span>CATALOG ITEM REFERENCE</span>
+                            </div>
+                            <span className="font-mono text-[10px]">Item Master</span>
+                          </div>
 
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', fontWeight: 600 }}>Standard Category</div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
-                      {item.itemCategory?.categoryName || category?.categoryName ? (
-                        `${item.itemCategory?.categoryName || category?.categoryName} (${item.itemCategory?.categoryCode || category?.categoryCode || ''})`
-                      ) : '—'}
-                    </div>
-                  </div>
+                          <div style={{ padding: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', backgroundColor: '#ffffff', fontSize: '12px' }}>
+                            <div>
+                              <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>Item Name & Code</span>
+                              <strong style={{ color: 'var(--neutral-900)' }}>{itemObj.itemName}</strong> <span className="font-mono text-blue-700">({itemObj.itemCode})</span>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>Category & UOM</span>
+                              <span>{catObj?.categoryName || itemObj.itemCategory?.categoryName || '—'} | {uomObj?.uomName || itemObj.salesUom?.uomName || '—'}</span>
+                            </div>
 
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', fontWeight: 600 }}>Standard Unit of Measure (UOM)</div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
-                      {item.salesUom?.uomName || item.inventoryUom?.uomName || uom?.uomName ? (
-                        `${item.salesUom?.uomName || item.inventoryUom?.uomName || uom?.uomName} (${item.salesUom?.uomCode || item.inventoryUom?.uomCode || uom?.uomCode || ''})`
-                      ) : '—'}
-                    </div>
-                  </div>
+                            {itemObj.filterGrade && (
+                              <div style={{ gridColumn: 'span 2', paddingTop: '6px', borderTop: '1px dashed var(--neutral-200)' }}>
+                                <span style={{ color: 'var(--neutral-500)', fontSize: '11px' }}>Filter Grade: </span>
+                                <strong>{typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade.filterGrade : itemObj.filterGrade}</strong>
+                                {typeof itemObj.filterGrade === 'object' && itemObj.filterGrade.eurovent ? ` (${itemObj.filterGrade.eurovent})` : ''}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Filter Grade Section if present on item */}
-                  {item.filterGrade && (
-                    <div style={{ gridColumn: 'span 2', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed var(--neutral-200)' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Tag size={13} /> Filter Grade Master Specification
+                      {/* TECHNICAL & ENGINEERING DIMENSION SPECIFICATIONS */}
+                      <div style={{ padding: '10px', backgroundColor: 'var(--neutral-50)', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Maximize2 size={14} /> ENGINEERING DIMENSION SPECIFICATION
+                          </span>
+                          <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: 'var(--neutral-500)' }}>Unit: mm</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                          <div>
+                            <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>A. Filter Body Dimensions</span>
+                            <strong style={{ color: 'var(--neutral-900)' }}>
+                              {reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—'} × {reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
+                            </strong>
+                          </div>
+
+                          {constTypeStr === 'FLANGE' && (
+                            <div>
+                              <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block' }}>B. Overall Flange Dimensions</span>
+                              <strong style={{ color: 'var(--primary-800)' }}>
+                                {reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || '—'} × {reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || '—'} mm
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Flange Design & Reference Preview */}
+                        {constTypeStr === 'FLANGE' && (
+                          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--neutral-200)' }}>
+                            <div style={{ fontSize: '11.5px', color: 'var(--neutral-700)', marginBottom: '4px' }}>
+                              Flange Design Master: <strong style={{ color: 'var(--neutral-900)' }}>
+                                {reqItem.flangeDesignSnapshot?.designCode || flangeObj?.designCode || 'FLG-001'} — {reqItem.flangeDesignSnapshot?.designName || flangeObj?.designName || 'Flange Design'}
+                              </strong>
+                            </div>
+                            {(reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage) && (
+                              <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>
+                                <img
+                                  src={reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage}
+                                  alt="Reference Design Preview"
+                                  style={{ maxHeight: '140px', objectFit: 'contain' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', backgroundColor: 'var(--neutral-50)', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)', fontSize: '12px' }}>
-                        <div>
-                          <span style={{ color: 'var(--neutral-500)' }}>Grade: </span>
-                          <strong style={{ color: 'var(--neutral-900)' }}>{item.filterGrade.filterGrade || '—'}</strong>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--neutral-500)' }}>EUROVENT: </span>
-                          <strong style={{ color: 'var(--primary-700)' }}>{item.filterGrade.eurovent || '—'}</strong>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--neutral-500)' }}>ISO 16890: </span>
-                          <strong style={{ color: 'var(--primary-700)' }}>{item.filterGrade.iso || '—'}</strong>
-                        </div>
-                      </div>
 
-                      {/* Grade Variants specs if available */}
-                      {Array.isArray(item.filterGrade.variants) && item.filterGrade.variants.length > 0 && (
-                        <div style={{ marginTop: '6px', fontSize: '11.5px', color: 'var(--neutral-700)' }}>
-                          <span style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>Technical Parameters: </span>
-                          {item.filterGrade.variants.map((v, i) => (
-                            <span key={i} className="mr-3">
-                              {v.filterClass ? `Class: ${v.filterClass}` : ''} 
-                              {v.efficiency ? ` | Eff: ${v.efficiency}` : ''}
-                              {v.initialPressureDrop ? ` | Initial PD: ${v.initialPressureDrop}` : ''}
-                              {v.finalPressureDrop ? ` | Final PD: ${v.finalPressureDrop}` : ''}
-                            </span>
-                          ))}
+                      {/* Item Specifications */}
+                      {Array.isArray(reqItem.specifications) && reqItem.specifications.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--neutral-700)', marginBottom: '4px' }}>
+                            Item Custom Specifications:
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', border: '1px solid var(--neutral-200)' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: 'var(--neutral-50)' }}>
+                                <th style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '1px solid var(--neutral-200)', width: '40%' }}>
+                                  Parameter / Feature
+                                </th>
+                                <th style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '1px solid var(--neutral-200)' }}>
+                                  Target Requirement
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reqItem.specifications.map((spec, specIdx) => {
+                                const key = typeof spec === 'object' ? (spec.key || spec.name || 'Spec') : 'Spec';
+                                const val = typeof spec === 'object' ? (spec.value || spec.val || '') : String(spec);
+                                return (
+                                  <tr key={specIdx} style={{ borderBottom: '1px solid var(--neutral-100)' }}>
+                                    <td style={{ padding: '5px 10px', fontWeight: 600, color: 'var(--neutral-800)' }}>{key}</td>
+                                    <td style={{ padding: '5px 10px', color: 'var(--neutral-700)' }}>{val}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {reqItem.remarks && (
+                        <div style={{ fontSize: '12px', color: 'var(--neutral-800)', fontStyle: 'italic', backgroundColor: 'var(--neutral-50)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                          Item Remarks: "{reqItem.remarks}"
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* CUSTOMER REQUIREMENT SECTION */}
-            <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', overflow: 'hidden' }}>
-              <div style={{ backgroundColor: 'var(--neutral-100)', padding: '8px 12px', fontSize: '12px', fontWeight: 700, color: 'var(--neutral-800)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <FileText size={14} color="var(--primary-700)" /> CUSTOMER-SPECIFIC REQUIREMENT
-              </div>
-
-              <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Requested Quantity</div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--neutral-900)' }}>
-                      {requirement.quantity !== null ? requirement.quantity : '—'}{' '}
-                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--neutral-600)' }}>
-                        {uom ? `${uom.uomName} (${uom.uomCode})` : ''}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Customer Dimensions</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--neutral-800)' }}>
-                      {requirement.dimensions && (requirement.dimensions.length || requirement.dimensions.width || requirement.dimensions.height) ? (
-                        <span>
-                          {requirement.dimensions.length || '—'} × {requirement.dimensions.width || '—'} × {requirement.dimensions.height || '—'}{' '}
-                          {requirement.dimensions.unit || 'mm'}
-                        </span>
-                      ) : (
-                        '— (Standard Dimensions)'
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Specifications */}
-                {Array.isArray(requirement.specifications) && requirement.specifications.length > 0 && (
-                  <div style={{ marginTop: '6px' }}>
-                    <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--neutral-700)', marginBottom: '4px' }}>
-                      Additional Customer Specifications:
-                    </div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', border: '1px solid var(--neutral-200)' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: 'var(--neutral-50)' }}>
-                          <th style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '1px solid var(--neutral-200)', width: '40%' }}>
-                            Parameter / Feature
-                          </th>
-                          <th style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '1px solid var(--neutral-200)' }}>
-                            Target Requirement
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {requirement.specifications.map((spec, idx) => {
-                          const key = typeof spec === 'object' ? (spec.key || spec.name || 'Spec') : 'Spec';
-                          const val = typeof spec === 'object' ? (spec.value || spec.val || '') : String(spec);
-                          return (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--neutral-100)' }}>
-                              <td style={{ padding: '6px 10px', fontWeight: 600, color: 'var(--neutral-800)' }}>{key}</td>
-                              <td style={{ padding: '6px 10px', color: 'var(--neutral-700)' }}>{val}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {requirement.remarks && (
-                  <div>
-                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginTop: '4px' }}>Customer Remarks / Special Instructions</div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)', fontStyle: 'italic', backgroundColor: 'var(--neutral-50)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                      "{requirement.remarks}"
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
+              );
+            })}
+          </div>
         ) : (
           <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', overflow: 'hidden' }}>
             <div style={{ backgroundColor: 'var(--neutral-100)', padding: '8px 12px', fontSize: '12px', fontWeight: 700, color: 'var(--neutral-800)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -405,6 +457,16 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* OVERALL REMARKS IF PRODUCT TYPE */}
+        {requirement.type === 'product' && requirement.remarks && (
+          <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '10px', backgroundColor: 'var(--neutral-50)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--neutral-500)', fontWeight: 600 }}>Overall Customer Remarks / Instructions</div>
+            <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)', fontStyle: 'italic', marginTop: '2px' }}>
+              "{requirement.remarks}"
             </div>
           </div>
         )}

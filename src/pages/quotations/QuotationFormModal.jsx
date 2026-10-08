@@ -89,61 +89,79 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       attentionPerson: (typeof selectedReq.client === 'object' ? selectedReq.client?.contactPerson : '') || prev.attentionPerson,
     }));
 
-    // Resolve catalog item object (if requirement has catalog item reference)
-    const itemObj = (typeof selectedReq.item === 'object' ? selectedReq.item : allItems.find((i) => i._id === selectedReq.item)) || null;
+    const reqItemsList = (Array.isArray(selectedReq.items) && selectedReq.items.length > 0)
+      ? selectedReq.items
+      : [selectedReq]; // Fallback to single top-level fields for legacy data
 
-    const itemId = itemObj?._id || (typeof selectedReq.item === 'string' ? selectedReq.item : null) || '';
-    const itemCatId = itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
-    const uomId = selectedReq.uom?._id || selectedReq.uom || itemObj?.salesUom?._id || itemObj?.salesUom || itemObj?.inventoryUom?._id || itemObj?.inventoryUom || allUoms[0]?._id || '';
-    const hsnCode = itemObj?.hsnCode || '';
+    const mappedLineItems = reqItemsList.map((reqItem, idx) => {
+      const itemRef = reqItem.item || selectedReq.item;
+      const itemObj = (typeof itemRef === 'object' ? itemRef : allItems.find((i) => i._id === itemRef)) || null;
 
-    let description = '';
-    if (itemObj) {
-      description = itemObj.itemName;
-    } else if (selectedReq.type === 'service' && selectedReq.serviceDescription) {
-      description = selectedReq.serviceDescription;
-    } else {
-      description = 'Custom Air Filter Requirement';
-    }
+      const itemId = itemObj?._id || (typeof itemRef === 'string' ? itemRef : null) || '';
+      const itemCatId = reqItem.itemCategory?._id || reqItem.itemCategory || itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
+      const uomRef = reqItem.uom || selectedReq.uom || itemObj?.salesUom || itemObj?.inventoryUom;
+      const uomId = (typeof uomRef === 'object' ? uomRef?._id : uomRef) || allUoms[0]?._id || '';
+      const hsnCode = itemObj?.hsnCode || '';
 
-    const qty = selectedReq.quantity !== null && selectedReq.quantity !== undefined ? Number(selectedReq.quantity) : 1;
-    const dims = selectedReq.dimensions || {};
-    const specs = Array.isArray(selectedReq.specifications) ? selectedReq.specifications : [];
-
-    // Detailed Technical Snapshot in remarks
-    let remarksText = selectedReq.remarks || '';
-    if (itemObj?.filterGrade) {
-      const fg = typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade : null;
-      const fgName = fg ? fg.filterGrade : itemObj.filterGrade;
-      const eurovent = fg?.eurovent || '';
-      const iso = fg?.iso || '';
-      const fgStr = [fgName ? `Grade: ${fgName}` : '', eurovent ? `EU: ${eurovent}` : '', iso ? `ISO: ${iso}` : ''].filter(Boolean).join(' / ');
-      if (fgStr && !remarksText.includes('Grade:')) {
-        remarksText = remarksText ? `${fgStr} | ${remarksText}` : fgStr;
+      let description = reqItem.description || '';
+      if (!description) {
+        if (itemObj) {
+          description = itemObj.itemName;
+        } else if (selectedReq.type === 'service' && selectedReq.serviceDescription) {
+          description = selectedReq.serviceDescription;
+        } else if (reqItem.constructionType) {
+          description = `Item #${idx + 1} - ${reqItem.constructionType} Filter`;
+        } else {
+          description = `Item #${idx + 1} - Custom Air Filter Requirement`;
+        }
       }
-    }
 
-    if (dims && (dims.length || dims.width)) {
-      const dimStr = `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`;
-      if (!remarksText.includes('Dim:')) {
-        remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+      const qty = reqItem.quantity !== null && reqItem.quantity !== undefined ? Number(reqItem.quantity) : (selectedReq.quantity !== null && selectedReq.quantity !== undefined ? Number(selectedReq.quantity) : 1);
+      const dims = reqItem.dimensions || selectedReq.dimensions || {};
+      const specs = Array.isArray(reqItem.specifications) && reqItem.specifications.length > 0 ? reqItem.specifications : (Array.isArray(selectedReq.specifications) ? selectedReq.specifications : []);
+      const flangeDesignId = reqItem.flangeDesign?._id || reqItem.flangeDesign || selectedReq.flangeDesign?._id || selectedReq.flangeDesign || null;
+      const constructionTypeVal = reqItem.constructionType || selectedReq.constructionType || 'FLANGE';
+
+      // Detailed Technical Snapshot in remarks
+      let remarksText = reqItem.remarks || selectedReq.remarks || '';
+      if (itemObj?.filterGrade) {
+        const fg = typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade : null;
+        const fgName = fg ? fg.filterGrade : itemObj.filterGrade;
+        const eurovent = fg?.eurovent || '';
+        const iso = fg?.iso || '';
+        const fgStr = [fgName ? `Grade: ${fgName}` : '', eurovent ? `EU: ${eurovent}` : '', iso ? `ISO: ${iso}` : ''].filter(Boolean).join(' / ');
+        if (fgStr && !remarksText.includes('Grade:')) {
+          remarksText = remarksText ? `${fgStr} | ${remarksText}` : fgStr;
+        }
       }
-    }
 
-    setLineItems([
-      {
+      if (dims && (dims.length || dims.width || dims.outerDiameter)) {
+        const dimStr = (dims.length || dims.width)
+          ? `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`
+          : `OD: ${dims.outerDiameter || '—'} ID: ${dims.innerDiameter || '—'} H: ${dims.height || '—'} ${dims.unit || 'mm'}`;
+        if (!remarksText.includes('Dim:') && !remarksText.includes('OD:')) {
+          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+        }
+      }
+
+      return {
         item: itemId,
         itemCategory: itemCatId,
         description: description,
         quantity: qty,
         uom: uomId,
-        unitPrice: 0, // Rate strictly blank / 0 for manual entry
+        unitPrice: 0,
         hsnCode: hsnCode,
+        constructionType: constructionTypeVal,
+        flangeDesign: flangeDesignId,
+        flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq.flangeDesignSnapshot || null,
         dimensions: dims,
         specifications: specs,
         remarks: remarksText,
-      },
-    ]);
+      };
+    });
+
+    setLineItems(mappedLineItems);
   };
 
   // Load Master Selectors on Mount
@@ -391,6 +409,22 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
     setSubmitting(true);
     try {
+      const lineItemsPayload = lineItems.map((item) => ({
+        item: item.item || null,
+        itemCategory: item.itemCategory || null,
+        description: item.description,
+        quantity: Number(item.quantity),
+        uom: item.uom,
+        unitPrice: Number(item.unitPrice),
+        hsnCode: item.hsnCode,
+        constructionType: item.constructionType || 'FLANGE',
+        flangeDesign: item.flangeDesign || null,
+        flangeDesignSnapshot: item.flangeDesignSnapshot || null,
+        dimensions: item.dimensions || {},
+        specifications: item.specifications || [],
+        remarks: item.remarks || '',
+      }));
+
       const headerPayload = {
         client: formData.client,
         requirement: formData.requirement,
@@ -410,6 +444,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         deliveryTerms: formData.deliveryTerms,
         generalTerms: formData.generalTerms,
         remarks: formData.remarks,
+        items: lineItemsPayload,
       };
 
       let savedQuotationId;
@@ -419,46 +454,18 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         await updateQuotation(savedQuotationId, headerPayload);
 
         // Update items: delete existing items not in form, update existing, add new
-        // For simplicity, save items cleanly
-        for (const item of lineItems) {
-          const itemPayload = {
-            item: item.item || null,
-            itemCategory: item.itemCategory || null,
-            description: item.description,
-            quantity: Number(item.quantity),
-            uom: item.uom,
-            unitPrice: Number(item.unitPrice),
-            hsnCode: item.hsnCode,
-            remarks: item.remarks,
-          };
-
+        for (const item of lineItemsPayload) {
           if (item._id) {
-            await updateQuotationItem(savedQuotationId, item._id, itemPayload);
+            await updateQuotationItem(savedQuotationId, item._id, item);
           } else {
-            await addQuotationItem(savedQuotationId, itemPayload);
+            await addQuotationItem(savedQuotationId, item);
           }
         }
       } else {
-        // Create Header
+        // Create Header and Line Items atomically
         const createRes = await createQuotation(headerPayload);
         if (!createRes.success || !createRes.quotation) {
           throw new Error(createRes.message || 'Failed to create quotation header');
-        }
-        savedQuotationId = createRes.quotation._id;
-
-        // Add Line Items
-        for (const item of lineItems) {
-          const itemPayload = {
-            item: item.item || null,
-            itemCategory: item.itemCategory || null,
-            description: item.description,
-            quantity: Number(item.quantity),
-            uom: item.uom,
-            unitPrice: Number(item.unitPrice),
-            hsnCode: item.hsnCode,
-            remarks: item.remarks,
-          };
-          await addQuotationItem(savedQuotationId, itemPayload);
         }
       }
 
