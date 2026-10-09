@@ -82,14 +82,31 @@ const EnquiryMis = () => {
   useEffect(() => {
     const loadMasterOptions = async () => {
       try {
+        const isSystemCode = (code) => {
+          if (!code) return false;
+          const u = String(code).toUpperCase();
+          return (
+            u.startsWith('CAT-WO-') ||
+            u === 'CAT-INV' ||
+            u === 'CAT-OBOM' ||
+            u.startsWith('ITEM-WO-') ||
+            u.startsWith('ITEM-INV-') ||
+            u.startsWith('ITEM-OBOM-')
+          );
+        };
+
         const [catRes, itemRes, empRes] = await Promise.all([
-          getItemCategories().catch(() => ({ success: false, itemCategories: [] })),
-          getItems().catch(() => ({ success: false, items: [] })),
+          getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: false, itemCategories: [] })),
+          getItems({ typeFilter: 'MASTER' }).catch(() => ({ success: false, items: [] })),
           getEmployees().catch(() => ({ success: false, employees: [] })),
         ]);
 
-        if (catRes.success && Array.isArray(catRes.itemCategories)) setCategories(catRes.itemCategories);
-        if (itemRes.success && Array.isArray(itemRes.items)) setItems(itemRes.items);
+        if (catRes.success && Array.isArray(catRes.itemCategories)) {
+          setCategories(catRes.itemCategories.filter((c) => !isSystemCode(c.categoryCode)));
+        }
+        if (itemRes.success && Array.isArray(itemRes.items)) {
+          setItems(itemRes.items.filter((i) => !isSystemCode(i.itemCode)));
+        }
         if (empRes.success && Array.isArray(empRes.employees)) setSalesPersons(empRes.employees);
       } catch (err) {
         console.error('Error loading master filter options:', err);

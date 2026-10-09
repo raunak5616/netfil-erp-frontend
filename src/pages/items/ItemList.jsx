@@ -56,25 +56,41 @@ const ItemList = () => {
     setLoading(true);
     setError('');
     try {
+      const isSystemCode = (code) => {
+        if (!code) return false;
+        const u = String(code).toUpperCase();
+        return (
+          u.startsWith('CAT-WO-') ||
+          u === 'CAT-INV' ||
+          u === 'CAT-OBOM' ||
+          u.startsWith('GP-WO-') ||
+          u === 'GP-INV' ||
+          u === 'GP-OBOM' ||
+          u.startsWith('ITEM-WO-') ||
+          u.startsWith('ITEM-INV-') ||
+          u.startsWith('ITEM-OBOM-')
+        );
+      };
+
       const [itemRes, groupRes, catRes] = await Promise.all([
-        getItems(),
-        getItemGroups().catch(() => ({ success: true, itemGroups: [] })),
-        getItemCategories().catch(() => ({ success: true, itemCategories: [] })),
+        getItems({ typeFilter: 'MASTER' }),
+        getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemGroups: [] })),
+        getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemCategories: [] })),
       ]);
 
       if (itemRes.success && Array.isArray(itemRes.items)) {
-        setItems(itemRes.items);
+        setItems(itemRes.items.filter((i) => !isSystemCode(i.itemCode)));
       } else {
         setError('Unexpected API response format');
       }
 
       const groupsArray = groupRes.itemGroups || groupRes.groups;
       if (groupRes.success && Array.isArray(groupsArray)) {
-        setItemGroups(groupsArray);
+        setItemGroups(groupsArray.filter((g) => !isSystemCode(g.groupCode)));
       }
       const categoriesArray = catRes.itemCategories || catRes.categories;
       if (catRes.success && Array.isArray(categoriesArray)) {
-        setItemCategories(categoriesArray);
+        setItemCategories(categoriesArray.filter((cat) => !isSystemCode(cat.categoryCode)));
       }
     } catch (err) {
       console.error("Failed to fetch Items:", err);

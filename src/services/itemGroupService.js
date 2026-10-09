@@ -1,7 +1,7 @@
 import api from './api';
 
-export const getItemGroups = async () => {
-  const response = await api.get('/item-groups');
+export const getItemGroups = async (params = {}) => {
+  const response = await api.get('/item-groups', { params });
   return response.data;
 };
 

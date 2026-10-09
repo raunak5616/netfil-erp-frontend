@@ -35,6 +35,7 @@ const ClientList = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('MASTER');
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -87,6 +88,12 @@ const ClientList = () => {
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
+      const code = client.clientCode || '';
+      const isSystem = code.startsWith('CL-WO-') || code.startsWith('CL-INV-') || code === 'CL-OBOM';
+
+      if (typeFilter === 'MASTER' && isSystem) return false;
+      if (typeFilter === 'SYSTEM' && !isSystem) return false;
+
       // Status filter
       if (statusFilter !== 'all' && client.status !== statusFilter) return false;
 
@@ -94,7 +101,6 @@ const ClientList = () => {
       if (!searchTerm.trim()) return true;
 
       const term = searchTerm.toLowerCase();
-      const code = (client.clientCode || '').toLowerCase();
       const company = (client.companyName || '').toLowerCase();
       const contact = (client.contactPerson || '').toLowerCase();
       const mobile = (client.mobile || '').toLowerCase();
@@ -103,7 +109,7 @@ const ClientList = () => {
       const state = (client.state || '').toLowerCase();
 
       return (
-        code.includes(term) ||
+        code.toLowerCase().includes(term) ||
         company.includes(term) ||
         contact.includes(term) ||
         mobile.includes(term) ||
@@ -112,7 +118,7 @@ const ClientList = () => {
         state.includes(term)
       );
     });
-  }, [clients, searchTerm, statusFilter]);
+  }, [clients, searchTerm, statusFilter, typeFilter]);
 
   const columns = [
     {
@@ -271,6 +277,16 @@ const ClientList = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Filter size={16} className="text-muted" />
+
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              style={{ width: '160px' }}
+            >
+              <option value="MASTER">Master Parties</option>
+              <option value="SYSTEM">System Operational</option>
+              <option value="all">All Parties</option>
+            </Select>
 
             <Select
               value={statusFilter}

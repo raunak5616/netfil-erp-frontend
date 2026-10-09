@@ -38,6 +38,8 @@ const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
     overallFlangeWidth: '',
     overallFlangeHeight: '',
     unit: 'mm',
+    moc: '',
+    temperature: '',
   },
   specifications: [],
   remarks: '',
@@ -97,24 +99,43 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     const fetchMasterData = async () => {
       setLoadingMasters(true);
       try {
+        const isSystemCode = (code) => {
+          if (!code) return false;
+          const u = String(code).toUpperCase();
+          return (
+            u.startsWith('CAT-WO-') ||
+            u === 'CAT-INV' ||
+            u === 'CAT-OBOM' ||
+            u.startsWith('GP-WO-') ||
+            u === 'GP-INV' ||
+            u === 'GP-OBOM' ||
+            u.startsWith('CL-WO-') ||
+            u.startsWith('CL-INV-') ||
+            u.startsWith('CL-OBOM') ||
+            u.startsWith('ITEM-WO-') ||
+            u.startsWith('ITEM-INV-') ||
+            u.startsWith('ITEM-OBOM-')
+          );
+        };
+
         const [cRes, iRes, catRes, uRes, eRes, fRes] = await Promise.all([
-          getClients(),
-          getItems(),
-          getItemCategories(),
+          getClients({ typeFilter: 'MASTER' }),
+          getItems({ typeFilter: 'MASTER' }),
+          getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getEmployees(),
           getFlangeDesigns({ status: 'active' }),
         ]);
 
         if (cRes.success && Array.isArray(cRes.clients)) {
-          setClients(cRes.clients.filter((c) => c.status === 'active'));
+          setClients(cRes.clients.filter((c) => c.status === 'active' && !isSystemCode(c.clientCode)));
         }
         if (iRes.success && Array.isArray(iRes.items)) {
-          setItems(iRes.items.filter((i) => i.status === 'active'));
+          setItems(iRes.items.filter((i) => i.status === 'active' && !isSystemCode(i.itemCode)));
         }
         const categoriesArray = catRes.itemCategories || catRes.categories;
         if (catRes.success && Array.isArray(categoriesArray)) {
-          setItemCategories(categoriesArray.filter((cat) => cat.status === 'active'));
+          setItemCategories(categoriesArray.filter((cat) => cat.status === 'active' && !isSystemCode(cat.categoryCode)));
         }
         if (uRes.success && Array.isArray(uRes.uoms)) {
           setUoms(uRes.uoms.filter((u) => u.status === 'active'));
@@ -174,6 +195,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             overallFlangeWidth: rawDims.overallFlangeWidth || rawDims.flangeWidth || '',
             overallFlangeHeight: rawDims.overallFlangeHeight || rawDims.flangeHeight || '',
             unit: rawDims.unit || 'mm',
+            moc: rawDims.moc || '',
+            temperature: rawDims.temperature || '',
           };
 
           const constType = reqItem.constructionType || rawDims.constructionType || 'FLANGE';
@@ -218,6 +241,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           overallFlangeWidth: rawDims.overallFlangeWidth || rawDims.flangeWidth || '',
           overallFlangeHeight: rawDims.overallFlangeHeight || rawDims.flangeHeight || '',
           unit: rawDims.unit || 'mm',
+          moc: rawDims.moc || '',
+          temperature: rawDims.temperature || '',
         };
 
         const constType = requirement.constructionType || rawDims.constructionType || 'FLANGE';
@@ -284,13 +309,16 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  // Filtered clients list
+  // Filtered clients list (exclude system operational test clients)
   const filteredClients = clients.filter((c) => {
+    const code = c.clientCode || '';
+    if (code.startsWith('CL-WO-') || code.startsWith('CL-INV-') || code === 'CL-OBOM') {
+      return false;
+    }
     if (!clientSearch.trim()) return true;
     const term = clientSearch.toLowerCase();
-    const code = (c.clientCode || '').toLowerCase();
     const name = (c.companyName || '').toLowerCase();
-    return code.includes(term) || name.includes(term);
+    return code.toLowerCase().includes(term) || name.includes(term);
   });
 
   const handleFormChange = (e) => {
@@ -515,6 +543,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         flangeWidth: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeWidth) : undefined,
         flangeHeight: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeHeight) : undefined,
         unit: itemObj.dimensions.unit || 'mm',
+        moc: itemObj.dimensions.moc || '',
+        temperature: itemObj.dimensions.temperature || '',
       },
       specifications: (itemObj.specifications || []).filter((s) => s.key?.trim() || s.value?.trim()),
       remarks: itemObj.remarks || '',
@@ -1233,6 +1263,34 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   </div>
                                 </div>
                               )}
+
+                              {/* Section C: Customer-Specific Technical Requirements (MOC & Temperature) */}
+                              <div style={{ backgroundColor: '#f0fdf4', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#166534', marginBottom: '8px' }}>
+                                  C. Customer Specific Technical Requirements
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                  <FormField label="Material of Construction (MOC)" helperText="e.g. Aluminum, SS 304, Galvanized Iron (GI)">
+                                    <Input
+                                      type="text"
+                                      placeholder="e.g. Aluminum"
+                                      value={itemObj.dimensions.moc || ''}
+                                      onChange={(e) => handleItemDimensionChange(itemIndex, 'moc', e.target.value)}
+                                      disabled={submitting}
+                                    />
+                                  </FormField>
+
+                                  <FormField label="Operating Temperature (°C)" helperText="Max operating temperature in °C e.g. 120">
+                                    <Input
+                                      type="text"
+                                      placeholder="e.g. 120"
+                                      value={itemObj.dimensions.temperature || ''}
+                                      onChange={(e) => handleItemDimensionChange(itemIndex, 'temperature', e.target.value)}
+                                      disabled={submitting}
+                                    />
+                                  </FormField>
+                                </div>
+                              </div>
 
                               {/* Reference Design Preview Box */}
                               {itemObj.constructionType === 'FLANGE' && selectedFlangeDesignObj && (

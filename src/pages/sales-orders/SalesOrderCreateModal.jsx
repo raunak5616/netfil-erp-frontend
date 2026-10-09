@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
-import { Input, Select, Textarea, FormField } from '../../components/ui/FormField';
+import { Input, Textarea, FormField } from '../../components/ui/FormField';
 import { getQuotations, getQuotationById } from '../../services/quotationService';
 import { createSalesOrder } from '../../services/salesOrderService';
-import { Search, Calculator, Calendar, FileText, CheckCircle2, ChevronRight, AlertCircle, ShoppingBag } from 'lucide-react';
+import { Search, Calculator, Calendar, FileText, CheckCircle2, ChevronRight, AlertCircle, ShoppingBag, X, Check } from 'lucide-react';
 
 const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
   const [loadingEligible, setLoadingEligible] = useState(true);
@@ -35,22 +35,24 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
       setLoadingEligible(true);
       setError('');
       try {
-        const [acceptedRes, releasedRes] = await Promise.all([
-          getQuotations({ status: 'accepted' }),
-          getQuotations({ status: 'released' })
-        ]);
+        const res = await getQuotations({ eligibleForSalesOrder: 'true' });
 
-        let combined = [];
-        if (acceptedRes.success && Array.isArray(acceptedRes.quotations)) {
-          combined = [...combined, ...acceptedRes.quotations];
-        }
-        if (releasedRes.success && Array.isArray(releasedRes.quotations)) {
-          combined = [...combined, ...releasedRes.quotations];
+        let list = [];
+        if (res.success && Array.isArray(res.quotations)) {
+          list = res.quotations;
         }
 
-        // De-duplicate by _id
-        const unique = Array.from(new Map(combined.map(q => [q._id, q])).values());
-        setEligibleQuotations(unique);
+        // De-duplicate by _id and strictly exclude any quotation with existing salesOrder or won/converted status
+        const uniqueMap = new Map();
+        list.forEach(q => {
+          if (!q || !q._id) return;
+          if (q.salesOrder) return;
+          const statusLower = (q.status || '').toLowerCase();
+          if (['won', 'converted', 'lost', 'cancelled'].includes(statusLower)) return;
+          uniqueMap.set(q._id, q);
+        });
+
+        setEligibleQuotations(Array.from(uniqueMap.values()));
       } catch (err) {
         console.error("Failed to load eligible quotations:", err);
         setError("Failed to load eligible quotations from server.");
@@ -64,6 +66,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
 
   // Load detailed quotation when selected
   const handleSelectQuotation = async (qId) => {
+    if (selectedQuotationId === qId) return;
     setSelectedQuotationId(qId);
     if (!qId) {
       setSelectedQuotationDetails(null);
@@ -104,7 +107,8 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
     const term = quotationSearch.toLowerCase();
     const qNo = q.quotationNo ? q.quotationNo.toLowerCase() : '';
     const partyName = q.client?.companyName ? q.client.companyName.toLowerCase() : '';
-    return qNo.includes(term) || partyName.includes(term);
+    const amt = q.grandTotal ? String(q.grandTotal) : '';
+    return qNo.includes(term) || partyName.includes(term) || amt.includes(term);
   });
 
   const handleSubmit = async (e) => {
@@ -150,137 +154,204 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
     >
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
-          {/* Step 1: Quotation Selector */}
-          <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', background: 'var(--neutral-50)' }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calculator size={16} color="var(--primary-600)" />
-              Step 1: Select Eligible Quotation
+      <form onSubmit={handleSubmit} className="space-y-4">
+        
+        {/* Step 1: Eligible Quotation Picker */}
+        <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 shadow-xs">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <div className="p-1 rounded bg-blue-100 text-blue-600">
+                <Calculator size={15} />
+              </div>
+              <span>Step 1: Select Eligible Quotation</span>
             </h4>
-
-            {loadingEligible ? (
-              <div style={{ padding: '12px', color: 'var(--neutral-500)', fontSize: '13px' }}>
-                Loading eligible accepted/released quotations...
-              </div>
-            ) : eligibleQuotations.length === 0 ? (
-              <div style={{ padding: '12px', background: 'var(--warning-50)', border: '1px solid var(--warning-200)', borderRadius: '6px', color: 'var(--warning-800)', fontSize: '13px' }}>
-                No accepted or released quotations found. Sales Orders can only be generated from quotations in <strong>accepted</strong> or <strong>released</strong> status.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <div className="relative flex-1 min-w-[220px]" style={{ flex: 1 }}>
-                    <Search size={14} />
-                    <Input
-                      placeholder="Search eligible quotation by No or Party..."
-                      value={quotationSearch}
-                      onChange={(e) => setQuotationSearch(e.target.value)}
-                    />
-                  </div>
-
-                  <Select
-                    value={selectedQuotationId}
-                    onChange={(e) => handleSelectQuotation(e.target.value)}
-                    style={{ flex: 1.5 }}
-                    required
-                  >
-                    <option value="">-- Select Quotation --</option>
-                    {filteredQuotations.map(q => (
-                      <option key={q._id} value={q._id}>
-                        {q.quotationNo} — {q.client?.companyName || 'N/A'} (₹{(q.grandTotal || 0).toLocaleString('en-IN')}) [{q.status.toUpperCase()}]
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            )}
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+              {eligibleQuotations.length} {eligibleQuotations.length === 1 ? 'Quotation' : 'Quotations'} Available
+            </span>
           </div>
 
-          {/* Step 2: Quotation Snapshot Preview Card */}
-          {loadingDetails && (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--neutral-500)', fontSize: '13px' }}>
-              Fetching quotation details & commercial breakdown...
+          {loadingEligible ? (
+            <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-lg border border-slate-200">
+              Loading eligible accepted and released quotations...
+            </div>
+          ) : eligibleQuotations.length === 0 ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">No eligible quotations found.</span> Sales Orders can only be generated from quotations in <strong>ACCEPTED</strong> or <strong>RELEASED</strong> status. Please release or accept a quotation first.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Search Filter Input */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
+                  placeholder="Filter by Quotation No, Client / Party Name, or Amount..."
+                  value={quotationSearch}
+                  onChange={(e) => setQuotationSearch(e.target.value)}
+                />
+                {quotationSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setQuotationSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Quotation Selection List Cards */}
+              <div className="max-h-[210px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {filteredQuotations.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-500 bg-white rounded-lg border border-slate-200">
+                    No quotation matching "{quotationSearch}"
+                  </div>
+                ) : (
+                  filteredQuotations.map((q) => {
+                    const isSelected = selectedQuotationId === q._id;
+                    const isAccepted = q.status?.toLowerCase() === 'accepted';
+                    return (
+                      <div
+                        key={q._id}
+                        onClick={() => handleSelectQuotation(q._id)}
+                        className={`p-3 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`flex-shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                          }`}>
+                            {isSelected && <Check size={11} strokeWidth={3} />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-blue-700">{q.quotationNo}</span>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                                isAccepted
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>
+                                {q.status ? q.status.toUpperCase() : 'ELIGIBLE'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-slate-800 truncate mt-0.5">
+                              {q.client?.companyName || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-xs font-bold text-slate-900">
+                            ₹{(q.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            {q.quotationDate ? new Date(q.quotationDate).toLocaleDateString('en-IN') : 'Date N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
+        </div>
 
-          {selectedQuotationDetails && (
-            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '16px', borderColor: 'var(--primary-200)', background: '#f8fafc' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={16} color="var(--primary-600)" />
-                  Step 2: Quotation Commercial Snapshot
-                </span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11.5px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
-                  {selectedQuotationDetails.header.status}
-                </span>
+        {/* Loading details feedback */}
+        {loadingDetails && (
+          <div className="p-4 text-center text-xs text-slate-500 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-center gap-2">
+            <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            Loading quotation commercial breakdown...
+          </div>
+        )}
+
+        {/* Step 2: Commercial Snapshot Preview Card */}
+        {selectedQuotationDetails && (
+          <div className="bg-white rounded-xl border border-blue-200 shadow-xs p-4 md:p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <div className="p-1 rounded bg-blue-100 text-blue-600">
+                  <FileText size={15} />
+                </div>
+                <span>Step 2: Quotation Commercial Snapshot</span>
               </h4>
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">
+                {selectedQuotationDetails.header.status}
+              </span>
+            </div>
 
-              {/* Quotation Header Meta Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '14px', background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Quotation No</div>
-                  <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--primary-700)' }} className="font-mono">
-                    {selectedQuotationDetails.header.quotationNo}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Party / Client</div>
-                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--neutral-900)' }}>
-                    {selectedQuotationDetails.header.client?.companyName || 'N/A'}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Order Category</div>
-                  <div style={{ fontSize: '12px', textTransform: 'capitalize', color: 'var(--neutral-800)' }}>
-                    {selectedQuotationDetails.header.quotationType} / {selectedQuotationDetails.header.quotationCategory}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Quotation Grand Total</div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--success-700)' }}>
-                    ₹{(selectedQuotationDetails.header.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
+            {/* Meta Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
+              <div>
+                <div className="text-[11px] text-slate-500">Quotation No</div>
+                <div className="font-mono font-bold text-xs text-blue-700 mt-0.5">
+                  {selectedQuotationDetails.header.quotationNo}
                 </div>
               </div>
 
-              {/* Items Preview Table */}
-              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--neutral-200)', overflow: 'hidden', marginBottom: '14px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--neutral-100)', textTransform: 'uppercase', fontSize: '10.5px', color: 'var(--neutral-600)', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 12px' }}>#</th>
-                      <th style={{ padding: '8px 12px' }}>Description</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Qty</th>
-                      <th style={{ padding: '8px 12px' }}>UOM</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Rate (₹)</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Line Total (₹)</th>
+              <div>
+                <div className="text-[11px] text-slate-500">Party / Client</div>
+                <div className="font-semibold text-slate-900 mt-0.5 truncate">
+                  {selectedQuotationDetails.header.client?.companyName || 'N/A'}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-slate-500">Order Category</div>
+                <div className="capitalize text-slate-800 mt-0.5">
+                  {selectedQuotationDetails.header.quotationType} / {selectedQuotationDetails.header.quotationCategory}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] text-slate-500">Grand Total</div>
+                <div className="font-bold text-xs text-emerald-700 mt-0.5">
+                  ₹{(selectedQuotationDetails.header.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+              <div className="max-h-[160px] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead className="bg-slate-100 text-slate-600 uppercase text-[10.5px] font-semibold sticky top-0 z-10">
+                    <tr>
+                      <th className="px-3 py-2">#</th>
+                      <th className="px-3 py-2">Item / Description</th>
+                      <th className="px-3 py-2 text-right">Qty</th>
+                      <th className="px-3 py-2">UOM</th>
+                      <th className="px-3 py-2 text-right">Rate (₹)</th>
+                      <th className="px-3 py-2 text-right">Line Total (₹)</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100 text-slate-800">
                     {selectedQuotationDetails.items.map((item, idx) => (
-                      <tr key={item._id || idx} style={{ borderBottom: '1px solid var(--neutral-100)' }}>
-                        <td style={{ padding: '8px 12px', color: 'var(--neutral-500)' }}>{idx + 1}</td>
-                        <td style={{ padding: '8px 12px', color: 'var(--neutral-900)', fontWeight: 500 }}>
+                      <tr key={item._id || idx} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-400">{idx + 1}</td>
+                        <td className="px-3 py-2 font-medium">
                           {item.description}
                           {item.item?.itemCode && (
-                            <span style={{ fontSize: '11px', color: 'var(--neutral-500)', marginLeft: '6px' }} className="font-mono">
+                            <span className="font-mono text-[11px] text-slate-500 ml-1.5">
                               ({item.item.itemCode})
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
-                        <td style={{ padding: '8px 12px', color: 'var(--neutral-600)' }}>
+                        <td className="px-3 py-2 text-right font-bold">{item.quantity}</td>
+                        <td className="px-3 py-2 text-slate-600">
                           {typeof item.uom === 'object' ? item.uom?.uomCode || item.uom?.uomName || item.uom?.unitSymbol || item.uom?.unitName : 'Units'}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <td className="px-3 py-2 text-right">
                           ₹{(item.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--neutral-900)' }}>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">
                           ₹{(item.lineTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
@@ -288,124 +359,127 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              {/* Commercial Summary Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)', fontSize: '12px' }}>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>Subtotal: </span>
-                  <strong>₹{(selectedQuotationDetails.header.subtotal || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>P&F: </span>
-                  <strong>₹{(selectedQuotationDetails.header.pfAmount || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>Freight: </span>
-                  <strong>₹{(selectedQuotationDetails.header.freightAmount || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>Discount: </span>
-                  <strong>₹{(selectedQuotationDetails.header.discountAmount || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>Taxable: </span>
-                  <strong>₹{(selectedQuotationDetails.header.taxableAmount || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--neutral-500)' }}>Tax ({selectedQuotationDetails.header.taxName || 'GST'} {selectedQuotationDetails.header.taxRate || 0}%): </span>
-                  <strong>₹{(selectedQuotationDetails.header.taxAmount || 0).toLocaleString('en-IN')}</strong>
-                </div>
-                <div style={{ gridColumn: 'span 2', textAlign: 'right' }}>
-                  <span style={{ color: 'var(--neutral-700)', fontWeight: 600 }}>Grand Total: </span>
-                  <strong style={{ fontSize: '14px', color: 'var(--success-700)' }}>
-                    ₹{(selectedQuotationDetails.header.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </strong>
-                </div>
+            {/* Financial Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
+              <div>
+                <span className="text-slate-500">Subtotal: </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.subtotal || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500">P&F: </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.pfAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Freight: </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.freightAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Discount: </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.discountAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Taxable: </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.taxableAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Tax ({selectedQuotationDetails.header.taxName || 'GST'} {selectedQuotationDetails.header.taxRate || 0}%): </span>
+                <strong className="text-slate-800">₹{(selectedQuotationDetails.header.taxAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+              <div className="col-span-2 text-right">
+                <span className="text-slate-600 font-medium">Grand Total: </span>
+                <strong className="text-sm font-bold text-emerald-700 ml-1">
+                  ₹{(selectedQuotationDetails.header.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </strong>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Step 3: Customer PO & Order Details */}
-          {selectedQuotationDetails && (
-            <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--neutral-900)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShoppingBag size={16} color="var(--primary-600)" />
-                Step 3: Customer Purchase Order & Delivery Terms
-              </h4>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <FormField label="Customer PO Number" helpText="Buyer's purchase order reference">
-                  <Input
-                    placeholder="e.g. PO-2026-9901"
-                    value={customerPoNumber}
-                    onChange={(e) => setCustomerPoNumber(e.target.value)}
-                  />
-                </FormField>
-
-                <FormField label="Customer PO Date">
-                  <Input
-                    type="date"
-                    value={customerPoDate}
-                    onChange={(e) => setCustomerPoDate(e.target.value)}
-                  />
-                </FormField>
-
-                <FormField label="Expected Delivery Date">
-                  <Input
-                    type="date"
-                    value={expectedDeliveryDate}
-                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                  />
-                </FormField>
+        {/* Step 3: Customer PO & Delivery Terms */}
+        {selectedQuotationDetails && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 md:p-5 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <div className="p-1 rounded bg-blue-100 text-blue-600">
+                <ShoppingBag size={15} />
               </div>
+              <span>Step 3: Customer Purchase Order & Delivery Terms</span>
+            </h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <FormField label="Payment Terms">
-                  <Input
-                    placeholder="e.g. 50% advance, 50% against PI before dispatch"
-                    value={paymentTerms}
-                    onChange={(e) => setPaymentTerms(e.target.value)}
-                  />
-                </FormField>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <FormField label="Customer PO Number" helpText="Buyer's purchase order reference">
+                <Input
+                  placeholder="e.g. PO-2026-9901"
+                  value={customerPoNumber}
+                  onChange={(e) => setCustomerPoNumber(e.target.value)}
+                />
+              </FormField>
 
-                <FormField label="Delivery Terms">
-                  <Input
-                    placeholder="e.g. Ex-Works / Door Delivery within 3 weeks"
-                    value={deliveryTerms}
-                    onChange={(e) => setDeliveryTerms(e.target.value)}
-                  />
-                </FormField>
-              </div>
+              <FormField label="Customer PO Date">
+                <Input
+                  type="date"
+                  value={customerPoDate}
+                  onChange={(e) => setCustomerPoDate(e.target.value)}
+                />
+              </FormField>
 
-              <FormField label="Sales Order Remarks / Instructions">
-                <Textarea
-                  rows={2}
-                  placeholder="Additional order instructions or internal notes..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
+              <FormField label="Expected Delivery Date">
+                <Input
+                  type="date"
+                  value={expectedDeliveryDate}
+                  onChange={(e) => setExpectedDeliveryDate(e.target.value)}
                 />
               </FormField>
             </div>
-          )}
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px', borderTop: '1px solid var(--neutral-200)' }}>
-            <Button variant="secondary" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!selectedQuotationId || submitting || loadingDetails}
-            >
-              {submitting ? 'Generating Sales Order...' : 'Confirm & Create Sales Order'}
-            </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Payment Terms">
+                <Input
+                  placeholder="e.g. 50% advance, 50% against PI before dispatch"
+                  value={paymentTerms}
+                  onChange={(e) => setPaymentTerms(e.target.value)}
+                />
+              </FormField>
+
+              <FormField label="Delivery Terms">
+                <Input
+                  placeholder="e.g. Ex-Works / Door Delivery within 3 weeks"
+                  value={deliveryTerms}
+                  onChange={(e) => setDeliveryTerms(e.target.value)}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Sales Order Remarks / Instructions">
+              <Textarea
+                rows={2}
+                placeholder="Additional order instructions or internal notes..."
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </FormField>
           </div>
+        )}
 
+        {/* Action Footer */}
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!selectedQuotationId || submitting || loadingDetails}
+          >
+            {submitting ? 'Generating Sales Order...' : 'Confirm & Create Sales Order'}
+          </Button>
         </div>
+
       </form>
     </Modal>
   );
 };
 
 export default SalesOrderCreateModal;
+

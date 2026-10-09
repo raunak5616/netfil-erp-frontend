@@ -25,6 +25,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [initialItemIds, setInitialItemIds] = useState([]);
 
   // Master Data Options
   const [clients, setClients] = useState([]);
@@ -169,15 +170,21 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     const loadMasters = async () => {
       setLoading(true);
       try {
+        const isSystemCode = (code) => {
+          if (!code) return false;
+          const u = String(code).toUpperCase();
+          return u.startsWith('ITEM-WO-') || u.startsWith('ITEM-INV-') || u.startsWith('ITEM-OBOM-');
+        };
+
         const [rRes, iRes, uRes, eRes] = await Promise.all([
           getRequirements().catch(() => ({ success: false, requirements: [] })),
-          getItems().catch(() => ({ success: false, items: [] })),
+          getItems({ typeFilter: 'MASTER' }).catch(() => ({ success: false, items: [] })),
           getUOMs().catch(() => ({ success: false, uoms: [] })),
           getEmployees().catch(() => ({ success: false, employees: [] })),
         ]);
 
         const reqsList = (rRes.success && Array.isArray(rRes.requirements)) ? rRes.requirements : [];
-        const itemsList = (iRes.success && Array.isArray(iRes.items)) ? iRes.items : [];
+        const itemsList = (iRes.success && Array.isArray(iRes.items)) ? iRes.items.filter((i) => !isSystemCode(i.itemCode)) : [];
         const uomsList = (uRes.success && Array.isArray(uRes.uoms)) ? uRes.uoms : [];
         const empList = (eRes.success && Array.isArray(eRes.employees)) ? eRes.employees : [];
 
@@ -192,6 +199,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
           if (detailRes.success && detailRes.quotation) {
             const q = detailRes.quotation;
             if (Array.isArray(detailRes.items) && detailRes.items.length > 0) {
+              setInitialItemIds(detailRes.items.map((it) => it._id));
               const loadedLineItems = detailRes.items.map((it) => ({
                 _id: it._id,
                 item: it.item?._id || it.item || '',
@@ -201,6 +209,12 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 uom: it.uom?._id || it.uom || '',
                 unitPrice: it.unitPrice || 0,
                 hsnCode: it.hsnCode || '',
+                constructionType: it.constructionType || 'FLANGE',
+                flangeDesign: it.flangeDesign?._id || it.flangeDesign || null,
+                flangeDesignSnapshot: it.flangeDesignSnapshot || null,
+                dimensions: it.dimensions || {},
+                specifications: it.specifications || [],
+                faceVelocity: it.dimensions?.faceVelocity || '',
                 remarks: it.remarks || '',
               }));
               setLineItems(loadedLineItems);
@@ -520,6 +534,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     setSubmitting(true);
     try {
       const lineItemsPayload = lineItems.map((item) => ({
+        _id: item._id || undefined,
         item: item.item || null,
         itemCategory: item.itemCategory || null,
         description: item.description,
@@ -563,7 +578,19 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         savedQuotationId = quotation._id;
         await updateQuotation(savedQuotationId, headerPayload);
 
-        // Update items: delete existing items not in form, update existing, add new
+        // Delete items that were removed in the UI form
+        const currentFormIds = new Set(
+          lineItemsPayload.filter((it) => it._id).map((it) => String(it._id))
+        );
+        for (const oldId of initialItemIds) {
+          if (!currentFormIds.has(String(oldId))) {
+            await deleteQuotationItem(savedQuotationId, oldId).catch((err) =>
+              console.error('Failed to delete quotation item:', err)
+            );
+          }
+        }
+
+        // Update existing items or add new items
         for (const item of lineItemsPayload) {
           if (item._id) {
             await updateQuotationItem(savedQuotationId, item._id, item);

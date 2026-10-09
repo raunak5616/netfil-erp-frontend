@@ -33,6 +33,7 @@ const ItemGroupList = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('MASTER');
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,6 +86,11 @@ const ItemGroupList = () => {
 
   const filteredItemGroups = useMemo(() => {
     return itemGroups.filter((group) => {
+      // Type filter (MASTER vs SYSTEM vs all)
+      const isSystem = group.groupType === 'SYSTEM' || (group.groupCode && group.groupCode.startsWith('GP-'));
+      if (typeFilter === 'MASTER' && isSystem) return false;
+      if (typeFilter === 'SYSTEM' && !isSystem) return false;
+
       // Status filter
       if (statusFilter !== 'all' && group.status !== statusFilter) return false;
 
@@ -98,7 +104,7 @@ const ItemGroupList = () => {
 
       return code.includes(term) || name.includes(term) || desc.includes(term);
     });
-  }, [itemGroups, searchTerm, statusFilter]);
+  }, [itemGroups, searchTerm, statusFilter, typeFilter]);
 
   const columns = [
     {
@@ -231,6 +237,16 @@ const ItemGroupList = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Filter size={16} className="text-muted" />
+
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              style={{ width: '160px' }}
+            >
+              <option value="MASTER">Master Groups</option>
+              <option value="SYSTEM">System Groups</option>
+              <option value="all">All Groups</option>
+            </Select>
 
             <Select
               value={statusFilter}

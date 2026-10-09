@@ -71,9 +71,22 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       setLoadingData(true);
       setErrorMessage('');
       try {
+        const isSystemCode = (code) => {
+          if (!code) return false;
+          const u = String(code).toUpperCase();
+          return (
+            u.startsWith('CAT-WO-') ||
+            u === 'CAT-INV' ||
+            u === 'CAT-OBOM' ||
+            u.startsWith('GP-WO-') ||
+            u === 'GP-INV' ||
+            u === 'GP-OBOM'
+          );
+        };
+
         const [groupRes, catRes, uomRes, binRes, fgRes] = await Promise.all([
-          getItemGroups(),
-          getItemCategories(),
+          getItemGroups({ typeFilter: 'MASTER' }),
+          getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
           getFilterGrades().catch(() => ({ success: true, filterGrades: [] }))
@@ -81,11 +94,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
         const groupsArray = groupRes.itemGroups || groupRes.groups;
         if (groupRes.success && Array.isArray(groupsArray)) {
-          setItemGroups(groupsArray.filter((g) => g.status === 'active'));
+          setItemGroups(groupsArray.filter((g) => g.status === 'active' && !isSystemCode(g.groupCode)));
         }
         const categoriesArray = catRes.itemCategories || catRes.categories;
         if (catRes.success && Array.isArray(categoriesArray)) {
-          setItemCategories(categoriesArray.filter((c) => c.status === 'active'));
+          setItemCategories(categoriesArray.filter((c) => c.status === 'active' && !isSystemCode(c.categoryCode)));
         }
         if (uomRes.success && Array.isArray(uomRes.uoms)) {
           setUoms(uomRes.uoms.filter((u) => u.status === 'active'));

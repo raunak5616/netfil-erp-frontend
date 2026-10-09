@@ -48,19 +48,32 @@ const ItemCategoryList = () => {
     setLoading(true);
     setError('');
     try {
+      const isSystemCode = (code) => {
+        if (!code) return false;
+        const u = String(code).toUpperCase();
+        return (
+          u.startsWith('CAT-WO-') ||
+          u === 'CAT-INV' ||
+          u === 'CAT-OBOM' ||
+          u.startsWith('GP-WO-') ||
+          u === 'GP-INV' ||
+          u === 'GP-OBOM'
+        );
+      };
+
       const [catRes, groupRes] = await Promise.all([
-        getItemCategories(),
-        getItemGroups().catch(() => ({ success: false, itemGroups: [] })),
+        getItemCategories({ typeFilter: 'MASTER' }),
+        getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: false, itemGroups: [] })),
       ]);
 
       if (catRes.success && Array.isArray(catRes.itemCategories)) {
-        setItemCategories(catRes.itemCategories);
+        setItemCategories(catRes.itemCategories.filter((c) => !isSystemCode(c.categoryCode)));
       } else {
         setError('Unexpected API response format');
       }
 
       if (groupRes.success && Array.isArray(groupRes.itemGroups)) {
-        setItemGroups(groupRes.itemGroups);
+        setItemGroups(groupRes.itemGroups.filter((g) => !isSystemCode(g.groupCode)));
       }
     } catch (err) {
       console.error("Failed to fetch Item Categories:", err);
@@ -97,13 +110,19 @@ const ItemCategoryList = () => {
 
   const filteredCategories = useMemo(() => {
     return itemCategories.filter((cat) => {
+      const parentGroupCode = cat.itemGroup?.groupCode || '';
+      const isSystem = cat.itemGroup?.groupType === 'SYSTEM' || parentGroupCode.startsWith('GP-') || cat.categoryCode.startsWith('CAT-WO') || cat.categoryCode.startsWith('CAT-OBOM') || cat.categoryCode === 'CAT-INV';
+
+      // Hide system categories by default unless explicitly searched or a specific system group is selected
+      if (!searchTerm.trim() && groupFilter === 'all' && isSystem) return false;
+
       // Status filter
       if (statusFilter !== 'all' && cat.status !== statusFilter) return false;
 
       // Group filter
       if (groupFilter !== 'all') {
         const catGroupId = cat.itemGroup?._id || cat.itemGroup;
-        if (catGroupId !== groupFilter) return false;
+        if (String(catGroupId) !== String(groupFilter)) return false;
       }
 
       // Search filter
@@ -290,7 +309,7 @@ const ItemCategoryList = () => {
               style={{ width: '180px' }}
             >
               <option value="all">All Item Groups</option>
-              {itemGroups.map((g) => (
+              {itemGroups.filter(g => g.groupType !== 'SYSTEM' && !g.groupCode?.startsWith('GP-')).map((g) => (
                 <option key={g._id} value={g._id}>
                   {g.groupCode} — {g.groupName}
                 </option>
