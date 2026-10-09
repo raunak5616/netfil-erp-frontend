@@ -19,6 +19,126 @@ import {
   Printer,
 } from 'lucide-react';
 
+const getItemTechnicalSpecs = (it) => {
+  const itemDoc = (typeof it.item === 'object' ? it.item : {}) || {};
+  const filterGrade = typeof itemDoc.filterGrade === 'object' ? itemDoc.filterGrade : null;
+  const dims = it.dimensions || {};
+  const specsArr = Array.isArray(it.specifications) ? it.specifications : [];
+  const remarksStr = it.remarks || '';
+
+  const findSpecValue = (keys) => {
+    for (const k of keys) {
+      if (dims[k] !== undefined && dims[k] !== null && String(dims[k]).trim() !== '') {
+        return String(dims[k]).trim();
+      }
+    }
+    for (const k of keys) {
+      const match = specsArr.find((s) => {
+        const name = (s.name || s.specificationCode || '').toLowerCase();
+        return name.includes(k.toLowerCase());
+      });
+      if (match && match.value !== undefined && match.value !== null && String(match.value).trim() !== '') {
+        return String(match.value).trim();
+      }
+    }
+    for (const k of keys) {
+      const regex = new RegExp(`(?:${k})\\s*[:=]\\s*([^|;,\\n]+)`, 'i');
+      const m = remarksStr.match(regex);
+      if (m && m[1]) return m[1].trim();
+    }
+    return null;
+  };
+
+  const specs = [];
+
+  // 1. Dimensions / Size
+  const width = dims.width || dims.length || itemDoc?.grade_items?.width;
+  const height = dims.height || itemDoc?.grade_items?.height;
+  const depth = dims.depth || dims.outerDiameter || itemDoc?.grade_items?.length;
+  const unit = dims.unit || 'mm';
+
+  if (width && height && depth) {
+    specs.push({ label: 'Size', value: `${width} × ${height} × ${depth} ${unit}` });
+  } else if (width && height) {
+    specs.push({ label: 'Size', value: `${width} × ${height} ${unit}` });
+  }
+
+  // 2. Airflow CFM
+  let cfmVal = findSpecValue(['capacity', 'cfm', 'cmf', 'airFlow']);
+  if (!cfmVal) {
+    let wVal = Number(width) || 0;
+    let hVal = Number(height) || 0;
+    const uVal = String(unit).toLowerCase();
+    if (!wVal || !hVal) {
+      const textStr = `${it.description || ''} ${remarksStr}`;
+      const m = textStr.match(/(\d+(?:\.\d+)?)\s*[*×x]\s*(\d+(?:\.\d+)?)/i);
+      if (m) {
+        wVal = wVal || Number(m[1]);
+        hVal = hVal || Number(m[2]);
+      }
+    }
+    const fpm = Number(dims.faceVelocity || findSpecValue(['fpm', 'velocity', 'faceVelocity'])) || 0;
+    if (wVal > 0 && hVal > 0 && fpm > 0) {
+      let hFt = hVal;
+      let wFt = wVal;
+      if (uVal === 'mm') {
+        hFt = hVal / 304.8;
+        wFt = wVal / 304.8;
+      } else if (uVal === 'inch' || uVal === 'in' || uVal === 'inches') {
+        hFt = hVal / 12;
+        wFt = wVal / 12;
+      }
+      const calcCfm = Math.round(hFt * wFt * fpm);
+      if (calcCfm > 0) cfmVal = `${calcCfm} CFM`;
+    }
+  }
+  if (cfmVal) {
+    const cleanCfm = String(cfmVal).toLowerCase().includes('cfm') ? cfmVal : `${cfmVal} CFM`;
+    specs.push({ label: 'Airflow', value: cleanCfm });
+  }
+
+  // 3. MOC
+  const moc = findSpecValue(['moc', 'material', 'frameMaterial', 'casing']);
+  if (moc) {
+    specs.push({ label: 'MOC', value: moc });
+  }
+
+  // 4. Temperature (°C)
+  const temp = findSpecValue(['temperature', 'temp', 'maxTemp', 'operatingTemp']);
+  if (temp) {
+    const cleanTemp = temp.replace(/(?:degree|celcious|celsius|°c)/gi, '').trim();
+    specs.push({ label: 'Temp', value: `${cleanTemp} °C` });
+  }
+
+  // 5. Filter Media
+  const media = findSpecValue(['media', 'filterMedia', 'mediaType']);
+  if (media) {
+    specs.push({ label: 'Media', value: media });
+  }
+
+  // 6. Efficiency
+  const efficiency = findSpecValue(['efficiency', 'eff', 'rating']);
+  if (efficiency) {
+    specs.push({ label: 'Efficiency', value: efficiency });
+  } else if (filterGrade) {
+    const effStr = [filterGrade.eurovent ? `EU ${filterGrade.eurovent}` : '', filterGrade.iso ? `ISO ${filterGrade.iso}` : ''].filter(Boolean).join(' / ');
+    if (effStr) specs.push({ label: 'Efficiency', value: effStr });
+  }
+
+  // 7. Pressure Drop
+  const initPD = findSpecValue(['initialPressureDrop', 'initial pressure', 'initial pd', 'init pd']);
+  const finalPD = findSpecValue(['finalPressureDrop', 'final pressure', 'final pd']);
+  if (initPD || finalPD) {
+    let pdStr = '';
+    if (initPD && finalPD) pdStr = `Init ${initPD} / Final ${finalPD} mm WC`;
+    else if (initPD) pdStr = `Init ${initPD} mm WC`;
+    else if (finalPD) pdStr = `Final ${finalPD} mm WC`;
+    specs.push({ label: 'Pressure Drop', value: pdStr });
+  }
+
+  return specs;
+};
+
 const QuotationDetailModal = ({
   isOpen,
   onClose,
@@ -279,49 +399,73 @@ const QuotationDetailModal = ({
               Quotation Line Items ({items.length})
             </h4>
 
-            <div className="overflow-x-auto border border-slate-200 rounded bg-white">
-              <table className="w-full border-collapse text-left text-[13px] whitespace-nowrap" style={{ fontSize: '12.5px' }}>
+            <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white shadow-2xs">
+              <table className="w-full border-collapse text-left text-[12.5px]">
                 <thead>
-                  <tr>
-                    <th style={{ width: '40px' }}>#</th>
-                    <th>Item Description</th>
-                    <th>HSN</th>
-                    <th style={{ textAlign: 'right' }}>Qty</th>
-                    <th>UOM</th>
-                    <th style={{ textAlign: 'right' }}>Unit Rate (₹)</th>
-                    <th style={{ textAlign: 'right' }}>Line Total (₹)</th>
+                  <tr className="bg-slate-100/90 text-slate-700 font-semibold text-[11px] uppercase tracking-wider">
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200" style={{ width: '40px' }}>#</th>
+                    <th className="py-2.5 px-3 text-left border-b border-slate-200">Item Description & Specifications</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200" style={{ width: '90px' }}>HSN</th>
+                    <th className="py-2.5 px-3 text-center border-b border-slate-200" style={{ width: '110px' }}>Qty & UOM</th>
+                    <th className="py-2.5 px-3 text-right border-b border-slate-200" style={{ width: '120px' }}>Unit Rate (₹)</th>
+                    <th className="py-2.5 px-3 text-right border-b border-slate-200" style={{ width: '130px' }}>Line Total (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it, idx) => (
-                    <tr key={it._id || idx}>
-                      <td>{idx + 1}</td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>
-                          {it.item?.itemName || it.description}
-                        </div>
-                        {it.item?.itemCode && (
-                          <div style={{ fontSize: '11px', color: 'var(--gray-500)' }} className="font-mono">
-                            {it.item.itemCode}
+                  {items.map((it, idx) => {
+                    const techSpecs = getItemTechnicalSpecs(it);
+                    const uomCode = it.uom?.uomCode || (typeof it.uom === 'string' ? it.uom : '') || 'NOS';
+                    return (
+                      <tr key={it._id || idx} className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3 px-3 text-center font-semibold text-slate-500 align-top">{idx + 1}</td>
+                        <td className="py-3 px-3 align-top whitespace-normal">
+                          <div className="font-bold text-slate-900 text-[13px]">
+                            {it.item?.itemName || it.description}
                           </div>
-                        )}
-                        {it.remarks && (
-                          <div style={{ fontSize: '11px', color: 'var(--gray-600)', fontStyle: 'italic' }}>
-                            Note: {it.remarks}
-                          </div>
-                        )}
-                      </td>
-                      <td className="font-mono" style={{ fontSize: '11.5px' }}>{it.hsnCode || '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
-                      <td>{it.uom?.uomCode || '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--primary-700)' }}>
-                        ₹{(it.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                        ₹{(it.lineTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
+                          {it.item?.itemCode && (
+                            <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                              Code: {it.item.itemCode}
+                            </div>
+                          )}
+
+                          {techSpecs.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {techSpecs.map((s, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200/90 shadow-2xs"
+                                >
+                                  <span className="text-slate-500 mr-1 font-normal">{s.label}:</span>
+                                  <strong className="text-slate-900 font-semibold">{s.value}</strong>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {it.remarks && (
+                            <div className="text-[11px] text-slate-600 font-normal italic mt-1.5 bg-amber-50/60 px-2 py-1 rounded border border-amber-100/80 inline-block">
+                              Note: {it.remarks}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono text-[11.5px] text-slate-600 align-top">
+                          {it.hsnCode || '—'}
+                        </td>
+                        <td className="py-3 px-3 text-center align-top whitespace-nowrap">
+                          <span className="font-bold text-slate-900 text-xs">{it.quantity}</span>{' '}
+                          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block ml-0.5">
+                            {uomCode}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-semibold text-indigo-700 align-top font-mono text-xs whitespace-nowrap">
+                          ₹{(it.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3 px-3 text-right font-bold text-slate-950 align-top font-mono text-xs whitespace-nowrap">
+                          ₹{(it.lineTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -6,6 +6,7 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const triggerRef = useRef(null);
+  const menuRef = useRef(null);
 
   const filterItems = items.filter((item) => item.show !== false);
 
@@ -18,7 +19,7 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
       const menuHeight = filterItems.length * 34 + 16;
       const openUpward = rect.bottom + menuHeight > window.innerHeight;
 
-      const leftPos = align === 'right' ? Math.max(10, rect.right - 180) : rect.left;
+      const leftPos = align === 'right' ? Math.max(10, rect.right - 185) : rect.left;
 
       setCoords({
         top: openUpward ? Math.max(10, rect.top - menuHeight) : rect.bottom + 4,
@@ -32,12 +33,18 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
     if (!isOpen) return;
 
     const handleOutsideClick = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target)) {
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target)
+      ) {
         setIsOpen(false);
       }
     };
 
-    const handleScrollOrResize = () => {
+    const handleScrollOrResize = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
       setIsOpen(false);
     };
 
@@ -51,6 +58,14 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
       window.removeEventListener('resize', handleScrollOrResize);
     };
   }, [isOpen]);
+
+  const handleItemClick = (e, item) => {
+    e.stopPropagation();
+    setIsOpen(false);
+    if (typeof item.onClick === 'function') {
+      item.onClick();
+    }
+  };
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -79,6 +94,7 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
       {isOpen &&
         createPortal(
           <div
+            ref={menuRef}
             style={{
               position: 'fixed',
               top: `${coords.top}px`,
@@ -101,11 +117,7 @@ const ActionDropdown = ({ items = [], align = 'right' }) => {
                   <button
                     type="button"
                     disabled={item.disabled}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpen(false);
-                      item.onClick();
-                    }}
+                    onClick={(e) => handleItemClick(e, item)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

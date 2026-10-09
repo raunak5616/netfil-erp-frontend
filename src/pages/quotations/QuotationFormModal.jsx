@@ -51,7 +51,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     currency: 'INR',
     pfAmount: 0,
     freightAmount: 0,
-    discountAmount: 0,
+    discountRate: 0,
     taxName: 'GST',
     taxRate: 18,
     paymentTerms: '50% Advance, 50% Before Dispatch',
@@ -101,7 +101,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       const itemCatId = reqItem.itemCategory?._id || reqItem.itemCategory || itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
       const uomRef = reqItem.uom || selectedReq.uom || itemObj?.salesUom || itemObj?.inventoryUom;
       const uomId = (typeof uomRef === 'object' ? uomRef?._id : uomRef) || allUoms[0]?._id || '';
-      const hsnCode = itemObj?.hsnCode || '';
+      const hsnCode = reqItem.hsnCode || selectedReq.hsnCode || itemObj?.hsnCode || '';
 
       let description = reqItem.description || '';
       if (!description) {
@@ -191,43 +191,75 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
           const detailRes = await getQuotationById(quotation._id);
           if (detailRes.success && detailRes.quotation) {
             const q = detailRes.quotation;
-            setFormData({
-              client: q.client?._id || q.client || '',
-              clientName: q.client?.companyName || '',
-              clientCode: q.client?.clientCode || '',
-              requirement: q.requirement?._id || q.requirement || '',
-              quotationType: q.quotationType || 'domestic',
-              quotationCategory: q.quotationCategory || 'product',
-              attentionPerson: q.attentionPerson || '',
-              salesPerson: q.salesPerson?._id || q.salesPerson || '',
-              quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
-              validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
-              currency: q.currency || 'INR',
-              pfAmount: q.pfAmount || 0,
-              freightAmount: q.freightAmount || 0,
-              discountAmount: q.discountAmount || 0,
-              taxName: q.taxName || 'GST',
-              taxRate: q.taxRate || 0,
-              paymentTerms: q.paymentTerms || '',
-              deliveryTerms: q.deliveryTerms || '',
-              generalTerms: q.generalTerms || '',
-              remarks: q.remarks || '',
-            });
-
             if (Array.isArray(detailRes.items) && detailRes.items.length > 0) {
-              setLineItems(
-                detailRes.items.map((it) => ({
-                  _id: it._id,
-                  item: it.item?._id || it.item || '',
-                  itemCategory: it.itemCategory?._id || it.itemCategory || '',
-                  description: it.description || '',
-                  quantity: it.quantity || 1,
-                  uom: it.uom?._id || it.uom || '',
-                  unitPrice: it.unitPrice || 0,
-                  hsnCode: it.hsnCode || '',
-                  remarks: it.remarks || '',
-                }))
+              const loadedLineItems = detailRes.items.map((it) => ({
+                _id: it._id,
+                item: it.item?._id || it.item || '',
+                itemCategory: it.itemCategory?._id || it.itemCategory || '',
+                description: it.description || '',
+                quantity: it.quantity || 1,
+                uom: it.uom?._id || it.uom || '',
+                unitPrice: it.unitPrice || 0,
+                hsnCode: it.hsnCode || '',
+                remarks: it.remarks || '',
+              }));
+              setLineItems(loadedLineItems);
+
+              const loadedSubtotal = loadedLineItems.reduce(
+                (sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+                0
               );
+              const qDiscountAmount = q.discountAmount || 0;
+              const calcRate =
+                loadedSubtotal > 0 && qDiscountAmount > 0
+                  ? Number(((qDiscountAmount / loadedSubtotal) * 100).toFixed(2))
+                  : 0;
+
+              setFormData({
+                client: q.client?._id || q.client || '',
+                clientName: q.client?.companyName || '',
+                clientCode: q.client?.clientCode || '',
+                requirement: q.requirement?._id || q.requirement || '',
+                quotationType: q.quotationType || 'domestic',
+                quotationCategory: q.quotationCategory || 'product',
+                attentionPerson: q.attentionPerson || '',
+                salesPerson: q.salesPerson?._id || q.salesPerson || '',
+                quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
+                validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+                currency: q.currency || 'INR',
+                pfAmount: q.pfAmount || 0,
+                freightAmount: q.freightAmount || 0,
+                discountRate: calcRate,
+                taxName: q.taxName || 'GST',
+                taxRate: q.taxRate || 0,
+                paymentTerms: q.paymentTerms || '',
+                deliveryTerms: q.deliveryTerms || '',
+                generalTerms: q.generalTerms || '',
+                remarks: q.remarks || '',
+              });
+            } else {
+              setFormData({
+                client: q.client?._id || q.client || '',
+                clientName: q.client?.companyName || '',
+                clientCode: q.client?.clientCode || '',
+                requirement: q.requirement?._id || q.requirement || '',
+                quotationType: q.quotationType || 'domestic',
+                quotationCategory: q.quotationCategory || 'product',
+                attentionPerson: q.attentionPerson || '',
+                salesPerson: q.salesPerson?._id || q.salesPerson || '',
+                quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
+                validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+                currency: q.currency || 'INR',
+                pfAmount: q.pfAmount || 0,
+                freightAmount: q.freightAmount || 0,
+                discountRate: 0,
+                taxName: q.taxName || 'GST',
+                taxRate: q.taxRate || 0,
+                paymentTerms: q.paymentTerms || '',
+                deliveryTerms: q.deliveryTerms || '',
+                generalTerms: q.generalTerms || '',
+                remarks: q.remarks || '',
+              });
             }
           }
         } else {
@@ -309,8 +341,70 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         itemCategory: targetItem ? targetItem.itemCategory?._id || targetItem.itemCategory : '',
         description: targetItem ? targetItem.itemName : next[index].description,
         uom: targetItem ? targetItem.inventoryUom?._id || targetItem.inventoryUom : next[index].uom,
-        hsnCode: targetItem ? targetItem.hsnCode : next[index].hsnCode,
+        hsnCode: targetItem?.hsnCode ? targetItem.hsnCode : next[index].hsnCode,
       };
+      return next;
+    });
+  };
+
+  const sanitizeNumberInput = (val) => {
+    if (val === null || val === undefined) return '';
+    const str = String(val);
+    if (str.length > 1 && str.startsWith('0') && !str.startsWith('0.')) {
+      const cleaned = str.replace(/^0+/, '');
+      return cleaned === '' ? '0' : cleaned;
+    }
+    return str;
+  };
+
+  const calculateLineCFM = (line) => {
+    const dims = line.dimensions || {};
+    let w = Number(dims.width || dims.length) || 0;
+    let h = Number(dims.height) || 0;
+    const unit = dims.unit || 'mm';
+
+    if (!w || !h) {
+      const text = `${line.description || ''} ${line.remarks || ''}`;
+      const m = text.match(/(\d+(?:\.\d+)?)\s*[*×x]\s*(\d+(?:\.\d+)?)/i);
+      if (m) {
+        w = w || Number(m[1]);
+        h = h || Number(m[2]);
+      }
+    }
+
+    const fpm = Number(line.faceVelocity || dims.faceVelocity) || 0;
+    if (w <= 0 || h <= 0 || fpm <= 0) return 0;
+
+    let hFt = h;
+    let wFt = w;
+    const u = String(unit).toLowerCase();
+    if (u === 'mm') {
+      hFt = h / 304.8;
+      wFt = w / 304.8;
+    } else if (u === 'inch' || u === 'in' || u === 'inches') {
+      hFt = h / 12;
+      wFt = w / 12;
+    }
+
+    return Math.round(hFt * wFt * fpm);
+  };
+
+  const handleFaceVelocityChange = (index, value) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const sanitizedFpm = sanitizeNumberInput(value);
+      const updatedLine = {
+        ...next[index],
+        faceVelocity: sanitizedFpm,
+        dimensions: {
+          ...(next[index].dimensions || {}),
+          faceVelocity: sanitizedFpm,
+        },
+      };
+      const calculatedCfm = calculateLineCFM(updatedLine);
+      updatedLine.dimensions.cfm = calculatedCfm;
+      updatedLine.dimensions.capacity = calculatedCfm;
+      next[index] = updatedLine;
       return next;
     });
   };
@@ -318,7 +412,20 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   const handleLineItemChange = (index, field, value) => {
     setLineItems((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
+      let cleanVal = value;
+      if (field === 'unitPrice' || field === 'quantity') {
+        cleanVal = sanitizeNumberInput(value);
+      }
+      const updatedLine = { ...next[index], [field]: cleanVal };
+      const calculatedCfm = calculateLineCFM(updatedLine);
+      if (calculatedCfm > 0) {
+        updatedLine.dimensions = {
+          ...(updatedLine.dimensions || {}),
+          cfm: calculatedCfm,
+          capacity: calculatedCfm,
+        };
+      }
+      next[index] = updatedLine;
       return next;
     });
   };
@@ -355,17 +462,20 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       return sum + q * p;
     }, 0);
 
+    const dRate = Number(formData.discountRate) || 0;
+    const discountRate = Math.min(100, Math.max(0, dRate));
+    const discountAmount = subtotal > 0 && discountRate > 0 ? (subtotal * discountRate) / 100 : 0;
+
     const pf = Number(formData.pfAmount) || 0;
     const freight = Number(formData.freightAmount) || 0;
-    const discount = Number(formData.discountAmount) || 0;
     const tRate = Number(formData.taxRate) || 0;
 
-    const taxableAmount = Math.max(0, subtotal - discount + pf + freight);
+    const taxableAmount = Math.max(0, subtotal - discountAmount + pf + freight);
     const taxAmount = tRate > 0 ? (taxableAmount * tRate) / 100 : 0;
     const grandTotal = Math.max(0, taxableAmount + taxAmount);
 
-    return { subtotal, taxableAmount, taxAmount, grandTotal };
-  }, [lineItems, formData.pfAmount, formData.freightAmount, formData.discountAmount, formData.taxRate]);
+    return { subtotal, discountRate, discountAmount, taxableAmount, taxAmount, grandTotal };
+  }, [lineItems, formData.pfAmount, formData.freightAmount, formData.discountRate, formData.taxRate]);
 
   // Form Submit Handler
   const handleSubmit = async (e) => {
@@ -437,7 +547,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         currency: formData.currency,
         pfAmount: Number(formData.pfAmount) || 0,
         freightAmount: Number(formData.freightAmount) || 0,
-        discountAmount: Number(formData.discountAmount) || 0,
+        discountAmount: Number(totals.discountAmount) || 0,
         taxName: formData.taxName,
         taxRate: Number(formData.taxRate) || 0,
         paymentTerms: formData.paymentTerms,
@@ -600,45 +710,57 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
           </div>
 
           {/* Section 2: Quotation Line Items (Manual Unit Rate Entry) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider m-0">
-                2. Quotation Line Items (Manual Rate Entry)
-              </h4>
-              <Button type="button" variant="outline" size="xs" onClick={handleAddLineItem}>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <Package size={16} className="text-indigo-600" />
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider m-0">
+                  2. Quotation Line Items (Manual Rate Entry)
+                </h4>
+              </div>
+              <Button type="button" variant="outline" size="xs" onClick={handleAddLineItem} className="text-indigo-700 border-indigo-200 hover:bg-indigo-50">
                 <Plus size={14} className="mr-1" /> Add Line Item
               </Button>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {lineItems.map((line, idx) => (
                 <div
                   key={idx}
-                  className="p-3 border border-slate-200 rounded-lg bg-slate-50 space-y-2"
+                  className="p-4 border border-slate-200 rounded-xl bg-white shadow-xs hover:border-slate-300 transition-all space-y-3 relative overflow-hidden"
                 >
-                  <div className="flex justify-between items-center">
-                    <strong className="text-xs text-slate-600">
-                      Line #{idx + 1}
-                    </strong>
+                  <div className="flex justify-between items-center bg-slate-50 -mx-4 -mt-4 px-4 py-2.5 rounded-t-xl border-b border-slate-200/80 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        Line #{idx + 1}
+                      </span>
+                      {line.item && (
+                        <span className="text-[10px] font-medium text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
+                          Catalog Item
+                        </span>
+                      )}
+                    </div>
                     {lineItems.length > 1 && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="xs"
                         onClick={() => handleRemoveLineItem(idx)}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs px-2 py-0.5"
                       >
-                        <Trash2 size={14} className="mr-1" /> Remove
+                        <Trash2 size={13} className="mr-1" /> Remove Line
                       </Button>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                    <div className="md:col-span-1">
-                      <label className="form-label text-[11px]">Item Master</label>
+                  <div className="grid grid-cols-12 gap-3 items-start">
+                    {/* Item Master Select */}
+                    <div className="col-span-12 md:col-span-6 lg:col-span-4">
+                      <label className="form-label text-[11px] font-medium text-slate-700">Item Master</label>
                       <Select
                         value={line.item}
                         onChange={(e) => handleItemSelect(idx, e.target.value)}
+                        className="w-full text-xs"
                       >
                         <option value="">Custom Item / Service</option>
                         {items.map((it) => (
@@ -649,34 +771,52 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                       </Select>
                     </div>
 
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>Description *</label>
+                    {/* Description */}
+                    <div className="col-span-12 md:col-span-6 lg:col-span-5">
+                      <label className="form-label text-[11px] font-medium text-slate-700">Description *</label>
                       <Input
                         type="text"
                         placeholder="Item Description"
                         value={line.description}
                         onChange={(e) => handleLineItemChange(idx, 'description', e.target.value)}
+                        className="w-full text-xs"
                         required
                       />
                     </div>
 
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>Quantity *</label>
+                    {/* HSN Code */}
+                    <div className="col-span-12 sm:col-span-6 md:col-span-4 lg:col-span-3">
+                      <label className="form-label text-[11px] font-medium text-slate-700">HSN Code</label>
+                      <Input
+                        type="text"
+                        placeholder="HSN Code"
+                        value={line.hsnCode}
+                        onChange={(e) => handleLineItemChange(idx, 'hsnCode', e.target.value)}
+                        className="w-full text-xs font-mono"
+                      />
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="col-span-6 sm:col-span-3 md:col-span-3 lg:col-span-2">
+                      <label className="form-label text-[11px] font-medium text-slate-700">Quantity *</label>
                       <Input
                         type="number"
                         min="0.01"
                         step="any"
                         value={line.quantity}
                         onChange={(e) => handleLineItemChange(idx, 'quantity', e.target.value)}
+                        className="w-full text-xs font-medium"
                         required
                       />
                     </div>
 
-                    <div>
-                      <label className="form-label" style={{ fontSize: '11px' }}>UOM *</label>
+                    {/* UOM */}
+                    <div className="col-span-6 sm:col-span-3 md:col-span-3 lg:col-span-2">
+                      <label className="form-label text-[11px] font-medium text-slate-700">UOM *</label>
                       <Select
                         value={line.uom}
                         onChange={(e) => handleLineItemChange(idx, 'uom', e.target.value)}
+                        className="w-full text-xs"
                         required
                       >
                         <option value="">Select UOM</option>
@@ -688,18 +828,19 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                       </Select>
                     </div>
 
-                    <div>
-                      <label className="form-label text-[11px] text-blue-700 font-bold">
-                        Rate / Unit (₹) *
+                    {/* Rate / Unit (₹) */}
+                    <div className="col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-4 bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100/80">
+                      <label className="form-label text-[11px] text-indigo-900 font-bold flex items-center justify-between">
+                        <span>Rate / Unit (₹) *</span>
                       </label>
                       <Input
                         type="number"
                         min="0"
                         step="any"
-                        placeholder="Manual Rate"
-                        value={line.unitPrice}
+                        placeholder="0.00"
+                        value={line.unitPrice === 0 || line.unitPrice === '0' ? '' : line.unitPrice}
                         onChange={(e) => handleLineItemChange(idx, 'unitPrice', e.target.value)}
-                        className="font-bold border-blue-400"
+                        className="font-bold text-slate-900 border-indigo-300 focus:border-indigo-500 focus:ring-indigo-200 text-sm bg-white"
                         required
                       />
                       {formData.client && line.item && (
@@ -710,34 +851,56 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                         />
                       )}
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mt-2">
-                    <div>
-                      <label className="form-label text-[11px]">HSN Code</label>
+                    {/* Item Remarks */}
+                    <div className="col-span-12 lg:col-span-4">
+                      <label className="form-label text-[11px] font-medium text-slate-700">Item Remarks / Specs</label>
                       <Input
                         type="text"
-                        placeholder="HSN Code"
-                        value={line.hsnCode}
-                        onChange={(e) => handleLineItemChange(idx, 'hsnCode', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="form-label text-[11px]">Item Remarks</label>
-                      <Input
-                        type="text"
-                        placeholder="Remarks / Specs"
+                        placeholder="Remarks, Grade, Dims, Specs..."
                         value={line.remarks}
                         onChange={(e) => handleLineItemChange(idx, 'remarks', e.target.value)}
+                        className="w-full text-xs"
                       />
                     </div>
 
-                    <div className="text-right flex items-center justify-end pb-2">
-                      <span className="text-[11px] text-slate-500 mr-2">Line Total: </span>
-                      <strong className="text-sm text-slate-900">
+                    {/* Airflow / CFM Calculator Bar */}
+                    <div className="col-span-12 bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/80 grid grid-cols-12 gap-3 items-center mt-1">
+                      <div className="col-span-12 sm:col-span-4 lg:col-span-4 flex items-center space-x-1.5 text-xs font-semibold text-slate-800">
+                        <Calculator size={14} className="text-indigo-600 shrink-0" />
+                        <span>Airflow CFM Calculator</span>
+                      </div>
+                      <div className="col-span-6 sm:col-span-4 lg:col-span-4">
+                        <label className="form-label text-[10px] font-medium text-slate-600">Face Velocity (FPM) *</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 500"
+                          value={line.faceVelocity || line.dimensions?.faceVelocity || ''}
+                          onChange={(e) => handleFaceVelocityChange(idx, e.target.value)}
+                          className="w-full text-xs bg-white font-medium"
+                        />
+                      </div>
+                      <div className="col-span-6 sm:col-span-4 lg:col-span-4">
+                        <label className="form-label text-[10px] font-medium text-slate-600">Calculated Airflow (CFM)</label>
+                        <div className="h-8 px-2.5 bg-indigo-50/80 border border-indigo-200 rounded-md flex items-center justify-between font-mono font-bold text-indigo-950 text-xs">
+                          <span>{calculateLineCFM(line) || line.dimensions?.cfm || 0} CFM</span>
+                          <span className="text-[10px] font-normal text-indigo-600">H(ft) × W(ft) × FPM</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Computed Line Total Footer */}
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between bg-emerald-50/60 -mx-4 -mb-4 px-4 py-2 rounded-b-xl">
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                      Computed Line Total
+                    </span>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-xs text-emerald-700">Line Total:</span>
+                      <span className="text-sm font-bold text-emerald-950 font-mono">
                         ₹{((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -757,8 +920,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 <Input
                   type="number"
                   min="0"
-                  value={formData.pfAmount}
-                  onChange={(e) => setFormData({ ...formData, pfAmount: e.target.value })}
+                  placeholder="0.00"
+                  value={formData.pfAmount === 0 || formData.pfAmount === '0' ? '' : formData.pfAmount}
+                  onChange={(e) => setFormData({ ...formData, pfAmount: sanitizeNumberInput(e.target.value) })}
                 />
               </div>
 
@@ -767,19 +931,35 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 <Input
                   type="number"
                   min="0"
-                  value={formData.freightAmount}
-                  onChange={(e) => setFormData({ ...formData, freightAmount: e.target.value })}
+                  placeholder="0.00"
+                  value={formData.freightAmount === 0 || formData.freightAmount === '0' ? '' : formData.freightAmount}
+                  onChange={(e) => setFormData({ ...formData, freightAmount: sanitizeNumberInput(e.target.value) })}
                 />
               </div>
 
+              {/* Discount Input (%) */}
               <div>
-                <label className="form-label">Discount Amount (₹)</label>
+                <label className="form-label text-[11px] font-medium text-slate-700">
+                  Discount (%)
+                </label>
                 <Input
                   type="number"
                   min="0"
-                  value={formData.discountAmount}
-                  onChange={(e) => setFormData({ ...formData, discountAmount: e.target.value })}
+                  max="100"
+                  step="any"
+                  placeholder="e.g. 5"
+                  value={formData.discountRate === 0 || formData.discountRate === '0' ? '' : formData.discountRate}
+                  onChange={(e) => {
+                    const val = sanitizeNumberInput(e.target.value);
+                    if (Number(val) > 100) return;
+                    setFormData({ ...formData, discountRate: val });
+                  }}
                 />
+                {Number(formData.discountRate) > 0 && (
+                  <div className="text-[10px] text-indigo-600 mt-1 font-medium">
+                    = ₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} off
+                  </div>
+                )}
               </div>
 
               <div>
@@ -801,28 +981,32 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                   min="0"
                   step="any"
                   placeholder="e.g. 18"
-                  value={formData.taxRate}
-                  onChange={(e) => setFormData({ ...formData, taxRate: e.target.value })}
+                  value={formData.taxRate === 0 || formData.taxRate === '0' ? '' : formData.taxRate}
+                  onChange={(e) => setFormData({ ...formData, taxRate: sanitizeNumberInput(e.target.value) })}
                 />
               </div>
 
-              {/* Real-time calculated Commercial Summary Box - simple design applied */}
-              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <span className="text-slate-500 text-[11px] block">Subtotal:</span>
-                  <div className="text-sm font-bold text-slate-800">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              {/* Real-time calculated Commercial Summary Box */}
+              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-500 text-[10px] block font-medium">Subtotal:</span>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <span className="text-slate-500 text-[11px] block">Taxable:</span>
-                  <div className="text-sm font-bold text-slate-800">₹{totals.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="p-2.5 bg-amber-50/70 rounded-lg border border-amber-100">
+                  <span className="text-amber-700 text-[10px] block font-medium">Discount:</span>
+                  <div className="text-xs font-bold text-amber-900 mt-0.5">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div className="p-3 bg-sky-50 rounded-lg border border-sky-100">
-                  <span className="text-sky-700 text-[11px] block">Tax Amount:</span>
-                  <div className="text-sm font-bold text-sky-800">₹{totals.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-500 text-[10px] block font-medium">Taxable:</span>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">₹{totals.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
-                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                  <span className="text-emerald-700 text-[11px] block">Grand Total:</span>
-                  <div className="text-base font-bold text-emerald-800">
+                <div className="p-2.5 bg-sky-50 rounded-lg border border-sky-100">
+                  <span className="text-sky-700 text-[10px] block font-medium">Tax Amount:</span>
+                  <div className="text-xs font-bold text-sky-800 mt-0.5">₹{totals.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-100 col-span-2 md:col-span-1">
+                  <span className="text-emerald-700 text-[10px] block font-medium">Grand Total:</span>
+                  <div className="text-xs font-bold text-emerald-950 mt-0.5">
                     ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
