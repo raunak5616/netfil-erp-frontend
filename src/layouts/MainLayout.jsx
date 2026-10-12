@@ -23,6 +23,7 @@ import {
   Command,
   User,
   Truck,
+  Database,
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -58,7 +59,7 @@ const MainLayout = () => {
         console.error("Failed to parse expanded groups state:", e);
       }
     }
-    return { 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true, 'store-module': true };
+    return { 'master-module': true, 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true, 'store-module': true };
   });
 
   // Handle window resize for mobile breakpoint
@@ -103,11 +104,20 @@ const MainLayout = () => {
   // Auto-expand parent group on route change
   useEffect(() => {
     const path = location.pathname;
-    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications'];
+    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/flange-designs'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const commercialPaths = ['/clients', '/parties', '/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders', '/master-boms', '/order-boms', '/work-orders'];
+    const partyMasterPaths = ['/clients', '/parties'];
+    const isPartyMasterChild = partyMasterPaths.some((p) => path.startsWith(p));
+
+    const commercialPaths = ['/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders'];
     const isCommercialChild = commercialPaths.some((p) => path.startsWith(p));
+
+    const bomPaths = ['/master-boms', '/order-boms'];
+    const isBomChild = bomPaths.some((p) => path.startsWith(p));
+
+    const productionPaths = ['/work-orders'];
+    const isProductionChild = productionPaths.some((p) => path.startsWith(p));
 
     const purchasePaths = ['/suppliers', '/purchase-enquiries', '/purchase-orders', '/goods-receipts'];
     const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
@@ -116,10 +126,19 @@ const MainLayout = () => {
     const isStoreChild = storePaths.some((p) => path.startsWith(p));
 
     if (isItemMasterChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'item-master': true }));
+      setExpandedGroups((prev) => ({ ...prev, 'master-module': true, 'item-master': true }));
+    }
+    if (isPartyMasterChild) {
+      setExpandedGroups((prev) => ({ ...prev, 'master-module': true }));
     }
     if (isCommercialChild) {
       setExpandedGroups((prev) => ({ ...prev, 'commercial-module': true }));
+    }
+    if (isBomChild) {
+      setExpandedGroups((prev) => ({ ...prev, 'bom-module': true }));
+    }
+    if (isProductionChild) {
+      setExpandedGroups((prev) => ({ ...prev, 'production-module': true }));
     }
     if (isPurchaseChild) {
       setExpandedGroups((prev) => ({ ...prev, 'purchase-module': true }));
@@ -165,14 +184,15 @@ const MainLayout = () => {
       '/users': [{ label: 'Security' }, { label: 'User Accounts' }],
       '/roles': [{ label: 'Security' }, { label: 'Role Management' }],
       '/departments': [{ label: 'Organization' }, { label: 'Departments' }],
-      '/uoms': [{ label: 'Item Master' }, { label: 'Units of Measure (UOM)' }],
-      '/items': [{ label: 'Item Master' }, { label: 'Items Catalog' }],
-      '/item-groups': [{ label: 'Item Master' }, { label: 'Item Groups' }],
-      '/item-categories': [{ label: 'Item Master' }, { label: 'Item Categories' }],
-      '/specifications': [{ label: 'Item Master' }, { label: 'Specifications' }],
-      '/filter-grades': [{ label: 'Item Master' }, { label: 'Filter Grades' }],
-      '/clients': [{ label: 'Commercial' }, { label: 'Party Master' }],
-      '/parties': [{ label: 'Commercial' }, { label: 'Party Master' }],
+      '/uoms': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Units of Measure (UOM)' }],
+      '/items': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Items Catalog' }],
+      '/item-groups': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Item Groups' }],
+      '/item-categories': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Item Categories' }],
+      '/specifications': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Specifications' }],
+      '/filter-grades': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Filter Grades' }],
+      '/flange-designs': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Flange Designs' }],
+      '/clients': [{ label: 'Master' }, { label: 'Party Master' }],
+      '/parties': [{ label: 'Master' }, { label: 'Party Master' }],
       '/requirements': [{ label: 'Commercial' }, { label: 'Client Requirements' }],
       '/enquiries': [{ label: 'Commercial' }, { label: 'Client Enquiries' }],
       '/enquiry-mis': [{ label: 'Commercial' }, { label: 'Enquiry MIS Reports' }],
@@ -243,18 +263,27 @@ const MainLayout = () => {
       title: 'COMMERCIAL & ENGINEERING',
       items: [
         {
-          id: 'item-master',
-          label: 'Item Master',
-          icon: Package,
+          id: 'master-module',
+          label: 'Master',
+          icon: Database,
           isGroup: true,
           children: [
-            { label: 'Items Catalog', path: '/items', icon: Package, permission: 'ITEM_VIEW' },
-            { label: 'Item Groups', path: '/item-groups', icon: Layers, permission: 'ITEM_GROUP_VIEW' },
-            { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
-            { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
-            { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
-            { label: 'Flange Designs', path: '/flange-designs', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
-            { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
+            {
+              id: 'item-master',
+              label: 'Item Master',
+              icon: Package,
+              isGroup: true,
+              children: [
+                { label: 'Items Catalog', path: '/items', icon: Package, permission: 'ITEM_VIEW' },
+                { label: 'Item Groups', path: '/item-groups', icon: Layers, permission: 'ITEM_GROUP_VIEW' },
+                { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
+                { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
+                { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
+                { label: 'Flange Designs', path: '/flange-designs', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
+                { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
+              ],
+            },
+            { label: 'Party Master', path: '/clients', icon: Users, permission: 'CLIENT_VIEW' },
           ],
         },
         {
@@ -263,7 +292,6 @@ const MainLayout = () => {
           icon: ShoppingCart,
           isGroup: true,
           children: [
-            { label: 'Party Master', path: '/clients', icon: Users, permission: 'CLIENT_VIEW' },
             { label: 'Enquiry & Requirement', path: '/requirements', icon: ClipboardList, permission: 'REQUIREMENT_VIEW' },
             { label: 'Enquiry MIS', path: '/enquiry-mis', icon: FileText, permission: 'REQUIREMENT_VIEW' },
             { label: 'Quotation', path: '/quotations', icon: Calculator, permission: 'QUOTATION_VIEW' },
@@ -304,7 +332,11 @@ const MainLayout = () => {
     { label: 'Items Catalog', path: '/items', category: 'Item Master', permission: 'ITEM_VIEW' },
     { label: 'Item Groups', path: '/item-groups', category: 'Item Master', permission: 'ITEM_GROUP_VIEW' },
     { label: 'Item Categories', path: '/item-categories', category: 'Item Master', permission: 'ITEM_CATEGORY_VIEW' },
-    { label: 'Party Master', path: '/clients', category: 'Commercial', permission: 'CLIENT_VIEW' },
+    { label: 'Specifications', path: '/specifications', category: 'Item Master', permission: 'SPECIFICATION_VIEW' },
+    { label: 'Filter Grades', path: '/filter-grades', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
+    { label: 'Flange Designs', path: '/flange-designs', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
+    { label: 'Units of Measure', path: '/uoms', category: 'Item Master', permission: 'UOM_VIEW' },
+    { label: 'Party Master', path: '/clients', category: 'Master', permission: 'CLIENT_VIEW' },
     { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },
     { label: 'Quotation Register', path: '/quotations', category: 'Commercial', permission: 'QUOTATION_VIEW' },
     { label: 'Sales Orders', path: '/sales-orders', category: 'Commercial', permission: 'SALES_ORDER_VIEW' },
@@ -320,6 +352,35 @@ const MainLayout = () => {
     i.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     i.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper to recursively filter navigation items by user permissions
+  const filterMenuItem = (navItem) => {
+    if (navItem.isGroup) {
+      const visibleChildren = navItem.children
+        .map((child) => filterMenuItem(child))
+        .filter(Boolean);
+      if (visibleChildren.length === 0) return null;
+      return { ...navItem, children: visibleChildren };
+    }
+    if (!navItem.permission || hasPermission(navItem.permission)) {
+      return navItem;
+    }
+    return null;
+  };
+
+  // Helper to determine if a menu item or any of its nested children are active
+  const isItemActive = (navItem) => {
+    if (navItem.isGroup) {
+      return navItem.children?.some((child) => isItemActive(child));
+    }
+    if (navItem.path === '/clients') {
+      return location.pathname.startsWith('/clients') || location.pathname.startsWith('/parties');
+    }
+    if (navItem.path === '/requirements') {
+      return location.pathname.startsWith('/requirements') || location.pathname.startsWith('/enquiries');
+    }
+    return location.pathname.startsWith(navItem.path);
+  };
 
   const breadcrumbs = getBreadcrumbs();
 
@@ -369,19 +430,7 @@ const MainLayout = () => {
         <nav className="p-2 flex-1 overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar">
           {menuSections.map((section, sIdx) => {
             const visibleItems = section.items
-              .map((item) => {
-                if (item.isGroup) {
-                  const visibleChildren = item.children.filter(
-                    (child) => !child.permission || hasPermission(child.permission)
-                  );
-                  if (visibleChildren.length === 0) return null;
-                  return { ...item, children: visibleChildren };
-                }
-                if (!item.permission || hasPermission(item.permission)) {
-                  return item;
-                }
-                return null;
-              })
+              .map((item) => filterMenuItem(item))
               .filter(Boolean);
 
             if (visibleItems.length === 0) return null;
@@ -402,9 +451,7 @@ const MainLayout = () => {
                 {visibleItems.map((item) => {
                   if (item.isGroup) {
                     const isExpanded = !!expandedGroups[item.id];
-                    const isChildActive = item.children.some((child) =>
-                      location.pathname.startsWith(child.path)
-                    );
+                    const isChildActive = isItemActive(item);
                     const GroupIcon = item.icon;
 
                     return (
@@ -455,11 +502,76 @@ const MainLayout = () => {
                             pl-2.5 border-l border-slate-800/80 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out
                             ${collapsed && !isMobile 
                               ? 'max-h-0 opacity-0 ml-0' 
-                              : (isExpanded ? 'max-h-96 opacity-100 ml-3 mt-0.5' : 'max-h-0 opacity-0 ml-3')}
+                              : (isExpanded ? 'max-h-[800px] opacity-100 ml-3 mt-0.5' : 'max-h-0 opacity-0 ml-3')}
                           `}
                         >
                           {item.children.map((child) => {
+                            if (child.isGroup) {
+                              const isSubExpanded = !!expandedGroups[child.id];
+                              const isSubActive = isItemActive(child);
+                              const SubGroupIcon = child.icon;
+
+                              return (
+                                <div key={child.id} className="space-y-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleGroup(child.id)}
+                                    title={child.label}
+                                    className={`
+                                      w-full flex items-center justify-between px-2 py-1.5 rounded-md text-[12px] font-medium
+                                      transition-all duration-200 group cursor-pointer overflow-hidden
+                                      ${isSubActive ? 'text-blue-400 font-semibold bg-slate-800/80 shadow-xs' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'}
+                                    `}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <SubGroupIcon size={14} className={`shrink-0 transition-colors ${isSubActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                                      <span className="truncate">{child.label}</span>
+                                    </div>
+                                    <div 
+                                      className={`
+                                        transition-all duration-300 shrink-0
+                                        ${isSubExpanded ? 'rotate-180 text-blue-400' : 'text-slate-500'}
+                                      `}
+                                    >
+                                      <ChevronDown size={13} />
+                                    </div>
+                                  </button>
+
+                                  {/* Nested Submenu */}
+                                  <div 
+                                    className={`
+                                      pl-2.5 border-l border-slate-800/60 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out ml-2.5
+                                      ${isSubExpanded ? 'max-h-96 opacity-100 mt-0.5' : 'max-h-0 opacity-0'}
+                                    `}
+                                  >
+                                    {child.children.map((subChild) => {
+                                      const SubChildIcon = subChild.icon;
+                                      return (
+                                        <NavLink
+                                          key={subChild.path}
+                                          to={subChild.path}
+                                          className={({ isActive }) => `
+                                            flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] font-medium
+                                            transition-all duration-200 relative group whitespace-nowrap
+                                            ${isActive 
+                                              ? 'bg-blue-600 text-white shadow-xs font-semibold' 
+                                              : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}
+                                          `}
+                                        >
+                                          <SubChildIcon size={13} className="shrink-0" />
+                                          <span className="truncate">{subChild.label}</span>
+                                        </NavLink>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             const ChildIcon = child.icon;
+                            const isDirectActive = (child.path === '/clients' && (location.pathname.startsWith('/clients') || location.pathname.startsWith('/parties'))) ||
+                                                   (child.path === '/requirements' && (location.pathname.startsWith('/requirements') || location.pathname.startsWith('/enquiries')));
+
                             return (
                               <NavLink
                                 key={child.path}
@@ -467,7 +579,7 @@ const MainLayout = () => {
                                 className={({ isActive }) => `
                                   flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] font-medium
                                   transition-all duration-200 relative group whitespace-nowrap
-                                  ${isActive 
+                                  ${(isActive || isDirectActive)
                                     ? 'bg-blue-600 text-white shadow-xs font-semibold' 
                                     : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}
                                 `}
