@@ -62,6 +62,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showAdvancedInventory, setShowAdvancedInventory] = useState(false);
 
   // Fetch dropdown master records when modal opens
   useEffect(() => {
@@ -244,11 +245,19 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     return true;
   });
 
-  // Filtered categories belonging to selected Item Group
+  // Filtered categories: by selected group AND by parent group's applicableProductTypes
   const availableCategories = itemCategories.filter((cat) => {
-    if (!formData.itemGroup) return true;
-    const catGroupId = cat.itemGroup?._id || cat.itemGroup;
-    return String(catGroupId) === String(formData.itemGroup);
+    // If a group is already chosen, only show categories that belong to it
+    if (formData.itemGroup) {
+      const catGroupId = cat.itemGroup?._id || cat.itemGroup;
+      if (String(catGroupId) !== String(formData.itemGroup)) return false;
+    }
+    // Always hide categories whose parent group does not support the current productType
+    const parentGroup = typeof cat.itemGroup === 'object' ? cat.itemGroup : itemGroups.find((g) => String(g._id) === String(cat.itemGroup));
+    if (parentGroup && parentGroup.applicableProductTypes && parentGroup.applicableProductTypes.length > 0) {
+      if (!parentGroup.applicableProductTypes.includes(formData.productType)) return false;
+    }
+    return true;
   });
 
   const handleChange = (e) => {
@@ -267,6 +276,34 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           next.filterGrade = '';
           next.filterGradeVariant = '';
         }
+        // Clear group if it no longer supports the new productType
+        if (prev.itemGroup) {
+          const currentGroup = itemGroups.find((g) => String(g._id) === String(prev.itemGroup));
+          const groupStillValid =
+            !currentGroup ||
+            !currentGroup.applicableProductTypes ||
+            currentGroup.applicableProductTypes.length === 0 ||
+            currentGroup.applicableProductTypes.includes(value);
+          if (!groupStillValid) {
+            next.itemGroup = '';
+            next.itemCategory = '';
+          }
+        }
+        // Clear category if it no longer belongs to a group that supports the new productType
+        if (next.itemCategory && next.itemGroup) {
+          const currentCat = itemCategories.find((c) => String(c._id) === String(next.itemCategory));
+          const catGroup = currentCat && (typeof currentCat.itemGroup === 'object'
+            ? currentCat.itemGroup
+            : itemGroups.find((g) => String(g._id) === String(currentCat.itemGroup)));
+          const catStillValid =
+            !catGroup ||
+            !catGroup.applicableProductTypes ||
+            catGroup.applicableProductTypes.length === 0 ||
+            catGroup.applicableProductTypes.includes(value);
+          if (!catStillValid) {
+            next.itemCategory = '';
+          }
+        }
       }
 
       // Reset category if selected group changes and category is no longer valid
@@ -282,6 +319,15 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           next.itemCategory = validCategories[0]._id;
         } else {
           next.itemCategory = '';
+        }
+      }
+
+      // Auto-derive Item Group when Item Category is selected
+      if (name === 'itemCategory' && value) {
+        const selectedCat = itemCategories.find((c) => c._id === value);
+        if (selectedCat) {
+          const derivedGroupId = selectedCat.itemGroup?._id || selectedCat.itemGroup;
+          if (derivedGroupId) next.itemGroup = String(derivedGroupId);
         }
       }
 
@@ -488,6 +534,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         {/* TAB 1: BASIC INFO */}
         {activeTab === 'basic' && (
           <>
+            {/* Product Type + Item Code */}
             <FormField label="Product Type" required helperText="Select master item product type.">
               <Select
                 name="productType"
@@ -512,7 +559,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               />
             </FormField>
 
-            <FormField label="Item Name" required helperText="Full descriptive name of the item.">
+            {/* Item Name — full width for prominence */}
+            <FormField label="Item Name" required fullWidth helperText="Full descriptive name of the item.">
               <Input
                 name="itemName"
                 placeholder="e.g. Synthetic Pocket Filter G4"
@@ -523,7 +571,36 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               />
             </FormField>
 
-            <FormField label="Item Group" required helperText="Select top-level classification group.">
+            {/* Item Category first — Item Group auto-derives from selection */}
+            <FormField
+              label="Item Category"
+              required
+              helperText={
+                formData.itemGroup && availableCategories.length === 0
+                  ? '⚠️ No categories found under this group. Select another group or create a category first.'
+                  : 'Select category — Item Group will be set automatically.'
+              }
+            >
+              <Select
+                name="itemCategory"
+                value={formData.itemCategory}
+                onChange={handleChange}
+                disabled={submitting || loadingData}
+              >
+                <option value="">-- Select Item Category --</option>
+                {availableCategories.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.categoryCode} — {c.categoryName}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Item Group"
+              required
+              helperText={formData.itemCategory ? 'Auto-derived from selected category. Change here to override.' : 'Select top-level classification group.'}
+            >
               <Select
                 name="itemGroup"
                 value={formData.itemGroup}
@@ -539,43 +616,30 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               </Select>
             </FormField>
 
-            <FormField
-              label="Item Category"
-              required
-              helperText={
-                formData.itemGroup && availableCategories.length === 0
-                  ? "⚠️ No categories created under this group. Please select another group or create a category first."
-                  : "Select category belonging to the chosen group."
-              }
-            >
-              <Select
-                name="itemCategory"
-                value={formData.itemCategory}
-                onChange={handleChange}
-                disabled={submitting || loadingData || !formData.itemGroup}
-              >
-                <option value="">-- Select Item Category --</option>
-                {availableCategories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.categoryCode} — {c.categoryName}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-
-            <FormField label="Item Type" helperText={!isEditMode ? "Automatically set based on Product Type selection." : "Classification of item in ERP."}>
-              <Select
-                name="itemType"
-                value={formData.itemType}
-                onChange={handleChange}
-                disabled={submitting || !isEditMode}
-              >
-                <option value="raw_material">Raw Material</option>
-                <option value="finished_goods">Finished Goods</option>
-                <option value="standard">Standard Item</option>
-                <option value="component">Component / Sub-Assembly</option>
-              </Select>
-            </FormField>
+            {/* Item Type: editable select in edit mode; read-only chip in create mode */}
+            {isEditMode ? (
+              <FormField label="Item Type" helperText="Classification of item in ERP.">
+                <Select
+                  name="itemType"
+                  value={formData.itemType}
+                  onChange={handleChange}
+                  disabled={submitting}
+                >
+                  <option value="raw_material">Raw Material</option>
+                  <option value="finished_goods">Finished Goods</option>
+                  <option value="standard">Standard Item</option>
+                  <option value="component">Component / Sub-Assembly</option>
+                </Select>
+              </FormField>
+            ) : (
+              <div className="col-span-full flex items-center gap-2 -mt-1 mb-0.5">
+                <span className="text-xs text-slate-400">Derived Item Type:</span>
+                <span className="text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded capitalize">
+                  {(formData.itemType || 'raw_material').replace(/_/g, ' ')}
+                </span>
+                <span className="text-[11px] text-slate-400">(auto-set from Product Type)</span>
+              </div>
+            )}
 
             {/* Filter Grade Configuration: Enabled only when Product Type is FILTER */}
             {formData.productType === 'FILTER' && (() => {
@@ -771,6 +835,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         {/* TAB 3: INVENTORY CONTROLS */}
         {activeTab === 'inventory' && (
           <>
+            {/* Always-visible fields */}
             <FormField label="HSN / SAC Code" helperText="Harmonized System Nomenclature code for taxation.">
               <Input
                 name="hsnCode"
@@ -797,55 +862,72 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               </Select>
             </FormField>
 
-            <FormField label="Reorder Level" helperText="Minimum stock threshold triggering reorder.">
-              <Input
-                type="number"
-                name="reorderLevel"
-                value={formData.reorderLevel}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </FormField>
+            {/* Collapsible: Reorder levels, safety stock, lead time */}
+            <div className="col-span-full">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedInventory((v) => !v)}
+                className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md px-3 py-2 w-full transition-colors cursor-pointer text-left"
+              >
+                <span style={{ fontSize: '10px' }}>{showAdvancedInventory ? '▾' : '▸'}</span>
+                <span>Advanced Inventory Settings</span>
+                <span className="text-slate-400 font-normal ml-1">— Reorder levels, safety stock, lead time</span>
+              </button>
+            </div>
 
-            <FormField label="Reorder Quantity" helperText="Standard reorder quantity.">
-              <Input
-                type="number"
-                name="reorderQty"
-                value={formData.reorderQty}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </FormField>
+            {showAdvancedInventory && (
+              <>
+                <FormField label="Reorder Level" helperText="Minimum stock threshold triggering reorder.">
+                  <Input
+                    type="number"
+                    name="reorderLevel"
+                    value={formData.reorderLevel}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
 
-            <FormField label="Min Inventory" helperText="Safety stock minimum level.">
-              <Input
-                type="number"
-                name="minInventory"
-                value={formData.minInventory}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </FormField>
+                <FormField label="Reorder Quantity" helperText="Standard reorder quantity.">
+                  <Input
+                    type="number"
+                    name="reorderQty"
+                    value={formData.reorderQty}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
 
-            <FormField label="Max Inventory" helperText="Maximum allowed stock level.">
-              <Input
-                type="number"
-                name="maxInventory"
-                value={formData.maxInventory}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </FormField>
+                <FormField label="Min Inventory" helperText="Safety stock minimum level.">
+                  <Input
+                    type="number"
+                    name="minInventory"
+                    value={formData.minInventory}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
 
-            <FormField label="Lead Time (Days)" helperText="Procurement / manufacturing lead time in days.">
-              <Input
-                type="number"
-                name="leadTimeDays"
-                value={formData.leadTimeDays}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </FormField>
+                <FormField label="Max Inventory" helperText="Maximum allowed stock level.">
+                  <Input
+                    type="number"
+                    name="maxInventory"
+                    value={formData.maxInventory}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
+
+                <FormField label="Lead Time (Days)" helperText="Procurement / manufacturing lead time in days.">
+                  <Input
+                    type="number"
+                    name="leadTimeDays"
+                    value={formData.leadTimeDays}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
+              </>
+            )}
           </>
         )}
 

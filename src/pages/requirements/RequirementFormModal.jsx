@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { createRequirement, updateRequirement } from '../../services/requirementService';
 import { getClients } from '../../services/clientService';
 import { getItems } from '../../services/itemService';
@@ -46,10 +47,14 @@ const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
   isExpanded: true,
   itemSearch: '',
   isItemDropdownOpen: false,
+  saveToCatalog: false,
+  newItemName: '',
 });
 
 const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!requirement;
+  const { hasPermission } = useAuth();
+  const canCreateItem = typeof hasPermission === 'function' ? hasPermission('ITEM_CREATE') : false;
 
   // Master options state
   const [clients, setClients] = useState([]);
@@ -406,6 +411,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         uom: itemUomId || updated[index].uom,
         itemSearch: `${selectedItemObj.itemCode ? selectedItemObj.itemCode + ' - ' : ''}${selectedItemObj.itemName}`,
         isItemDropdownOpen: false,
+        saveToCatalog: false,
+        newItemName: '',
       };
       return { ...prev, items: updated };
     });
@@ -418,6 +425,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         ...updated[index],
         item: '',
         itemSearch: '',
+        saveToCatalog: false,
+        newItemName: '',
       };
       return { ...prev, items: updated };
     });
@@ -482,6 +491,19 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           return `${numLabel}: Quantity cannot be a fractional/decimal number.`;
         }
 
+        if (itemObj.saveToCatalog && !itemObj.item) {
+          if (!canCreateItem) {
+            return `${numLabel}: You do not have permission to save products to the Item Catalog. Please uncheck 'Save to Item Catalog'.`;
+          }
+          const enteredName = (itemObj.newItemName || itemObj.itemSearch || '').trim();
+          if (!enteredName) {
+            return `${numLabel}: Item Name is required when 'Save to Item Catalog' is checked.`;
+          }
+          if (!itemObj.itemCategory) {
+            return `${numLabel}: Item Category is required when 'Save to Item Catalog' is checked.`;
+          }
+        }
+
         const cType = (itemObj.constructionType || 'FLANGE').toUpperCase();
         const bw = Number(itemObj.dimensions.bodyWidth);
         const bh = Number(itemObj.dimensions.bodyHeight);
@@ -526,6 +548,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     const formattedItems = formData.type === 'product' ? formData.items.map((itemObj) => ({
       itemCategory: itemObj.itemCategory || null,
       item: itemObj.item || null,
+      saveToCatalog: !itemObj.item && Boolean(itemObj.saveToCatalog),
+      newItemName: !itemObj.item && itemObj.saveToCatalog ? (itemObj.newItemName || itemObj.itemSearch || '').trim() : '',
       quantity: itemObj.quantity ? Number(itemObj.quantity) : null,
       uom: itemObj.uom || null,
       constructionType: itemObj.constructionType || 'FLANGE',
@@ -560,6 +584,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       items: formattedItems,
       itemCategory: firstItem.itemCategory || null,
       item: firstItem.item || null,
+      saveToCatalog: firstItem.saveToCatalog || false,
+      newItemName: firstItem.newItemName || '',
       quantity: firstItem.quantity || null,
       uom: firstItem.uom || null,
       constructionType: firstItem.constructionType || 'FLANGE',
@@ -1001,8 +1027,44 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         </div>
                                       ))
                                     ) : (
-                                      <div style={{ padding: '10px', fontSize: '12px', color: 'var(--neutral-500)', textAlign: 'center' }}>
-                                        No active items found matching "{itemObj.itemSearch}"
+                                      <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>
+                                          No active items found matching <strong style={{ color: 'var(--neutral-700)' }}>"{itemObj.itemSearch}"</strong>
+                                        </span>
+                                        {canCreateItem && !itemObj.saveToCatalog && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setFormData((prev) => {
+                                                const updated = [...prev.items];
+                                                updated[itemIndex] = {
+                                                  ...updated[itemIndex],
+                                                  saveToCatalog: true,
+                                                  newItemName: itemObj.itemSearch || '',
+                                                  isItemDropdownOpen: false,
+                                                };
+                                                return { ...prev, items: updated };
+                                              });
+                                            }}
+                                            style={{
+                                              flexShrink: 0,
+                                              fontSize: '11.5px',
+                                              fontWeight: 700,
+                                              color: '#1e40af',
+                                              backgroundColor: '#eff6ff',
+                                              border: '1px solid #bfdbfe',
+                                              borderRadius: '5px',
+                                              padding: '4px 10px',
+                                              cursor: 'pointer',
+                                              whiteSpace: 'nowrap',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                            }}
+                                          >
+                                            + Save Item
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1023,6 +1085,78 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   <button type="button" onClick={() => handleClearItemForIndex(itemIndex)} className="text-red-600 hover:text-red-800 text-xs font-semibold px-2 py-1 bg-white border border-red-200 rounded shadow-xs">
                                     Change Item
                                   </button>
+                                </div>
+                              )}
+
+                              {!selectedCatalogItem && (
+                                <div style={{ marginTop: '8px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canCreateItem ? 'pointer' : 'not-allowed', fontSize: '12.5px', fontWeight: 600, color: 'var(--neutral-800)' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={itemObj.saveToCatalog || false}
+                                      onChange={(e) => {
+                                        const isChecked = e.target.checked;
+                                        handleItemFieldChange(itemIndex, 'saveToCatalog', isChecked);
+                                        if (isChecked && !itemObj.newItemName) {
+                                          handleItemFieldChange(itemIndex, 'newItemName', itemObj.itemSearch || '');
+                                        }
+                                      }}
+                                      disabled={submitting || !canCreateItem}
+                                      style={{ width: '16px', height: '16px', cursor: canCreateItem ? 'pointer' : 'not-allowed' }}
+                                    />
+                                    <span>Save to Item Catalog</span>
+                                  </label>
+
+                                  {!canCreateItem && (
+                                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', marginLeft: '24px' }}>
+                                      Requires ITEM_CREATE permission to add new products to the catalog.
+                                    </div>
+                                  )}
+
+                                  {itemObj.saveToCatalog && (
+                                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px' }}>
+                                      <FormField label="Catalog Item Name" required helperText="Enter reusable commercial product name to save in Item Master.">
+                                        <Input
+                                          placeholder="e.g. Synthetic Pocket Filter 592x592x500"
+                                          value={itemObj.newItemName !== undefined ? itemObj.newItemName : (itemObj.itemSearch || '')}
+                                          onChange={(e) => handleItemFieldChange(itemIndex, 'newItemName', e.target.value)}
+                                          disabled={submitting}
+                                        />
+                                      </FormField>
+
+                                      {/* Live Duplicate Item Warning */}
+                                      {(() => {
+                                        const nameToCheck = (itemObj.newItemName || itemObj.itemSearch || '').trim().toLowerCase();
+                                        if (!nameToCheck) return null;
+                                        const duplicate = items.find((i) => {
+                                          const matchesName = (i.itemName || '').toLowerCase() === nameToCheck;
+                                          if (!matchesName) return false;
+                                          if (itemObj.itemCategory) {
+                                            const catId = typeof i.itemCategory === 'object' ? i.itemCategory?._id : i.itemCategory;
+                                            return catId === itemObj.itemCategory;
+                                          }
+                                          return true;
+                                        });
+
+                                        if (!duplicate) return null;
+
+                                        return (
+                                          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                            <div style={{ fontSize: '11.5px', color: '#92400e' }}>
+                                              ⚠️ An active item with this name already exists in catalog: <strong>{duplicate.itemName}</strong> ({duplicate.itemCode})
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSelectItemForIndex(itemIndex, duplicate)}
+                                              style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                            >
+                                              Select Existing Item
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </FormField>
