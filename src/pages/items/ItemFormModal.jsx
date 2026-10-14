@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createItem, updateItem, getItemSpecifications, assignItemSpecification, updateItemSpecification, removeItemSpecification } from '../../services/itemService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { getItemCategories, getCategorySpecifications } from '../../services/itemCategoryService';
 import { getFilterGrades } from '../../services/filterGradeService';
 import { getUOMs } from '../../services/uomService';
 import { getBins } from '../../services/binService';
+import { getFlangeDesigns } from '../../services/flangeDesignService';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -17,10 +18,39 @@ const PRODUCT_TYPE_TO_ITEM_TYPE = {
   AHU: 'finished_goods',
 };
 
+// Verified category codes for Filter constructions
+const VERIFIED_BOX_CATEGORY_CODES = ['BOX TYPE'];
+const VERIFIED_FLANGE_CATEGORY_CODES = ['FLANGE TYPE'];
+
+// Standard MOC options discovered from master data and historical ERP records
+const STANDARD_MOC_OPTIONS = [
+  'Aluminum',
+  'SS304',
+  'SS316L',
+  'Galvanized Iron (GI)',
+  'CRCA Powder Coated',
+  'Mild Steel'
+];
+
+// Confirmed Bonding options with operating temperature ranges
+const BONDING_OPTIONS = [
+  { value: 'PU Bonding', label: 'PU Bonding (50–150 °C)', minTemp: 50, maxTemp: 150 },
+  { value: 'Epoxy Bonding', label: 'Epoxy Bonding (200–350 °C)', minTemp: 200, maxTemp: 350 },
+  { value: 'White Adhesive (Ceramic)', label: 'White Adhesive (Ceramic) (230–400 °C)', minTemp: 230, maxTemp: 400 }
+];
+
+// Helper to normalize and extract construction from a variant object
+// Explicitly prioritizes mountingType with filterType as a fallback
+const getVariantConstruction = (v) => {
+  const raw = (v?.mountingType && String(v.mountingType).trim()) || (v?.filterType && String(v.filterType).trim()) || '';
+  return raw.toUpperCase();
+};
+
 const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 'RAW_ITEM' }) => {
   const isEditMode = !!item;
 
   const [activeTab, setActiveTab] = useState('basic'); // 'basic' | 'uom' | 'inventory' | 'specifications'
+  const [filterConstructionType, setFilterConstructionType] = useState(''); // 'BOX' | 'FLANGE' | ''
 
   const [formData, setFormData] = useState({
     itemCode: 'AUTO',
@@ -45,6 +75,17 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     filterGrade: '',
     filterGradeVariant: '',
     status: 'active',
+    // Technical Filter Fields
+    constructionType: '',
+    moc: '',
+    customMoc: '',
+    flangeType: '',
+    filterLength: '',
+    filterWidth: '',
+    filterDepth: '',
+    faceVelocity: 500,
+    temperatureRating: '',
+    bonding: '',
   });
 
   // Specification state: map of specId -> { value, isApply, isFix, existingSpecId }
@@ -56,6 +97,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const [uoms, setUoms] = useState([]);
   const [bins, setBins] = useState([]);
   const [filterGrades, setFilterGrades] = useState([]);
+  const [flangeDesigns, setFlangeDesigns] = useState([]);
   const [categorySpecs, setCategorySpecs] = useState([]);
 
   const [loadingData, setLoadingData] = useState(false);
@@ -85,12 +127,13 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           );
         };
 
-        const [groupRes, catRes, uomRes, binRes, fgRes] = await Promise.all([
+        const [groupRes, catRes, uomRes, binRes, fgRes, flangeRes] = await Promise.all([
           getItemGroups({ typeFilter: 'MASTER' }),
           getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
-          getFilterGrades().catch(() => ({ success: true, filterGrades: [] }))
+          getFilterGrades().catch(() => ({ success: true, filterGrades: [] })),
+          getFlangeDesigns({ constructionType: 'FLANGE', status: 'active' }).catch(() => ({ success: true, flangeDesigns: [] }))
         ]);
 
         const groupsArray = groupRes.itemGroups || groupRes.groups;
@@ -110,6 +153,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         if (fgRes.success && Array.isArray(fgRes.filterGrades)) {
           setFilterGrades(fgRes.filterGrades.filter((f) => f.status === 'active'));
         }
+        if (flangeRes.success && Array.isArray(flangeRes.flangeDesigns)) {
+          setFlangeDesigns(flangeRes.flangeDesigns.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001'));
+        }
       } catch (err) {
         console.error("Failed to load Item master option lists:", err);
         setErrorMessage("Could not load Item master options. Please try again.");
@@ -122,6 +168,37 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
     // Populate form data
     if (item) {
+      let initialConstruction = item.constructionType || '';
+      if (!initialConstruction && (item.productType === 'FILTER' || (!item.productType && item.filterGrade))) {
+        // Derive construction from item.filterGradeVariant if unambiguous
+        if (item.filterGradeVariant && typeof item.filterGradeVariant === 'string') {
+          const parts = item.filterGradeVariant.split('||');
+          if (parts.length >= 2) {
+            const candidate = parts[1]?.trim().toUpperCase();
+            if (candidate === 'BOX' || candidate === 'FLANGE') {
+              initialConstruction = candidate;
+            }
+          }
+        }
+        // Fallback: check itemCategory if unambiguously linked to a verified construction
+        if (!initialConstruction && item.itemCategory) {
+          const catCode = (item.itemCategory?.categoryCode || '').trim().toUpperCase();
+          if (VERIFIED_BOX_CATEGORY_CODES.includes(catCode)) {
+            initialConstruction = 'BOX';
+          } else if (VERIFIED_FLANGE_CATEGORY_CODES.includes(catCode)) {
+            initialConstruction = 'FLANGE';
+          }
+        }
+      }
+      setFilterConstructionType(initialConstruction);
+
+      let initialMoc = item.moc || '';
+      let initialCustomMoc = '';
+      if (initialMoc && !STANDARD_MOC_OPTIONS.includes(initialMoc)) {
+        initialCustomMoc = initialMoc;
+        initialMoc = 'OTHER';
+      }
+
       setFormData({
         itemCode: item.itemCode || '',
         itemName: item.itemName || '',
@@ -145,14 +222,34 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         filterGrade: item.filterGrade?._id || item.filterGrade || '',
         filterGradeVariant: item.filterGradeVariant || '',
         status: item.status || 'active',
+        constructionType: item.constructionType || initialConstruction,
+        moc: initialMoc,
+        customMoc: initialCustomMoc,
+        flangeType: item.flangeType?._id || item.flangeType || '',
+        filterLength: item.filterLength !== null && item.filterLength !== undefined ? item.filterLength : (item.grade_items?.height ?? ''),
+        filterWidth: item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : (item.grade_items?.width ?? ''),
+        filterDepth: item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : (item.grade_items?.length ?? ''),
+        faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
+        temperatureRating: item.temperatureRating !== null && item.temperatureRating !== undefined ? item.temperatureRating : (item.grade_items?.filterTemp ?? ''),
+        bonding: item.bonding || '',
       });
 
       // Load existing item specification values
       getItemSpecifications(item._id).then((specRes) => {
         if (specRes.success && Array.isArray(specRes.specifications)) {
           const map = {};
+          let specLength = '';
+          let specWidth = '';
+          let specDepth = '';
+
           specRes.specifications.forEach((s) => {
             const specId = s.specification?._id || s.specification;
+            const code = (s.specification?.specificationCode || '').toUpperCase().trim();
+            const name = (s.specification?.specificationName || '').toUpperCase().trim();
+            if (code === 'SPEC-LENGTH-01' || name === 'LENGTH') specLength = s.value;
+            if (code === 'SPEC-WIDTH-01' || name === 'WIDTH') specWidth = s.value;
+            if (code === 'DEPTH' || name === 'DEPTH') specDepth = s.value;
+
             map[specId] = {
               value: s.value,
               isApply: s.isApply || false,
@@ -161,11 +258,19 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
             };
           });
           setSpecsData(map);
+
+          setFormData((prev) => ({
+            ...prev,
+            filterLength: prev.filterLength !== '' ? prev.filterLength : (specLength || ''),
+            filterWidth: prev.filterWidth !== '' ? prev.filterWidth : (specWidth || ''),
+            filterDepth: prev.filterDepth !== '' ? prev.filterDepth : (specDepth || '')
+          }));
         }
       }).catch(console.error);
 
     } else {
       const pType = initialProductType || 'RAW_ITEM';
+      setFilterConstructionType('');
       setFormData({
         itemCode: 'AUTO',
         itemName: '',
@@ -189,6 +294,16 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         filterGrade: '',
         filterGradeVariant: '',
         status: 'active',
+        constructionType: '',
+        moc: '',
+        customMoc: '',
+        flangeType: '',
+        filterLength: '',
+        filterWidth: '',
+        filterDepth: '',
+        faceVelocity: 500,
+        temperatureRating: '',
+        bonding: '',
       });
       setSpecsData({});
     }
@@ -230,7 +345,27 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       });
   }, [formData.itemCategory]);
 
-  if (!isOpen) return null;
+  // For edit mode: derive construction from filterGrades master data if not yet derived
+  useEffect(() => {
+    if (!isEditMode || !item || filterConstructionType || (item.productType !== 'FILTER' && !item.filterGrade)) return;
+    if (!filterGrades.length || !item.filterGrade || !item.filterGradeVariant) return;
+
+    const fgId = item.filterGrade?._id || item.filterGrade;
+    const fg = filterGrades.find((f) => String(f._id) === String(fgId));
+    if (fg && Array.isArray(fg.variants)) {
+      const matched = fg.variants.find((v) => {
+        const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
+        const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||');
+        return item.filterGradeVariant === k1 || item.filterGradeVariant === k2;
+      });
+      if (matched) {
+        const c = getVariantConstruction(matched);
+        if (c === 'BOX' || c === 'FLANGE') {
+          setFilterConstructionType(c);
+        }
+      }
+    }
+  }, [isEditMode, item, filterGrades, filterConstructionType]);
 
   // Filtered groups: exclude system-generated groups and filter by applicable product types
   const availableGroups = itemGroups.filter((group) => {
@@ -245,20 +380,120 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     return true;
   });
 
-  // Filtered categories: by selected group AND by parent group's applicableProductTypes
+  // Filtered categories: by construction type when FILTER, or by applicableProductTypes for others
   const availableCategories = itemCategories.filter((cat) => {
+    // If productType is FILTER, strictly filter by construction type
+    if (formData.productType === 'FILTER') {
+      if (!filterConstructionType) {
+        // Must select construction type first
+        return false;
+      }
+      const catCode = (cat.categoryCode || '').trim().toUpperCase();
+      if (filterConstructionType === 'BOX') {
+        if (!VERIFIED_BOX_CATEGORY_CODES.includes(catCode)) return false;
+      } else if (filterConstructionType === 'FLANGE') {
+        if (!VERIFIED_FLANGE_CATEGORY_CODES.includes(catCode)) return false;
+      } else {
+        return false;
+      }
+    } else {
+      // Non-Filter Product Types: Preserve existing group-level applicableProductTypes logic
+      const parentGroup = typeof cat.itemGroup === 'object' ? cat.itemGroup : itemGroups.find((g) => String(g._id) === String(cat.itemGroup));
+      if (parentGroup && parentGroup.applicableProductTypes && parentGroup.applicableProductTypes.length > 0) {
+        if (!parentGroup.applicableProductTypes.includes(formData.productType)) return false;
+      }
+    }
+
     // If a group is already chosen, only show categories that belong to it
     if (formData.itemGroup) {
       const catGroupId = cat.itemGroup?._id || cat.itemGroup;
       if (String(catGroupId) !== String(formData.itemGroup)) return false;
     }
-    // Always hide categories whose parent group does not support the current productType
-    const parentGroup = typeof cat.itemGroup === 'object' ? cat.itemGroup : itemGroups.find((g) => String(g._id) === String(cat.itemGroup));
-    if (parentGroup && parentGroup.applicableProductTypes && parentGroup.applicableProductTypes.length > 0) {
-      if (!parentGroup.applicableProductTypes.includes(formData.productType)) return false;
-    }
+
     return true;
   });
+
+  // CFM = (Length in MM / 304.8) * (Width in MM / 304.8) * Face Velocity in FPM
+  const calculatedCfm = useMemo(() => {
+    const l = Number(formData.filterLength);
+    const w = Number(formData.filterWidth);
+    const fv = Number(formData.faceVelocity);
+    if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(fv) || fv <= 0) {
+      return null;
+    }
+    const cfmValue = (l / 304.8) * (w / 304.8) * fv;
+    return Math.round(cfmValue);
+  }, [formData.filterLength, formData.filterWidth, formData.faceVelocity]);
+
+  // Non-blocking warning if temperature rating is outside the selected bonding range
+  const temperatureWarning = useMemo(() => {
+    if (!formData.temperatureRating || !formData.bonding) return null;
+    const temp = Number(formData.temperatureRating);
+    if (Number.isNaN(temp)) return null;
+    const selectedBonding = BONDING_OPTIONS.find((b) => b.value === formData.bonding);
+    if (!selectedBonding) return null;
+    if (temp < selectedBonding.minTemp || temp > selectedBonding.maxTemp) {
+      return `Entered temperature rating (${temp} °C) is outside the recommended range for ${selectedBonding.value} (${selectedBonding.minTemp}–${selectedBonding.maxTemp} °C).`;
+    }
+    return null;
+  }, [formData.temperatureRating, formData.bonding]);
+
+  const handleConstructionChange = (e) => {
+    const newConstruction = e.target.value; // 'BOX' | 'FLANGE' | ''
+    setFilterConstructionType(newConstruction);
+
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        constructionType: newConstruction,
+        flangeType: newConstruction === 'FLANGE' ? prev.flangeType : ''
+      };
+
+      // Clear itemCategory if not compatible with newConstruction
+      if (prev.itemCategory) {
+        const currentCat = itemCategories.find((c) => String(c._id) === String(prev.itemCategory));
+        const currentCatCode = (currentCat?.categoryCode || '').trim().toUpperCase();
+        const isCompatible =
+          (newConstruction === 'BOX' && VERIFIED_BOX_CATEGORY_CODES.includes(currentCatCode)) ||
+          (newConstruction === 'FLANGE' && VERIFIED_FLANGE_CATEGORY_CODES.includes(currentCatCode));
+
+        if (!isCompatible) {
+          next.itemCategory = '';
+        }
+      }
+
+      // Clear filterGradeVariant if not compatible with newConstruction
+      if (prev.filterGrade && prev.filterGradeVariant) {
+        const currentFg = filterGrades.find((fg) => String(fg._id) === String(prev.filterGrade));
+        const currentVariantObj = currentFg?.variants?.find((v) => {
+          const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
+          const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||');
+          return prev.filterGradeVariant === k1 || prev.filterGradeVariant === k2;
+        });
+
+        if (currentVariantObj) {
+          const vConstruction = getVariantConstruction(currentVariantObj);
+          if (vConstruction !== newConstruction) {
+            next.filterGradeVariant = '';
+          }
+        } else {
+          next.filterGradeVariant = '';
+        }
+      }
+
+      // Check if current filterGrade has any variants matching newConstruction
+      if (prev.filterGrade && newConstruction) {
+        const currentFg = filterGrades.find((fg) => String(fg._id) === String(prev.filterGrade));
+        const hasMatchingVariant = currentFg?.variants?.some((v) => getVariantConstruction(v) === newConstruction);
+        if (!hasMatchingVariant) {
+          next.filterGrade = '';
+          next.filterGradeVariant = '';
+        }
+      }
+
+      return next;
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -273,8 +508,17 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           next.itemType = PRODUCT_TYPE_TO_ITEM_TYPE[value];
         }
         if (value !== 'FILTER') {
+          setFilterConstructionType('');
+          next.constructionType = '';
+          next.flangeType = '';
           next.filterGrade = '';
           next.filterGradeVariant = '';
+          next.filterLength = '';
+          next.filterWidth = '';
+          next.filterDepth = '';
+          next.faceVelocity = 500;
+          next.temperatureRating = '';
+          next.bonding = '';
         }
         // Clear group if it no longer supports the new productType
         if (prev.itemGroup) {
@@ -370,8 +614,31 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     }
     
     // Filter validation
-    if (formData.productType === 'FILTER' && formData.filterGrade && !formData.filterGradeVariant) {
-      return 'Filter Grade Variant is required when a Filter Grade is selected.';
+    if (formData.productType === 'FILTER') {
+      if (!filterConstructionType) {
+        return 'Filter Construction Type (BOX or FLANGE) is required for Filter items.';
+      }
+      if (formData.filterGrade && !formData.filterGradeVariant) {
+        return 'Filter Grade Variant is required when a Filter Grade is selected.';
+      }
+      if (formData.filterLength !== '' && (Number(formData.filterLength) <= 0 || isNaN(Number(formData.filterLength)))) {
+        return 'Filter Length must be a positive number in MM.';
+      }
+      if (formData.filterWidth !== '' && (Number(formData.filterWidth) <= 0 || isNaN(Number(formData.filterWidth)))) {
+        return 'Filter Width must be a positive number in MM.';
+      }
+      if (formData.filterDepth !== '' && (Number(formData.filterDepth) <= 0 || isNaN(Number(formData.filterDepth)))) {
+        return 'Filter Depth must be a positive number in MM.';
+      }
+      if (formData.faceVelocity !== '' && (Number(formData.faceVelocity) <= 0 || isNaN(Number(formData.faceVelocity)))) {
+        return 'Face Velocity must be a positive number in FPM.';
+      }
+      if (formData.temperatureRating !== '' && isNaN(Number(formData.temperatureRating))) {
+        return 'Temperature Rating must be a valid numeric temperature in °C.';
+      }
+      if (formData.moc === 'OTHER' && !formData.customMoc?.trim()) {
+        return 'Please specify the custom Material of Construction (MOC).';
+      }
     }
 
     if (Number(formData.itemPerPurchaseUnit) <= 0) {
@@ -384,7 +651,18 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     // Validate required category specifications
     for (const spec of categorySpecs) {
       if (spec.isRequiredCategorySpec) {
-        const val = specsData[spec._id]?.value;
+        let val = specsData[spec._id]?.value;
+        // If it's a Filter item, check if this spec maps to one of our filter fields
+        if (formData.productType === 'FILTER' && (val === undefined || val === null || val === '')) {
+          const code = (spec.specificationCode || '').toUpperCase().trim();
+          const name = (spec.specificationName || '').toUpperCase().trim();
+          if (code === 'SPEC-LENGTH-01' || name === 'LENGTH') val = formData.filterLength;
+          else if (code === 'SPEC-WIDTH-01' || name === 'WIDTH') val = formData.filterWidth;
+          else if (code === 'DEPTH' || name === 'DEPTH') val = formData.filterDepth;
+          else if (code === 'CFM' || name === 'CFM' || name.includes('AIRFLOW')) val = calculatedCfm;
+          else if (code === 'FILTER GRADE' || name.includes('FILTER GRADE') || name === 'GRADE') val = formData.filterGrade;
+        }
+
         if (val === undefined || val === null || val === '') {
           return `Specification '${spec.specificationName}' is required for this item category.`;
         }
@@ -407,22 +685,68 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     setSuccessMessage('');
 
     try {
+      const finalMoc = formData.moc === 'OTHER' ? (formData.customMoc?.trim() || 'Other') : (formData.moc || '');
+
+      const submitPayload = {
+        ...formData,
+        moc: finalMoc,
+        constructionType: formData.productType === 'FILTER' ? filterConstructionType : '',
+        flangeType: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' ? (formData.flangeType || null) : null,
+        filterLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
+        filterWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
+        filterDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+        faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
+        temperatureRating: formData.productType === 'FILTER' && formData.temperatureRating !== '' ? Number(formData.temperatureRating) : null,
+        bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
+      };
+      delete submitPayload.customMoc;
+
       let savedItem;
       if (isEditMode) {
-        const res = await updateItem(item._id, formData);
+        const res = await updateItem(item._id, submitPayload);
         if (res.success) {
           savedItem = res.item;
         }
       } else {
-        const res = await createItem(formData);
+        const res = await createItem(submitPayload);
         if (res.success) {
           savedItem = res.item;
         }
       }
 
+      // Build effective specs to save
+      // For Filter items, synchronize dimensions and grade into matching specs
+      const effectiveSpecs = { ...specsData };
+      if (formData.productType === 'FILTER') {
+        categorySpecs.forEach((spec) => {
+          const specId = spec._id;
+          const code = (spec.specificationCode || '').toUpperCase().trim();
+          const name = (spec.specificationName || '').toUpperCase().trim();
+
+          let autoVal = null;
+          if (code === 'SPEC-LENGTH-01' || name === 'LENGTH') autoVal = formData.filterLength;
+          else if (code === 'SPEC-WIDTH-01' || name === 'WIDTH') autoVal = formData.filterWidth;
+          else if (code === 'DEPTH' || name === 'DEPTH') autoVal = formData.filterDepth;
+          else if (code === 'CFM' || name === 'CFM' || name.includes('AIRFLOW')) autoVal = calculatedCfm;
+          else if (code === 'FILTER GRADE' || name.includes('FILTER GRADE') || name === 'GRADE') {
+            const fg = filterGrades.find(f => String(f._id) === String(formData.filterGrade));
+            autoVal = fg ? fg.filterGrade : '';
+          }
+
+          if (autoVal !== null && autoVal !== undefined && autoVal !== '') {
+            effectiveSpecs[specId] = {
+              ...(effectiveSpecs[specId] || {}),
+              value: String(autoVal),
+              isApply: effectiveSpecs[specId]?.isApply ?? true,
+              isFix: effectiveSpecs[specId]?.isFix ?? false,
+            };
+          }
+        });
+      }
+
       // Save specification values for the item
       if (savedItem && savedItem._id) {
-        for (const [specId, specVal] of Object.entries(specsData)) {
+        for (const [specId, specVal] of Object.entries(effectiveSpecs)) {
           if (specVal.value !== undefined && specVal.value !== null && specVal.value !== '') {
             try {
               if (specVal.isExisting) {
@@ -459,6 +783,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       setSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <Modal
@@ -513,7 +839,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               activeTab === 'specifications' ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            4. Specifications {categorySpecs.length > 0 && `(${categorySpecs.length})`}
+            {formData.productType === 'FILTER' ? '4. Filter Specifications' : `4. Specifications ${categorySpecs.length > 0 ? `(${categorySpecs.length})` : ''}`}
           </button>
         </div>
       </div>
@@ -534,7 +860,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         {/* TAB 1: BASIC INFO */}
         {activeTab === 'basic' && (
           <>
-            {/* Product Type + Item Code */}
+            {/* Product Type + Filter Construction Type (if FILTER) / Item Code */}
             <FormField label="Product Type" required helperText="Select master item product type.">
               <Select
                 name="productType"
@@ -549,15 +875,46 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               </Select>
             </FormField>
 
-            <FormField label="Item Code" required helperText="Enter code or leave 'AUTO' for auto-generated code.">
-              <Input
-                name="itemCode"
-                placeholder="AUTO"
-                value={formData.itemCode}
-                onChange={handleChange}
-                disabled={submitting || isEditMode}
-              />
-            </FormField>
+            {formData.productType === 'FILTER' ? (
+              <FormField
+                label="Filter Construction Type"
+                required
+                helperText="Select filter construction style (BOX or FLANGE)."
+              >
+                <Select
+                  name="filterConstructionType"
+                  value={filterConstructionType}
+                  onChange={handleConstructionChange}
+                  disabled={submitting}
+                >
+                  <option value="">-- Select Construction --</option>
+                  <option value="BOX">BOX</option>
+                  <option value="FLANGE">FLANGE</option>
+                </Select>
+              </FormField>
+            ) : (
+              <FormField label="Item Code" required helperText="Enter code or leave 'AUTO' for auto-generated code.">
+                <Input
+                  name="itemCode"
+                  placeholder="AUTO"
+                  value={formData.itemCode}
+                  onChange={handleChange}
+                  disabled={submitting || isEditMode}
+                />
+              </FormField>
+            )}
+
+            {formData.productType === 'FILTER' && (
+              <FormField label="Item Code" required helperText="Enter code or leave 'AUTO' for auto-generated code." fullWidth>
+                <Input
+                  name="itemCode"
+                  placeholder="AUTO"
+                  value={formData.itemCode}
+                  onChange={handleChange}
+                  disabled={submitting || isEditMode}
+                />
+              </FormField>
+            )}
 
             {/* Item Name — full width for prominence */}
             <FormField label="Item Name" required fullWidth helperText="Full descriptive name of the item.">
@@ -576,7 +933,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               label="Item Category"
               required
               helperText={
-                formData.itemGroup && availableCategories.length === 0
+                formData.productType === 'FILTER' && !filterConstructionType
+                  ? '⚠️ Please select Filter Construction Type above first.'
+                  : formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && availableCategories.length === 0
+                  ? '⚠️ No categories found for FLANGE construction in master data. Please create a FLANGE category in Item Categories or select BOX.'
+                  : formData.itemGroup && availableCategories.length === 0
                   ? '⚠️ No categories found under this group. Select another group or create a category first.'
                   : 'Select category — Item Group will be set automatically.'
               }
@@ -585,9 +946,15 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                 name="itemCategory"
                 value={formData.itemCategory}
                 onChange={handleChange}
-                disabled={submitting || loadingData}
+                disabled={submitting || loadingData || (formData.productType === 'FILTER' && (!filterConstructionType || availableCategories.length === 0))}
               >
-                <option value="">-- Select Item Category --</option>
+                <option value="">
+                  {formData.productType === 'FILTER' && !filterConstructionType
+                    ? '-- Select Construction Type First --'
+                    : formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && availableCategories.length === 0
+                    ? '-- No Categories Available for FLANGE --'
+                    : '-- Select Item Category --'}
+                </option>
                 {availableCategories.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.categoryCode} — {c.categoryName}
@@ -641,6 +1008,47 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               </div>
             )}
 
+            {/* HSN / SAC Code — accessible in Basic Info and preserved in Inventory Controls */}
+            <FormField label="HSN / SAC Code" helperText="Harmonized System Nomenclature code for taxation (preserved across tabs).">
+              <Input
+                name="hsnCode"
+                placeholder="e.g. 84213990"
+                value={formData.hsnCode}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+
+            {/* Material of Construction (MOC) — Catalog default */}
+            <FormField label="Material of Construction (MOC)" helperText="Select catalog-default material.">
+              <Select
+                name="moc"
+                value={formData.moc}
+                onChange={handleChange}
+                disabled={submitting}
+              >
+                <option value="">-- Select MOC --</option>
+                {STANDARD_MOC_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+                <option value="OTHER">Other / Custom</option>
+              </Select>
+            </FormField>
+
+            {formData.moc === 'OTHER' && (
+              <FormField label="Custom MOC Specification" required fullWidth helperText="Enter custom material of construction.">
+                <Input
+                  name="customMoc"
+                  placeholder="e.g. SS316 with PTFE lining"
+                  value={formData.customMoc}
+                  onChange={handleChange}
+                  disabled={submitting}
+                />
+              </FormField>
+            )}
+
             {/* Filter Grade Configuration: Enabled only when Product Type is FILTER */}
             {formData.productType === 'FILTER' && (() => {
               const selectedFg = filterGrades.find(fg => fg._id === formData.filterGrade);
@@ -648,6 +1056,10 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               const selectedVariantObj = selectedFg?.variants?.find(
                 v => getVariantKey(v) === formData.filterGradeVariant || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
               );
+              const matchingVariants = (selectedFg?.variants || []).filter((v) => {
+                if (!filterConstructionType) return true;
+                return getVariantConstruction(v) === filterConstructionType;
+              });
               
               return (
                 <div className="col-span-full border border-blue-200 bg-blue-50 p-4 rounded-md mt-2">
@@ -669,15 +1081,31 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                   
                   {selectedFg && (
                     <div className="mt-4">
-                      <FormField label="Filter Grade Variant" required helperText="Select the specific technical variant for this grade">
+                      <FormField
+                        label="Filter Grade Variant"
+                        required
+                        helperText={
+                          !filterConstructionType
+                            ? 'Please select Filter Construction Type above first.'
+                            : matchingVariants.length === 0
+                            ? `No ${filterConstructionType} variants available for ${selectedFg.filterGrade}.`
+                            : `Select the technical variant for this grade (${filterConstructionType} construction)`
+                        }
+                      >
                         <Select
                           name="filterGradeVariant"
                           value={formData.filterGradeVariant}
                           onChange={handleChange}
-                          disabled={submitting || loadingData}
+                          disabled={submitting || loadingData || !filterConstructionType || matchingVariants.length === 0}
                         >
-                          <option value="">-- Select Variant --</option>
-                          {(selectedFg.variants || []).map((v, i) => {
+                          <option value="">
+                            {!filterConstructionType
+                              ? '-- Select Construction Type Above First --'
+                              : matchingVariants.length === 0
+                              ? `-- No ${filterConstructionType} Variants Available --`
+                              : '-- Select Variant --'}
+                          </option>
+                          {matchingVariants.map((v, i) => {
                             const vKey = getVariantKey(v);
                             const typeDisplay = v.mountingType || v.filterType;
                             return (
@@ -931,115 +1359,448 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           </>
         )}
 
-        {/* TAB 4: SPECIFICATIONS */}
+        {/* TAB 4: SPECIFICATIONS / FILTER SPECIFICATIONS */}
         {activeTab === 'specifications' && (
           <div className="col-span-full">
-            {!formData.itemCategory ? (
-              <Alert type="info" message="Please select an Item Category in the 'Basic Info' tab to configure category specifications." />
-            ) : categorySpecs.length === 0 ? (
-              <div className="p-4 text-center text-slate-500 text-xs bg-slate-50 rounded-md border border-slate-200">
-                No specification parameters are configured for the selected Item Category.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div className="text-xs text-slate-600 mb-1">
-                  Category Specifications for selected category ({categorySpecs.length} parameters):
+            {formData.productType === 'FILTER' ? (
+              <div className="flex flex-col gap-5">
+                {/* Section A: Filter Dimensions and Airflow */}
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        A. Filter Dimensions & Airflow Rating
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Dimensions must be entered in millimeters (MM). CFM is calculated automatically at Face Velocity (FPM).
+                      </p>
+                    </div>
+                    <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded">
+                      Standard: MM & FPM
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                    <FormField label="Length (MM)" required helperText="Enter length in millimeters.">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="1"
+                        name="filterLength"
+                        placeholder="e.g. 610"
+                        value={formData.filterLength}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
+                    </FormField>
+
+                    <FormField label="Width (MM)" required helperText="Enter width in millimeters.">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="1"
+                        name="filterWidth"
+                        placeholder="e.g. 610"
+                        value={formData.filterWidth}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
+                    </FormField>
+
+                    <FormField label="Depth (MM)" helperText="Nominal depth in MM (excluded from CFM).">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="1"
+                        name="filterDepth"
+                        placeholder="e.g. 305"
+                        value={formData.filterDepth}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
+                    </FormField>
+
+                    <FormField label="Face Velocity (FPM)" required helperText="Airflow velocity across media face in FPM.">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="1"
+                        name="faceVelocity"
+                        placeholder="e.g. 500"
+                        value={formData.faceVelocity}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
+                    </FormField>
+
+                    {/* Calculated CFM Field (Read-Only) */}
+                    <div className="sm:col-span-2 md:col-span-2">
+                      <FormField
+                        label="Calculated Airflow (CFM)"
+                        helperText="Calculated via (L/304.8) × (W/304.8) × Face Velocity. Server validated."
+                      >
+                        <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-md px-3.5 py-2">
+                          <div className="flex-1 font-mono text-sm font-bold text-slate-800">
+                            {calculatedCfm !== null ? (
+                              <span className="text-blue-700">{calculatedCfm} CFM</span>
+                            ) : (
+                              <span className="text-slate-400 font-normal italic text-xs">
+                                Enter valid Length, Width & Face Velocity to calculate
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            Read-Only
+                          </span>
+                        </div>
+                      </FormField>
+                    </div>
+                  </div>
                 </div>
 
-                {categorySpecs.map((spec) => {
-                  const specId = spec._id;
-                  const currentData = specsData[specId] || { value: '', isApply: false, isFix: false };
+                {/* Section B: Construction & Thermal Ratings */}
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+                  <div className="mb-3 border-b border-slate-200 pb-2">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      B. Filter Construction & Thermal Specifications
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Flange profiles (when FLANGE), continuous operating temperature, and bonding adhesive.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {/* Flange Type: Conditionally visible ONLY when Construction Type in Item Detail is FLANGE */}
+                    {filterConstructionType === 'FLANGE' ? (
+                      <FormField
+                        label="Flange Type"
+                        helperText={
+                          flangeDesigns.length === 0
+                            ? 'No active FLANGE designs found in master data.'
+                            : 'Select certified active flange design profile.'
+                        }
+                      >
+                        <Select
+                          name="flangeType"
+                          value={formData.flangeType}
+                          onChange={handleChange}
+                          disabled={submitting || loadingData || flangeDesigns.length === 0}
+                        >
+                          <option value="">-- Select Flange Design --</option>
+                          {flangeDesigns.map((fd) => (
+                            <option key={fd._id} value={fd._id}>
+                              {fd.designCode} — {fd.designName} {fd.flangeSizeMm ? `(${fd.flangeSizeMm}mm)` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    ) : (
+                      <div className="flex items-center gap-2 p-3 bg-white rounded border border-slate-200 text-xs text-slate-600">
+                        <span className="font-semibold text-slate-700">Construction:</span>
+                        <span className="bg-slate-100 text-slate-800 font-mono px-2 py-0.5 rounded text-[11px] font-bold">
+                          {filterConstructionType || 'NOT SELECTED'}
+                        </span>
+                        <span className="text-slate-400 text-[11px]">(Flange options only apply to FLANGE construction)</span>
+                      </div>
+                    )}
+
+                    {/* Temperature Rating */}
+                    <FormField
+                      label="Rated Operating Temperature (°C)"
+                      helperText="Catalog-level maximum continuous operating temperature."
+                    >
+                      <Input
+                        type="number"
+                        step="any"
+                        name="temperatureRating"
+                        placeholder="e.g. 120"
+                        value={formData.temperatureRating}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
+                    </FormField>
+
+                    {/* Bonding Type */}
+                    <div className="col-span-full">
+                      <FormField
+                        label="Bonding Adhesive"
+                        helperText={
+                          formData.bonding
+                            ? `Recommended range: ${
+                                BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.minTemp
+                              }–${
+                                BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.maxTemp
+                              } °C`
+                            : 'Select bonding adhesive technology.'
+                        }
+                      >
+                        <Select
+                          name="bonding"
+                          value={formData.bonding}
+                          onChange={handleChange}
+                          disabled={submitting}
+                        >
+                          <option value="">-- Select Bonding Technology --</option>
+                          {BONDING_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    </div>
+
+                    {/* Non-blocking Temperature Range Warning */}
+                    {temperatureWarning && (
+                      <div className="col-span-full">
+                        <Alert type="warning" message={temperatureWarning} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section C: Additional Category Specifications (Excluding dimensions/grade) */}
+                {(() => {
+                  const isFilterCoreSpec = (spec) => {
+                    const code = (spec.specificationCode || '').toUpperCase().trim();
+                    const name = (spec.specificationName || '').toUpperCase().trim();
+                    return (
+                      code === 'SPEC-LENGTH-01' || name === 'LENGTH' ||
+                      code === 'SPEC-WIDTH-01' || name === 'WIDTH' ||
+                      code === 'DEPTH' || name === 'DEPTH' ||
+                      code === 'CFM' || name === 'CFM' || name.includes('AIRFLOW') ||
+                      code === 'FILTER GRADE' || name.includes('FILTER GRADE') || name === 'GRADE'
+                    );
+                  };
+
+                  const remainingSpecs = categorySpecs.filter((s) => !isFilterCoreSpec(s));
+
+                  if (remainingSpecs.length === 0) {
+                    return (
+                      <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-md text-xs text-blue-800 flex items-center gap-2">
+                        <span>ℹ️</span>
+                        <span>
+                          Category specifications for Length, Width, Depth, CFM, and Filter Grade are automatically synchronized from your inputs above.
+                        </span>
+                      </div>
+                    );
+                  }
 
                   return (
-                    <div
-                      key={specId}
-                      className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_70px_70px] gap-2.5 items-center bg-white p-2.5 rounded-md border border-slate-200"
-                    >
-                      <div>
-                        <strong className="text-xs font-semibold text-slate-900 inline-flex items-center gap-1">
-                          {spec.specificationName}
-                          {spec.isRequiredCategorySpec && <span className="text-red-600 font-bold">*</span>}
-                        </strong>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-mono">
-                          <span>{spec.specificationCode} ({spec.dataType})</span>
-                          {spec.unit && (
-                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10.5px] font-semibold">
-                              {spec.unit?.uomCode || spec.unit?.uomName || spec.unit}
-                            </span>
-                          )}
-                        </div>
+                    <div className="border border-slate-200 rounded-lg p-4 bg-white">
+                      <div className="mb-3 border-b border-slate-200 pb-2">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          C. Additional Category Specifications ({remainingSpecs.length})
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Configure any additional specifications defined for {formData.itemCategory ? 'this category' : 'the item'}.
+                        </p>
                       </div>
 
-                      {/* Specification Value Input based on dataType */}
-                      <div>
-                        {spec.dataType === 'select' && Array.isArray(spec.options) ? (
-                          <Select
-                            value={currentData.value || ''}
-                            onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
-                            disabled={submitting}
-                          >
-                            <option value="">-- Select Option --</option>
-                            {spec.options.map((opt, idx) => (
-                              <option key={idx} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </Select>
-                        ) : spec.dataType === 'number' ? (
-                          <Input
-                            type="number"
-                            placeholder="Enter number"
-                            value={currentData.value || ''}
-                            onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
-                            disabled={submitting}
-                          />
-                        ) : spec.dataType === 'boolean' ? (
-                          <Select
-                            value={String(currentData.value ?? '')}
-                            onChange={(e) => handleSpecChange(specId, 'value', e.target.value === 'true')}
-                            disabled={submitting}
-                          >
-                            <option value="">-- Select --</option>
-                            <option value="true">True / Yes</option>
-                            <option value="false">False / No</option>
-                          </Select>
-                        ) : (
-                          <Input
-                            placeholder="Enter text value"
-                            value={currentData.value || ''}
-                            onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
-                            disabled={submitting}
-                          />
-                        )}
+                      <div className="flex flex-col gap-3">
+                        {remainingSpecs.map((spec) => {
+                          const specId = spec._id;
+                          const currentData = specsData[specId] || { value: '', isApply: false, isFix: false };
+
+                          return (
+                            <div
+                              key={specId}
+                              className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_70px_70px] gap-2.5 items-center bg-slate-50 p-2.5 rounded-md border border-slate-200"
+                            >
+                              <div>
+                                <strong className="text-xs font-semibold text-slate-900 inline-flex items-center gap-1">
+                                  {spec.specificationName}
+                                  {spec.isRequiredCategorySpec && <span className="text-red-600 font-bold">*</span>}
+                                </strong>
+                                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-mono">
+                                  <span>{spec.specificationCode} ({spec.dataType})</span>
+                                  {spec.unit && (
+                                    <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10.5px] font-semibold">
+                                      {spec.unit?.uomCode || spec.unit?.uomName || spec.unit}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                {spec.dataType === 'select' && Array.isArray(spec.options) ? (
+                                  <Select
+                                    value={currentData.value || ''}
+                                    onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                    disabled={submitting}
+                                  >
+                                    <option value="">-- Select Option --</option>
+                                    {spec.options.map((opt, idx) => (
+                                      <option key={idx} value={opt}>
+                                        {opt}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                ) : spec.dataType === 'number' ? (
+                                  <Input
+                                    type="number"
+                                    placeholder="Enter number"
+                                    value={currentData.value || ''}
+                                    onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                    disabled={submitting}
+                                  />
+                                ) : spec.dataType === 'boolean' ? (
+                                  <Select
+                                    value={String(currentData.value ?? '')}
+                                    onChange={(e) => handleSpecChange(specId, 'value', e.target.value === 'true')}
+                                    disabled={submitting}
+                                  >
+                                    <option value="">-- Select --</option>
+                                    <option value="true">True / Yes</option>
+                                    <option value="false">False / No</option>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    placeholder="Enter text value"
+                                    value={currentData.value || ''}
+                                    onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                    disabled={submitting}
+                                  />
+                                )}
+                              </div>
+
+                              <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!currentData.isApply}
+                                  onChange={(e) => handleSpecChange(specId, 'isApply', e.target.checked)}
+                                  disabled={submitting}
+                                  className="accent-blue-600 cursor-pointer"
+                                />
+                                <span>Apply</span>
+                              </label>
+
+                              <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!currentData.isFix}
+                                  onChange={(e) => handleSpecChange(specId, 'isFix', e.target.checked)}
+                                  disabled={submitting}
+                                  className="accent-blue-600 cursor-pointer"
+                                />
+                                <span>Fix</span>
+                              </label>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      {/* isApply Checkbox */}
-                      <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!currentData.isApply}
-                          onChange={(e) => handleSpecChange(specId, 'isApply', e.target.checked)}
-                          disabled={submitting}
-                          className="accent-blue-600 cursor-pointer"
-                        />
-                        <span>Apply</span>
-                      </label>
-
-                      {/* isFix Checkbox */}
-                      <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!currentData.isFix}
-                          onChange={(e) => handleSpecChange(specId, 'isFix', e.target.checked)}
-                          disabled={submitting}
-                          className="accent-blue-600 cursor-pointer"
-                        />
-                        <span>Fix</span>
-                      </label>
                     </div>
                   );
-                })}
+                })()}
               </div>
+            ) : (
+              /* Non-Filter products: Preserve standard Category Specifications list */
+              <>
+                {!formData.itemCategory ? (
+                  <Alert type="info" message="Please select an Item Category in the 'Basic Info' tab to configure category specifications." />
+                ) : categorySpecs.length === 0 ? (
+                  <div className="p-4 text-center text-slate-500 text-xs bg-slate-50 rounded-md border border-slate-200">
+                    No specification parameters are configured for the selected Item Category.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="text-xs text-slate-600 mb-1">
+                      Category Specifications for selected category ({categorySpecs.length} parameters):
+                    </div>
+
+                    {categorySpecs.map((spec) => {
+                      const specId = spec._id;
+                      const currentData = specsData[specId] || { value: '', isApply: false, isFix: false };
+
+                      return (
+                        <div
+                          key={specId}
+                          className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_70px_70px] gap-2.5 items-center bg-white p-2.5 rounded-md border border-slate-200"
+                        >
+                          <div>
+                            <strong className="text-xs font-semibold text-slate-900 inline-flex items-center gap-1">
+                              {spec.specificationName}
+                              {spec.isRequiredCategorySpec && <span className="text-red-600 font-bold">*</span>}
+                            </strong>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-mono">
+                              <span>{spec.specificationCode} ({spec.dataType})</span>
+                              {spec.unit && (
+                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10.5px] font-semibold">
+                                  {spec.unit?.uomCode || spec.unit?.uomName || spec.unit}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            {spec.dataType === 'select' && Array.isArray(spec.options) ? (
+                              <Select
+                                value={currentData.value || ''}
+                                onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                disabled={submitting}
+                              >
+                                <option value="">-- Select Option --</option>
+                                {spec.options.map((opt, idx) => (
+                                  <option key={idx} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                              </Select>
+                            ) : spec.dataType === 'number' ? (
+                              <Input
+                                type="number"
+                                placeholder="Enter number"
+                                value={currentData.value || ''}
+                                onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                disabled={submitting}
+                              />
+                            ) : spec.dataType === 'boolean' ? (
+                              <Select
+                                value={String(currentData.value ?? '')}
+                                onChange={(e) => handleSpecChange(specId, 'value', e.target.value === 'true')}
+                                disabled={submitting}
+                              >
+                                <option value="">-- Select --</option>
+                                <option value="true">True / Yes</option>
+                                <option value="false">False / No</option>
+                              </Select>
+                            ) : (
+                              <Input
+                                placeholder="Enter text value"
+                                value={currentData.value || ''}
+                                onChange={(e) => handleSpecChange(specId, 'value', e.target.value)}
+                                disabled={submitting}
+                              />
+                            )}
+                          </div>
+
+                          <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!currentData.isApply}
+                              onChange={(e) => handleSpecChange(specId, 'isApply', e.target.checked)}
+                              disabled={submitting}
+                              className="accent-blue-600 cursor-pointer"
+                            />
+                            <span>Apply</span>
+                          </label>
+
+                          <label className="flex items-center gap-1 text-xs text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!currentData.isFix}
+                              onChange={(e) => handleSpecChange(specId, 'isFix', e.target.checked)}
+                              disabled={submitting}
+                              className="accent-blue-600 cursor-pointer"
+                            />
+                            <span>Fix</span>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
