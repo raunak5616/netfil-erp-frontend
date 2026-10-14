@@ -44,3 +44,8 @@ export const removeCategorySpecification = async (categoryId, specificationId) =
   const response = await api.delete(`/item-categories/${categoryId}/specifications/${specificationId}`);
   return response.data;
 };
+
+export const deleteItemCategory = async (categoryId) => {
+  const response = await api.delete(`/item-categories/${categoryId}`);
+  return response.data;
+};

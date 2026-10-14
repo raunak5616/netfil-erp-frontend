@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getItemCategories, updateItemCategoryStatus } from '../../services/itemCategoryService';
+import { getItemCategories, updateItemCategoryStatus, deleteItemCategory } from '../../services/itemCategoryService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -7,6 +7,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Input, Select } from '../../components/ui/FormField';
 import ItemCategoryFormModal from './ItemCategoryFormModal';
 import ItemCategoryDetailModal from './ItemCategoryDetailModal';
@@ -18,20 +19,37 @@ import {
   Edit, 
   RefreshCw,
   Power,
+  Trash2,
   Layers
 } from 'lucide-react';
 
 const ItemCategoryList = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
 
   const canCreate = hasPermission('ITEM_CATEGORY_CREATE');
   const canEdit = hasPermission('ITEM_CATEGORY_EDIT');
+
+  // Enforce Admin role requirement and honor user-level DENY override
+  const roles = user?.roles || (user?.role ? [user.role] : []);
+  const isAdmin = roles.some(
+    (r) => (typeof r === 'string' ? r : r.roleName)?.toLowerCase() === 'admin'
+  );
+  const hasDenyOverride = user?.permissions?.some(
+    (p) => p.permission?.permissionCode === 'ITEM_CATEGORY_DELETE' && p.effect === 'DENY'
+  );
+  const canDelete = isAdmin && !hasDenyOverride;
 
   const [itemCategories, setItemCategories] = useState([]);
   const [itemGroups, setItemGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+
+  // Delete confirmation modal states
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,6 +123,39 @@ const ItemCategoryList = () => {
       setError(err.response?.data?.message || 'Failed to update category status');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleDeleteClick = (category) => {
+    setError('');
+    setSuccessMessage('');
+    setCategoryToDelete(category);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!categoryToDelete) return;
+    setDeleteLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await deleteItemCategory(categoryToDelete._id);
+      if (res.success) {
+        setSuccessMessage(res.message || `Item category "${categoryToDelete.categoryName}" deleted successfully.`);
+        setIsDeleteDialogOpen(false);
+        setCategoryToDelete(null);
+        await fetchCategoryData();
+      } else {
+        setError(res.message || 'Failed to delete category');
+        setIsDeleteDialogOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to delete item category:", err);
+      const errMsg = err.response?.data?.message || err.message || 'Failed to delete category';
+      setError(errMsg);
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -208,7 +259,7 @@ const ItemCategoryList = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '180px',
+      width: canDelete ? '250px' : '180px',
       render: (_, row) => (
         <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
           <Button
@@ -250,6 +301,20 @@ const ItemCategoryList = () => {
               </Button>
             </>
           )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Trash2}
+              onClick={() => handleDeleteClick(row)}
+              title="Delete Category"
+              style={{
+                color: 'var(--danger-600)',
+              }}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       ),
     },
@@ -287,6 +352,7 @@ const ItemCategoryList = () => {
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
@@ -365,6 +431,28 @@ const ItemCategoryList = () => {
           setIsFormOpen(true);
         }}
         canEdit={canEdit}
+      />
+
+      {/* Delete Category Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          if (!deleteLoading) {
+            setIsDeleteDialogOpen(false);
+            setCategoryToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Item Category"
+        message={
+          categoryToDelete
+            ? `Are you sure you want to permanently delete category "${categoryToDelete.categoryName}" (${categoryToDelete.categoryCode})? This action cannot be undone.`
+            : 'Are you sure you want to delete this category?'
+        }
+        confirmLabel="Delete Category"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleteLoading}
       />
     </div>
   );
