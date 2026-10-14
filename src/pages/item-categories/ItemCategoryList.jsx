@@ -50,6 +50,7 @@ const ItemCategoryList = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deactivateCandidate, setDeactivateCandidate] = useState(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,21 +130,24 @@ const ItemCategoryList = () => {
   const handleDeleteClick = (category) => {
     setError('');
     setSuccessMessage('');
+    setDeactivateCandidate(null);
     setCategoryToDelete(category);
     setIsDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!categoryToDelete) return;
+    const target = categoryToDelete;
     setDeleteLoading(true);
     setError('');
     setSuccessMessage('');
     try {
-      const res = await deleteItemCategory(categoryToDelete._id);
+      const res = await deleteItemCategory(target._id);
       if (res.success) {
-        setSuccessMessage(res.message || `Item category "${categoryToDelete.categoryName}" deleted successfully.`);
+        setSuccessMessage(res.message || `Item category "${target.categoryName}" deleted successfully.`);
         setIsDeleteDialogOpen(false);
         setCategoryToDelete(null);
+        setDeactivateCandidate(null);
         await fetchCategoryData();
       } else {
         setError(res.message || 'Failed to delete category');
@@ -153,7 +157,9 @@ const ItemCategoryList = () => {
       console.error("Failed to delete item category:", err);
       const errMsg = err.response?.data?.message || err.message || 'Failed to delete category';
       setError(errMsg);
+      setDeactivateCandidate(target);
       setIsDeleteDialogOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setDeleteLoading(false);
     }
@@ -351,7 +357,37 @@ const ItemCategoryList = () => {
         }
       />
 
-      {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {error && (
+        <Alert
+          type="danger"
+          message={error}
+          onClose={() => {
+            setError('');
+            setDeactivateCandidate(null);
+          }}
+        >
+          {deactivateCandidate && deactivateCandidate.status === 'active' && canEdit && (
+            <div className="mt-2.5 pt-2 border-t border-red-200/80 flex items-center justify-between gap-3">
+              <span className="text-xs text-red-800 font-medium">
+                Recommendation: Deactivate this category to safely retire it without breaking existing quotes or inventory.
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={Power}
+                onClick={async () => {
+                  const cat = deactivateCandidate;
+                  setError('');
+                  setDeactivateCandidate(null);
+                  await handleStatusToggle(cat);
+                }}
+              >
+                Deactivate Instead
+              </Button>
+            </div>
+          )}
+        </Alert>
+      )}
       {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">

@@ -32,7 +32,8 @@ const Alert = ({
       <Icon size={18} className="shrink-0 mt-0.5" />
       <div className="flex-1">
         {title && <div className="font-semibold mb-0.5">{title}</div>}
-        <div>{message || children}</div>
+        {message && <div>{message}</div>}
+        {children}
       </div>
       {onClose && (
         <button
