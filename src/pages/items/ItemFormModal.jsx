@@ -5,7 +5,6 @@ import { getItemCategories, getCategorySpecifications } from '../../services/ite
 import { getFilterGrades } from '../../services/filterGradeService';
 import { getUOMs } from '../../services/uomService';
 import { getBins } from '../../services/binService';
-import { getFlangeDesigns } from '../../services/flangeDesignService';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -97,7 +96,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const [uoms, setUoms] = useState([]);
   const [bins, setBins] = useState([]);
   const [filterGrades, setFilterGrades] = useState([]);
-  const [flangeDesigns, setFlangeDesigns] = useState([]);
   const [categorySpecs, setCategorySpecs] = useState([]);
 
   const [loadingData, setLoadingData] = useState(false);
@@ -127,13 +125,12 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           );
         };
 
-        const [groupRes, catRes, uomRes, binRes, fgRes, flangeRes] = await Promise.all([
+        const [groupRes, catRes, uomRes, binRes, fgRes] = await Promise.all([
           getItemGroups({ typeFilter: 'MASTER' }),
           getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
-          getFilterGrades().catch(() => ({ success: true, filterGrades: [] })),
-          getFlangeDesigns({ constructionType: 'FLANGE', status: 'active' }).catch(() => ({ success: true, flangeDesigns: [] }))
+          getFilterGrades().catch(() => ({ success: true, filterGrades: [] }))
         ]);
 
         const groupsArray = groupRes.itemGroups || groupRes.groups;
@@ -152,9 +149,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         }
         if (fgRes.success && Array.isArray(fgRes.filterGrades)) {
           setFilterGrades(fgRes.filterGrades.filter((f) => f.status === 'active'));
-        }
-        if (flangeRes.success && Array.isArray(flangeRes.flangeDesigns)) {
-          setFlangeDesigns(flangeRes.flangeDesigns.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001'));
         }
       } catch (err) {
         console.error("Failed to load Item master option lists:", err);
@@ -413,7 +407,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     return true;
   });
 
-  // CFM = (Length in MM / 304.8) * (Width in MM / 304.8) * Face Velocity in FPM
+  // CFM = (Length in MM / 304.8) * (Width in MM / 304.8) * Face Velocity in FPM, rounded to nearest 10 CFM
   const calculatedCfm = useMemo(() => {
     const l = Number(formData.filterLength);
     const w = Number(formData.filterWidth);
@@ -421,8 +415,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(fv) || fv <= 0) {
       return null;
     }
-    const cfmValue = (l / 304.8) * (w / 304.8) * fv;
-    return Math.round(cfmValue);
+    const rawCfm = (l / 304.8) * (w / 304.8) * fv;
+    const rounded10 = Math.round(rawCfm / 10) * 10;
+    return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
   }, [formData.filterLength, formData.filterWidth, formData.faceVelocity]);
 
   // Non-blocking warning if temperature rating is outside the selected bonding range
@@ -1437,7 +1432,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                     <div className="sm:col-span-2 md:col-span-2">
                       <FormField
                         label="Calculated Airflow (CFM)"
-                        helperText="Calculated via (L/304.8) × (W/304.8) × Face Velocity. Server validated."
+                        helperText="Calculated via (L/304.8) × (W/304.8) × Face Velocity (rounded to nearest 10 CFM). Server validated."
                       >
                         <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-md px-3.5 py-2">
                           <div className="flex-1 font-mono text-sm font-bold text-slate-800">
@@ -1465,45 +1460,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                       B. Filter Construction & Thermal Specifications
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      Flange profiles (when FLANGE), continuous operating temperature, and bonding adhesive.
+                      Continuous operating temperature and bonding adhesive.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {/* Flange Type: Conditionally visible ONLY when Construction Type in Item Detail is FLANGE */}
-                    {filterConstructionType === 'FLANGE' ? (
-                      <FormField
-                        label="Flange Type"
-                        helperText={
-                          flangeDesigns.length === 0
-                            ? 'No active FLANGE designs found in master data.'
-                            : 'Select certified active flange design profile.'
-                        }
-                      >
-                        <Select
-                          name="flangeType"
-                          value={formData.flangeType}
-                          onChange={handleChange}
-                          disabled={submitting || loadingData || flangeDesigns.length === 0}
-                        >
-                          <option value="">-- Select Flange Design --</option>
-                          {flangeDesigns.map((fd) => (
-                            <option key={fd._id} value={fd._id}>
-                              {fd.designCode} — {fd.designName} {fd.flangeSizeMm ? `(${fd.flangeSizeMm}mm)` : ''}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormField>
-                    ) : (
-                      <div className="flex items-center gap-2 p-3 bg-white rounded border border-slate-200 text-xs text-slate-600">
-                        <span className="font-semibold text-slate-700">Construction:</span>
-                        <span className="bg-slate-100 text-slate-800 font-mono px-2 py-0.5 rounded text-[11px] font-bold">
-                          {filterConstructionType || 'NOT SELECTED'}
-                        </span>
-                        <span className="text-slate-400 text-[11px]">(Flange options only apply to FLANGE construction)</span>
-                      </div>
-                    )}
-
                     {/* Temperature Rating */}
                     <FormField
                       label="Rated Operating Temperature (°C)"
@@ -1521,34 +1482,32 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                     </FormField>
 
                     {/* Bonding Type */}
-                    <div className="col-span-full">
-                      <FormField
-                        label="Bonding Adhesive"
-                        helperText={
-                          formData.bonding
-                            ? `Recommended range: ${
-                                BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.minTemp
-                              }–${
-                                BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.maxTemp
-                              } °C`
-                            : 'Select bonding adhesive technology.'
-                        }
+                    <FormField
+                      label="Bonding Adhesive"
+                      helperText={
+                        formData.bonding
+                          ? `Recommended range: ${
+                              BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.minTemp
+                            }–${
+                              BONDING_OPTIONS.find((b) => b.value === formData.bonding)?.maxTemp
+                            } °C`
+                          : 'Select bonding adhesive technology.'
+                      }
+                    >
+                      <Select
+                        name="bonding"
+                        value={formData.bonding}
+                        onChange={handleChange}
+                        disabled={submitting}
                       >
-                        <Select
-                          name="bonding"
-                          value={formData.bonding}
-                          onChange={handleChange}
-                          disabled={submitting}
-                        >
-                          <option value="">-- Select Bonding Technology --</option>
-                          {BONDING_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormField>
-                    </div>
+                        <option value="">-- Select Bonding Technology --</option>
+                        {BONDING_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
 
                     {/* Non-blocking Temperature Range Warning */}
                     {temperatureWarning && (

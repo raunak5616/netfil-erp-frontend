@@ -352,9 +352,9 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
                           <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: 'var(--neutral-500)' }}>Unit: mm</span>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: constTypeStr === 'FLANGE' ? '1fr 1fr' : '1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
                           <div>
-                            <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>A. Filter Body Dimensions</span>
+                            <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>A. Filter Body (BOX) Dimensions</span>
                             <strong style={{ color: 'var(--neutral-900)' }}>
                               {reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—'} × {reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
                             </strong>
@@ -362,13 +362,21 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
 
                           {constTypeStr === 'FLANGE' && (
                             <div>
-                              <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block' }}>B. Overall Flange Dimensions</span>
+                              <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block' }}>B. Overall Flange Dimensions (+60 mm total flange)</span>
                               <strong style={{ color: 'var(--primary-800)' }}>
-                                {reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || '—'} × {reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || '—'} mm
+                                {reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || '—'} × {reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
                               </strong>
                             </div>
                           )}
                         </div>
+
+                        {/* CFM rating */}
+                        {reqItem.dimensions?.cfm ? (
+                          <div style={{ marginTop: '6px', padding: '6px 10px', backgroundColor: '#ecfdf5', borderRadius: '4px', border: '1px solid #a7f3d0', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#065f46', fontWeight: 600 }}>Design Airflow (Calculated from BOX Size):</span>
+                            <strong style={{ color: '#047857', fontFamily: 'monospace' }}>{reqItem.dimensions.cfm} CFM @ {reqItem.dimensions.faceVelocity || 500} FPM</strong>
+                          </div>
+                        ) : null}
 
                         {/* Flange Design & Reference Preview */}
                         {constTypeStr === 'FLANGE' && (

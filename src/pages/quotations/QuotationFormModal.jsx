@@ -16,7 +16,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
-import { Plus, Trash2, Calculator, Layers, Package } from 'lucide-react';
+import { Plus, Trash2, Calculator, Layers, Package, Maximize2 } from 'lucide-react';
 import QuotationRateSuggestion from './QuotationRateSuggestion';
 
 const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, initialRequirement = null }) => {
@@ -136,7 +136,51 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         }
       }
 
-      if (dims && (dims.length || dims.width || dims.outerDiameter)) {
+      const isFlange = constructionTypeVal === 'FLANGE';
+      const bw = Number(dims.bodyWidth || dims.width) || 0;
+      const bh = Number(dims.bodyHeight || dims.height) || 0;
+      const bd = Number(dims.depth || dims.length) || 0;
+      const ofw = isFlange ? (Number(dims.overallFlangeWidth || dims.flangeWidth) || (bw > 0 ? bw + 60 : undefined)) : undefined;
+      const ofh = isFlange ? (Number(dims.overallFlangeHeight || dims.flangeHeight) || (bh > 0 ? bh + 60 : undefined)) : undefined;
+      const fpm = Number(dims.faceVelocity || 500);
+
+      let computedCfm = dims.cfm;
+      if (bw > 0 && bh > 0 && fpm > 0) {
+        const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
+        const rounded10 = Math.round(rawCfm / 10) * 10;
+        computedCfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
+      }
+
+      const cleanDims = {
+        ...dims,
+        constructionType: constructionTypeVal,
+        bodyWidth: bw || undefined,
+        bodyHeight: bh || undefined,
+        depth: bd || undefined,
+        width: bw || dims.width,
+        height: bh || dims.height,
+        length: bd || dims.length,
+        overallFlangeWidth: ofw,
+        overallFlangeHeight: ofh,
+        overallFlangeDepth: isFlange ? bd : undefined,
+        flangeWidth: ofw,
+        flangeHeight: ofh,
+        flangeDepth: isFlange ? bd : undefined,
+        faceVelocity: fpm,
+        cfm: computedCfm,
+      };
+
+      if (isFlange && bw && bh && bd) {
+        const dimStr = `BOX: ${bw}×${bh}×${bd} mm | Flange: ${ofw}×${ofh}×${bd} mm`;
+        if (!remarksText.includes('BOX:')) {
+          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+        }
+      } else if (bw && bh && bd) {
+        const dimStr = `BOX: ${bw}×${bh}×${bd} mm`;
+        if (!remarksText.includes('BOX:')) {
+          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+        }
+      } else if (dims && (dims.length || dims.width || dims.outerDiameter)) {
         const dimStr = (dims.length || dims.width)
           ? `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`
           : `OD: ${dims.outerDiameter || '—'} ID: ${dims.innerDiameter || '—'} H: ${dims.height || '—'} ${dims.unit || 'mm'}`;
@@ -156,8 +200,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         constructionType: constructionTypeVal,
         flangeDesign: flangeDesignId,
         flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq.flangeDesignSnapshot || null,
-        dimensions: dims,
+        dimensions: cleanDims,
         specifications: specs,
+        faceVelocity: fpm,
         remarks: remarksText,
       };
     });
@@ -373,8 +418,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
   const calculateLineCFM = (line) => {
     const dims = line.dimensions || {};
-    let w = Number(dims.width || dims.length) || 0;
-    let h = Number(dims.height) || 0;
+    let w = Number(dims.bodyWidth || dims.width || dims.length) || 0;
+    let h = Number(dims.bodyHeight || dims.height) || 0;
     const unit = dims.unit || 'mm';
 
     if (!w || !h) {
@@ -400,7 +445,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       wFt = w / 12;
     }
 
-    return Math.round(hFt * wFt * fpm);
+    const rawCfm = hFt * wFt * fpm;
+    const rounded10 = Math.round(rawCfm / 10) * 10;
+    return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
   };
 
   const handleFaceVelocityChange = (index, value) => {
@@ -890,6 +937,43 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                         className="w-full text-xs"
                       />
                     </div>
+
+                    {/* Engineering Dimensions Snapshot */}
+                    {line.dimensions && (line.dimensions.bodyWidth || line.dimensions.width) && (
+                      <div className="col-span-12 bg-blue-50/70 p-2.5 rounded-lg border border-blue-200/90 flex flex-wrap items-center gap-3 text-xs">
+                        <div className="flex items-center space-x-1.5 font-semibold text-blue-900">
+                          <Maximize2 size={13} className="text-blue-600 shrink-0" />
+                          <span>Dimensions:</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-slate-600 font-medium">BOX Size:</span>
+                          <span className="font-mono font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                            {line.dimensions.bodyWidth || line.dimensions.width} × {line.dimensions.bodyHeight || line.dimensions.height} × {line.dimensions.depth || line.dimensions.length || 0} mm
+                          </span>
+                        </div>
+                        {line.constructionType === 'FLANGE' && (
+                          <>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-blue-700 font-medium">Overall Flange:</span>
+                              <span className="font-mono font-bold text-blue-950 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                                {line.dimensions.overallFlangeWidth || line.dimensions.flangeWidth || ((Number(line.dimensions.bodyWidth || line.dimensions.width) || 0) + 60)} × {line.dimensions.overallFlangeHeight || line.dimensions.flangeHeight || ((Number(line.dimensions.bodyHeight || line.dimensions.height) || 0) + 60)} × {line.dimensions.depth || line.dimensions.length || 0} mm
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-blue-600 font-medium bg-blue-100/80 px-1.5 py-0.5 rounded">
+                              +60 mm Flange Applied
+                            </span>
+                          </>
+                        )}
+                        {(line.flangeDesignSnapshot?.designCode || line.flangeDesign?.designCode) && (
+                          <div className="flex items-center space-x-1 ml-auto text-[11px] text-slate-600">
+                            <span>Flange Design:</span>
+                            <span className="font-semibold text-slate-800">
+                              {line.flangeDesignSnapshot?.designCode || line.flangeDesign?.designCode}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Airflow / CFM Calculator Bar */}
                     <div className="col-span-12 bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/80 grid grid-cols-12 gap-3 items-center mt-1">

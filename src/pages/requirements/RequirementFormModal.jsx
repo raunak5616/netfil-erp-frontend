@@ -38,6 +38,7 @@ const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
     depth: '',
     overallFlangeWidth: '',
     overallFlangeHeight: '',
+    faceVelocity: 500,
     unit: 'mm',
     moc: '',
     temperature: '',
@@ -149,7 +150,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           setEmployees(eRes.employees.filter((e) => e.status === 'active'));
         }
         if (fRes.success && Array.isArray(fRes.flangeDesigns)) {
-          setFlangeDesigns(fRes.flangeDesigns.filter((f) => f.status === 'active'));
+          setFlangeDesigns(fRes.flangeDesigns.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001'));
         }
       } catch (err) {
         console.error('Failed to load master references:', err);
@@ -166,7 +167,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   useEffect(() => {
     if (!isOpen) return;
 
-    const defaultFlangeId = flangeDesigns.length > 0 ? (flangeDesigns.find(f => f.constructionType === 'FLANGE')?._id || '') : '';
+    const defaultFlangeId = flangeDesigns.length > 0 ? (flangeDesigns.find(f => f.constructionType === 'FLANGE' && f.status === 'active' && f.designCode !== 'BOX-001')?._id || '') : '';
 
     if (requirement) {
       const formattedReqDate = requirement.requirementDate
@@ -193,18 +194,39 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             ? reqItem.dimensions
             : {};
 
+          const bw = rawDims.bodyWidth || rawDims.width || '';
+          const bh = rawDims.bodyHeight || rawDims.height || '';
+          const d = rawDims.depth || rawDims.length || '';
+          const constType = reqItem.constructionType || rawDims.constructionType || 'FLANGE';
+
+          let fw = '';
+          let fh = '';
+          if (constType === 'FLANGE') {
+            fw = rawDims.overallFlangeWidth || rawDims.flangeWidth || (bw ? Number(bw) + 60 : '');
+            fh = rawDims.overallFlangeHeight || rawDims.flangeHeight || (bh ? Number(bh) + 60 : '');
+          }
+
+          const fpm = Number(rawDims.faceVelocity || 500);
+          let cfm = rawDims.cfm || rawDims.capacity || '';
+          if (!cfm && bw && bh && fpm) {
+            const rawCfm = (Number(bw) / 304.8) * (Number(bh) / 304.8) * fpm;
+            const rounded10 = Math.round(rawCfm / 10) * 10;
+            cfm = rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
+          }
+
           const dims = {
-            bodyWidth: rawDims.bodyWidth || rawDims.width || '',
-            bodyHeight: rawDims.bodyHeight || rawDims.height || '',
-            depth: rawDims.depth || rawDims.length || '',
-            overallFlangeWidth: rawDims.overallFlangeWidth || rawDims.flangeWidth || '',
-            overallFlangeHeight: rawDims.overallFlangeHeight || rawDims.flangeHeight || '',
+            bodyWidth: bw,
+            bodyHeight: bh,
+            depth: d,
+            overallFlangeWidth: fw,
+            overallFlangeHeight: fh,
+            faceVelocity: fpm,
+            cfm: cfm,
             unit: rawDims.unit || 'mm',
             moc: rawDims.moc || '',
             temperature: rawDims.temperature || '',
           };
 
-          const constType = reqItem.constructionType || rawDims.constructionType || 'FLANGE';
           const flangeId = reqItem.flangeDesign?._id || reqItem.flangeDesign || reqItem.flangeDesignSnapshot?.flangeDesignId || '';
 
           const itemObj = typeof reqItem.item === 'object' ? reqItem.item : null;
@@ -217,7 +239,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             quantity: reqItem.quantity !== null && reqItem.quantity !== undefined ? reqItem.quantity : '',
             uom: reqItem.uom?._id || reqItem.uom || '',
             constructionType: constType,
-            flangeDesign: flangeId || defaultFlangeId,
+            flangeDesign: constType === 'FLANGE' ? (flangeId || defaultFlangeId) : '',
             dimensions: dims,
             specifications: specs,
             remarks: reqItem.remarks || '',
@@ -239,18 +261,39 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           ? requirement.dimensions
           : {};
 
+        const bw = rawDims.bodyWidth || rawDims.width || '';
+        const bh = rawDims.bodyHeight || rawDims.height || '';
+        const d = rawDims.depth || rawDims.length || '';
+        const constType = requirement.constructionType || rawDims.constructionType || 'FLANGE';
+
+        let fw = '';
+        let fh = '';
+        if (constType === 'FLANGE') {
+          fw = rawDims.overallFlangeWidth || rawDims.flangeWidth || (bw ? Number(bw) + 60 : '');
+          fh = rawDims.overallFlangeHeight || rawDims.flangeHeight || (bh ? Number(bh) + 60 : '');
+        }
+
+        const fpm = Number(rawDims.faceVelocity || 500);
+        let cfm = rawDims.cfm || rawDims.capacity || '';
+        if (!cfm && bw && bh && fpm) {
+          const rawCfm = (Number(bw) / 304.8) * (Number(bh) / 304.8) * fpm;
+          const rounded10 = Math.round(rawCfm / 10) * 10;
+          cfm = rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
+        }
+
         const dims = {
-          bodyWidth: rawDims.bodyWidth || rawDims.width || '',
-          bodyHeight: rawDims.bodyHeight || rawDims.height || '',
-          depth: rawDims.depth || rawDims.length || '',
-          overallFlangeWidth: rawDims.overallFlangeWidth || rawDims.flangeWidth || '',
-          overallFlangeHeight: rawDims.overallFlangeHeight || rawDims.flangeHeight || '',
+          bodyWidth: bw,
+          bodyHeight: bh,
+          depth: d,
+          overallFlangeWidth: fw,
+          overallFlangeHeight: fh,
+          faceVelocity: fpm,
+          cfm: cfm,
           unit: rawDims.unit || 'mm',
           moc: rawDims.moc || '',
           temperature: rawDims.temperature || '',
         };
 
-        const constType = requirement.constructionType || rawDims.constructionType || 'FLANGE';
         const flangeId = requirement.flangeDesign?._id || requirement.flangeDesign || requirement.flangeDesignSnapshot?.flangeDesignId || '';
         const itemObj = typeof requirement.item === 'object' ? requirement.item : null;
         const searchStr = itemObj ? `${itemObj.itemCode ? itemObj.itemCode + ' - ' : ''}${itemObj.itemName}` : '';
@@ -262,7 +305,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           quantity: requirement.quantity !== null && requirement.quantity !== undefined ? requirement.quantity : '',
           uom: requirement.uom?._id || requirement.uom || '',
           constructionType: constType,
-          flangeDesign: flangeId || defaultFlangeId,
+          flangeDesign: constType === 'FLANGE' ? (flangeId || defaultFlangeId) : '',
           dimensions: dims,
           specifications: specs,
           remarks: '',
@@ -379,7 +422,33 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const handleItemFieldChange = (index, field, value) => {
     setFormData((prev) => {
       const updated = [...prev.items];
-      updated[index] = { ...updated[index], [field]: value };
+      const curItem = updated[index];
+      let newFlangeDesign = curItem.flangeDesign;
+      let newDims = { ...curItem.dimensions };
+
+      if (field === 'constructionType') {
+        const ct = (value || '').toUpperCase();
+        if (ct === 'BOX') {
+          newFlangeDesign = '';
+          newDims.overallFlangeWidth = '';
+          newDims.overallFlangeHeight = '';
+        } else if (ct === 'FLANGE') {
+          if (!newFlangeDesign) {
+            newFlangeDesign = defaultFlangeId;
+          }
+          const bw = Number(newDims.bodyWidth);
+          const bh = Number(newDims.bodyHeight);
+          newDims.overallFlangeWidth = (!Number.isNaN(bw) && bw > 0) ? bw + 60 : '';
+          newDims.overallFlangeHeight = (!Number.isNaN(bh) && bh > 0) ? bh + 60 : '';
+        }
+      }
+
+      updated[index] = {
+        ...curItem,
+        [field]: value,
+        flangeDesign: newFlangeDesign,
+        dimensions: newDims,
+      };
       return { ...prev, items: updated };
     });
   };
@@ -387,12 +456,44 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const handleItemDimensionChange = (index, dimField, value) => {
     setFormData((prev) => {
       const updated = [...prev.items];
+      const curItem = updated[index];
+      const nextDims = {
+        ...curItem.dimensions,
+        [dimField]: value,
+      };
+
+      const bw = Number(dimField === 'bodyWidth' ? value : nextDims.bodyWidth);
+      const bh = Number(dimField === 'bodyHeight' ? value : nextDims.bodyHeight);
+
+      if (curItem.constructionType === 'FLANGE') {
+        if (!Number.isNaN(bw) && bw > 0) {
+          nextDims.overallFlangeWidth = bw + 60;
+        } else {
+          nextDims.overallFlangeWidth = '';
+        }
+        if (!Number.isNaN(bh) && bh > 0) {
+          nextDims.overallFlangeHeight = bh + 60;
+        } else {
+          nextDims.overallFlangeHeight = '';
+        }
+      } else {
+        nextDims.overallFlangeWidth = '';
+        nextDims.overallFlangeHeight = '';
+      }
+
+      // Calculate CFM from effective BOX dimensions
+      const fpm = Number(dimField === 'faceVelocity' ? value : (nextDims.faceVelocity || 500));
+      if (!Number.isNaN(bw) && !Number.isNaN(bh) && bw > 0 && bh > 0 && fpm > 0) {
+        const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
+        const rounded10 = Math.round(rawCfm / 10) * 10;
+        nextDims.cfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
+      } else {
+        nextDims.cfm = null;
+      }
+
       updated[index] = {
-        ...updated[index],
-        dimensions: {
-          ...updated[index].dimensions,
-          [dimField]: value,
-        },
+        ...curItem,
+        dimensions: nextDims,
       };
       return { ...prev, items: updated };
     });
@@ -517,8 +618,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           if (!itemObj.flangeDesign) {
             return `${numLabel}: Flange Design selection is required when constructionType is FLANGE.`;
           }
-          const fw = Number(itemObj.dimensions.overallFlangeWidth);
-          const fh = Number(itemObj.dimensions.overallFlangeHeight);
+          const fw = Number(itemObj.dimensions.overallFlangeWidth) || (bw > 0 ? bw + 60 : 0);
+          const fh = Number(itemObj.dimensions.overallFlangeHeight) || (bh > 0 ? bh + 60 : 0);
 
           if (!fw || fw <= 0) return `${numLabel}: Flange Width must be a positive number.`;
           if (!fh || fh <= 0) return `${numLabel}: Flange Height must be a positive number.`;
@@ -545,34 +646,56 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    const formattedItems = formData.type === 'product' ? formData.items.map((itemObj) => ({
-      itemCategory: itemObj.itemCategory || null,
-      item: itemObj.item || null,
-      saveToCatalog: !itemObj.item && Boolean(itemObj.saveToCatalog),
-      newItemName: !itemObj.item && itemObj.saveToCatalog ? (itemObj.newItemName || itemObj.itemSearch || '').trim() : '',
-      quantity: itemObj.quantity ? Number(itemObj.quantity) : null,
-      uom: itemObj.uom || null,
-      constructionType: itemObj.constructionType || 'FLANGE',
-      flangeDesign: itemObj.constructionType === 'FLANGE' ? itemObj.flangeDesign : null,
-      dimensions: {
-        constructionType: itemObj.constructionType,
-        bodyWidth: Number(itemObj.dimensions.bodyWidth),
-        bodyHeight: Number(itemObj.dimensions.bodyHeight),
-        depth: Number(itemObj.dimensions.depth),
-        overallFlangeWidth: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeWidth) : undefined,
-        overallFlangeHeight: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeHeight) : undefined,
-        width: Number(itemObj.dimensions.bodyWidth),
-        height: Number(itemObj.dimensions.bodyHeight),
-        length: Number(itemObj.dimensions.depth),
-        flangeWidth: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeWidth) : undefined,
-        flangeHeight: itemObj.constructionType === 'FLANGE' ? Number(itemObj.dimensions.overallFlangeHeight) : undefined,
-        unit: itemObj.dimensions.unit || 'mm',
-        moc: itemObj.dimensions.moc || '',
-        temperature: itemObj.dimensions.temperature || '',
-      },
-      specifications: (itemObj.specifications || []).filter((s) => s.key?.trim() || s.value?.trim()),
-      remarks: itemObj.remarks || '',
-    })) : [];
+    const formattedItems = formData.type === 'product' ? formData.items.map((itemObj) => {
+      const isFlange = itemObj.constructionType === 'FLANGE';
+      const bw = Number(itemObj.dimensions.bodyWidth) || 0;
+      const bh = Number(itemObj.dimensions.bodyHeight) || 0;
+      const bd = Number(itemObj.dimensions.depth) || 0;
+      const ofw = isFlange ? (Number(itemObj.dimensions.overallFlangeWidth) || (bw > 0 ? bw + 60 : undefined)) : undefined;
+      const ofh = isFlange ? (Number(itemObj.dimensions.overallFlangeHeight) || (bh > 0 ? bh + 60 : undefined)) : undefined;
+      const fpm = Number(itemObj.dimensions.faceVelocity || 500);
+
+      // Recalculate CFM strictly from effective BOX dimensions
+      let computedCfm = itemObj.dimensions.cfm;
+      if (bw > 0 && bh > 0 && fpm > 0) {
+        const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
+        const rounded10 = Math.round(rawCfm / 10) * 10;
+        computedCfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
+      }
+
+      return {
+        itemCategory: itemObj.itemCategory || null,
+        item: itemObj.item || null,
+        saveToCatalog: !itemObj.item && Boolean(itemObj.saveToCatalog),
+        newItemName: !itemObj.item && itemObj.saveToCatalog ? (itemObj.newItemName || itemObj.itemSearch || '').trim() : '',
+        quantity: itemObj.quantity ? Number(itemObj.quantity) : null,
+        uom: itemObj.uom || null,
+        constructionType: itemObj.constructionType || 'FLANGE',
+        flangeDesign: isFlange ? itemObj.flangeDesign : null,
+        dimensions: {
+          constructionType: itemObj.constructionType,
+          bodyWidth: bw,
+          bodyHeight: bh,
+          depth: bd,
+          overallFlangeWidth: ofw,
+          overallFlangeHeight: ofh,
+          overallFlangeDepth: isFlange ? bd : undefined,
+          width: bw,
+          height: bh,
+          length: bd,
+          flangeWidth: ofw,
+          flangeHeight: ofh,
+          flangeDepth: isFlange ? bd : undefined,
+          faceVelocity: fpm,
+          cfm: computedCfm !== undefined && computedCfm !== null ? Number(computedCfm) : undefined,
+          unit: itemObj.dimensions.unit || 'mm',
+          moc: itemObj.dimensions.moc || '',
+          temperature: itemObj.dimensions.temperature || '',
+        },
+        specifications: (itemObj.specifications || []).filter((s) => s.key?.trim() || s.value?.trim()),
+        remarks: itemObj.remarks || '',
+      };
+    }) : [];
 
     const firstItem = formattedItems[0] || {};
 
@@ -1198,7 +1321,12 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                               <button
                                 type="button"
-                                onClick={() => handleItemFieldChange(itemIndex, 'constructionType', 'FLANGE')}
+                                onClick={() => {
+                                  handleItemFieldChange(itemIndex, 'constructionType', 'FLANGE');
+                                  if (!itemObj.flangeDesign) {
+                                    handleItemFieldChange(itemIndex, 'flangeDesign', defaultFlangeId);
+                                  }
+                                }}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1252,7 +1380,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                               </button>
                             </div>
 
-                            {/* FLANGE DESIGN VISUAL CARDS SELECTOR (RESTORED) */}
+                            {/* FLANGE DESIGN VISUAL CARDS SELECTOR */}
                             {itemObj.constructionType === 'FLANGE' && (
                               <div style={{ marginTop: '6px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-700)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1260,7 +1388,12 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Choose flange geometry & slot pattern</span>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                                {flangeDesigns.filter((f) => f.constructionType === 'FLANGE' && f.status === 'active' && f.designCode !== 'BOX-001').length === 0 ? (
+                                  <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', color: '#b91c1c' }}>
+                                    ⚠️ No active FLANGE designs found in master data.
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                                   {flangeDesigns
                                     .filter((f) => f.constructionType === 'FLANGE')
                                     .map((design) => {
@@ -1314,9 +1447,10 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                       );
                                     })}
                                 </div>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                           {/* ENGINEERING DIMENSION SPECIFICATION SECTION (RESTORED) */}
                           <div style={{ gridColumn: 'span 2', marginTop: '6px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid var(--neutral-300)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -1331,12 +1465,19 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               {/* Section A: Filter Body Dimensions */}
-                              <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
-                                  A. Filter Body Dimensions
+                              <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
+                                    A. Filter Body (BOX) Dimensions & Airflow
+                                  </div>
+                                  {itemObj.dimensions.cfm ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#047857', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                      Airflow: {itemObj.dimensions.cfm} CFM (from BOX Size)
+                                    </span>
+                                  ) : null}
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                  <FormField label="Body Width (mm)" required>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                                  <FormField label="BOX Width (mm)" required>
                                     <Input
                                       type="number"
                                       placeholder="e.g. 610"
@@ -1346,7 +1487,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                     />
                                   </FormField>
 
-                                  <FormField label="Body Height (mm)" required>
+                                  <FormField label="BOX Height (mm)" required>
                                     <Input
                                       type="number"
                                       placeholder="e.g. 610"
@@ -1365,33 +1506,58 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                       disabled={submitting}
                                     />
                                   </FormField>
+
+                                  <FormField label="Face Velocity (FPM)" helperText="Default: 500 FPM">
+                                    <Input
+                                      type="number"
+                                      placeholder="500"
+                                      value={itemObj.dimensions.faceVelocity || 500}
+                                      onChange={(e) => handleItemDimensionChange(itemIndex, 'faceVelocity', e.target.value)}
+                                      disabled={submitting}
+                                    />
+                                  </FormField>
                                 </div>
                               </div>
 
                               {/* Section B: Overall Flange Dimensions */}
                               {itemObj.constructionType === 'FLANGE' && (
-                                <div style={{ backgroundColor: '#eff6ff', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#1e40af', marginBottom: '8px' }}>
-                                    B. Overall Flange Dimensions
+                                <div style={{ backgroundColor: '#eff6ff', padding: '12px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#1e40af' }}>
+                                      B. Overall Flange Dimensions (Auto-Calculated)
+                                    </div>
+                                    <span style={{ fontSize: '10.5px', color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                                      Standard 60 mm Flange Applied (+30 mm/side)
+                                    </span>
                                   </div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                    <FormField label="Flange Width (mm)" required>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                    <FormField label="Overall Flange Width (mm)" helperText="Auto: BOX Width + 60 mm">
                                       <Input
                                         type="number"
-                                        placeholder="e.g. 650"
+                                        placeholder="e.g. 670"
                                         value={itemObj.dimensions.overallFlangeWidth}
                                         onChange={(e) => handleItemDimensionChange(itemIndex, 'overallFlangeWidth', e.target.value)}
                                         disabled={submitting}
                                       />
                                     </FormField>
 
-                                    <FormField label="Flange Height (mm)" required>
+                                    <FormField label="Overall Flange Height (mm)" helperText="Auto: BOX Height + 60 mm">
                                       <Input
                                         type="number"
-                                        placeholder="e.g. 650"
+                                        placeholder="e.g. 670"
                                         value={itemObj.dimensions.overallFlangeHeight}
                                         onChange={(e) => handleItemDimensionChange(itemIndex, 'overallFlangeHeight', e.target.value)}
                                         disabled={submitting}
+                                      />
+                                    </FormField>
+
+                                    <FormField label="Overall Flange Depth (mm)" helperText="Same as BOX Depth">
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                        value={itemObj.dimensions.depth || ''}
+                                        disabled={true}
                                       />
                                     </FormField>
                                   </div>

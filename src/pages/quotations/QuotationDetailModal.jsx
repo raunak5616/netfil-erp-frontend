@@ -51,23 +51,59 @@ const getItemTechnicalSpecs = (it) => {
 
   const specs = [];
 
-  // 1. Dimensions / Size
-  const width = dims.width || dims.length || itemDoc?.grade_items?.width;
-  const height = dims.height || itemDoc?.grade_items?.height;
-  const depth = dims.depth || dims.outerDiameter || itemDoc?.grade_items?.length;
+  // Construction type & dimensional extraction
+  const constType = String(it.constructionType || dims.constructionType || '').toUpperCase();
+  const isFlange = constType === 'FLANGE';
+  const isBox = constType === 'BOX';
+
+  const boxW = dims.bodyWidth || dims.width || dims.length || itemDoc?.grade_items?.width;
+  const boxH = dims.bodyHeight || dims.height || itemDoc?.grade_items?.height;
+  const boxD = dims.depth || dims.outerDiameter || itemDoc?.grade_items?.length;
   const unit = dims.unit || 'mm';
 
-  if (width && height && depth) {
-    specs.push({ label: 'Size', value: `${width} × ${height} × ${depth} ${unit}` });
-  } else if (width && height) {
-    specs.push({ label: 'Size', value: `${width} × ${height} ${unit}` });
+  // 1. Dimensions / Size Display
+  if (isFlange) {
+    if (boxW && boxH && boxD) {
+      specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} × ${boxD} ${unit}` });
+    } else if (boxW && boxH) {
+      specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} ${unit}` });
+    }
+
+    const ofW = dims.overallFlangeWidth || dims.flangeWidth || (boxW ? Number(boxW) + 60 : null);
+    const ofH = dims.overallFlangeHeight || dims.flangeHeight || (boxH ? Number(boxH) + 60 : null);
+    const ofD = dims.overallFlangeDepth || dims.flangeDepth || boxD;
+
+    if (ofW && ofH && ofD) {
+      specs.push({ label: 'Overall Flange Size', value: `${ofW} × ${ofH} × ${ofD} ${unit}` });
+    } else if (ofW && ofH) {
+      specs.push({ label: 'Overall Flange Size', value: `${ofW} × ${ofH} ${unit}` });
+    }
+
+    const flangeCode = it.flangeDesignSnapshot?.designCode || it.flangeDesign?.designCode || dims.flangeDesignCode;
+    const flangeName = it.flangeDesignSnapshot?.designName || it.flangeDesign?.designName;
+    if (flangeCode || flangeName) {
+      specs.push({ label: 'Flange Design', value: flangeCode ? `${flangeCode}${flangeName ? ` (${flangeName})` : ''}` : flangeName });
+    }
+  } else if (isBox) {
+    if (boxW && boxH && boxD) {
+      specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} × ${boxD} ${unit}` });
+    } else if (boxW && boxH) {
+      specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} ${unit}` });
+    }
+  } else {
+    // General / legacy sizing fallback
+    if (boxW && boxH && boxD) {
+      specs.push({ label: 'Size', value: `${boxW} × ${boxH} × ${boxD} ${unit}` });
+    } else if (boxW && boxH) {
+      specs.push({ label: 'Size', value: `${boxW} × ${boxH} ${unit}` });
+    }
   }
 
-  // 2. Airflow CFM
-  let cfmVal = findSpecValue(['capacity', 'cfm', 'cmf', 'airFlow']);
+  // 2. Airflow CFM - strictly calculated from BOX dimensions
+  let cfmVal = dims.cfm || findSpecValue(['capacity', 'cfm', 'cmf', 'airFlow']);
   if (!cfmVal) {
-    let wVal = Number(width) || 0;
-    let hVal = Number(height) || 0;
+    let wVal = Number(boxW) || 0;
+    let hVal = Number(boxH) || 0;
     const uVal = String(unit).toLowerCase();
     if (!wVal || !hVal) {
       const textStr = `${it.description || ''} ${remarksStr}`;
@@ -88,7 +124,9 @@ const getItemTechnicalSpecs = (it) => {
         hFt = hVal / 12;
         wFt = wVal / 12;
       }
-      const calcCfm = Math.round(hFt * wFt * fpm);
+      const rawCfm = hFt * wFt * fpm;
+      const rounded10 = Math.round(rawCfm / 10) * 10;
+      const calcCfm = rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
       if (calcCfm > 0) cfmVal = `${calcCfm} CFM`;
     }
   }
