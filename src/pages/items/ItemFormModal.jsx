@@ -408,6 +408,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   });
 
   // CFM = (Length in MM / 304.8) * (Width in MM / 304.8) * Face Velocity in FPM, rounded to nearest 10 CFM
+  // Depth is strictly excluded from formula.
   const calculatedCfm = useMemo(() => {
     const l = Number(formData.filterLength);
     const w = Number(formData.filterWidth);
@@ -419,6 +420,39 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     const rounded10 = Math.round(rawCfm / 10) * 10;
     return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
   }, [formData.filterLength, formData.filterWidth, formData.faceVelocity]);
+
+  // Derived overall dimensions:
+  // For FLANGE: Length = BOX Length + 60 mm, Width = BOX Width + 60 mm, Depth = BOX Depth (+30 mm/side)
+  // For BOX: Overall dimensions equal BOX dimensions, no flange projection added.
+  const overallDims = useMemo(() => {
+    const l = Number(formData.filterLength);
+    const w = Number(formData.filterWidth);
+    const d = Number(formData.filterDepth);
+    const isFlange = filterConstructionType === 'FLANGE';
+    const isBox = filterConstructionType === 'BOX';
+
+    if (isFlange) {
+      return {
+        isFlange: true,
+        length: Number.isFinite(l) && l > 0 ? l + 60 : null,
+        width: Number.isFinite(w) && w > 0 ? w + 60 : null,
+        depth: Number.isFinite(d) && d > 0 ? d : (Number.isFinite(d) && d === 0 ? 0 : null),
+        ruleText: 'Standard Flange: +30 mm per side (+60 mm total per applicable dimension). Depth remains unchanged.'
+      };
+    }
+
+    if (isBox) {
+      return {
+        isBox: true,
+        length: Number.isFinite(l) && l > 0 ? l : null,
+        width: Number.isFinite(w) && w > 0 ? w : null,
+        depth: Number.isFinite(d) && d > 0 ? d : (Number.isFinite(d) && d === 0 ? 0 : null),
+        ruleText: 'BOX Construction: Overall dimensions equal BOX dimensions. No flange projection is added.'
+      };
+    }
+
+    return null;
+  }, [filterConstructionType, formData.filterLength, formData.filterWidth, formData.filterDepth]);
 
   // Non-blocking warning if temperature rating is outside the selected bonding range
   const temperatureWarning = useMemo(() => {
@@ -690,6 +724,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         filterLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
         filterWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
         filterDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+        overallFlangeLength: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterLength !== '' ? Number(formData.filterLength) + 60 : null,
+        overallFlangeWidth: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterWidth !== '' ? Number(formData.filterWidth) + 60 : null,
+        overallFlangeDepth: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
         faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
         temperatureRating: formData.productType === 'FILTER' && formData.temperatureRating !== '' ? Number(formData.temperatureRating) : null,
         bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
@@ -1376,7 +1413,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-                    <FormField label="Length (MM)" required helperText="Enter length in millimeters.">
+                    <FormField label="BOX Length (MM)" required helperText="Authoritative body length in millimeters.">
                       <Input
                         type="number"
                         step="any"
@@ -1389,7 +1426,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                       />
                     </FormField>
 
-                    <FormField label="Width (MM)" required helperText="Enter width in millimeters.">
+                    <FormField label="BOX Width (MM)" required helperText="Authoritative body width in millimeters.">
                       <Input
                         type="number"
                         step="any"
@@ -1402,7 +1439,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                       />
                     </FormField>
 
-                    <FormField label="Depth (MM)" helperText="Nominal depth in MM (excluded from CFM).">
+                    <FormField label="BOX Depth (MM)" helperText="Nominal depth in MM (excluded from CFM).">
                       <Input
                         type="number"
                         step="any"
@@ -1432,7 +1469,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                     <div className="sm:col-span-2 md:col-span-2">
                       <FormField
                         label="Calculated Airflow (CFM)"
-                        helperText="Calculated via (L/304.8) × (W/304.8) × Face Velocity (rounded to nearest 10 CFM). Server validated."
+                        helperText="Strictly calculated from BOX Length & Width: (L/304.8) × (W/304.8) × FPM. Depth excluded."
                       >
                         <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-md px-3.5 py-2">
                           <div className="flex-1 font-mono text-sm font-bold text-slate-800">
@@ -1440,7 +1477,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                               <span className="text-blue-700">{calculatedCfm} CFM</span>
                             ) : (
                               <span className="text-slate-400 font-normal italic text-xs">
-                                Enter valid Length, Width & Face Velocity to calculate
+                                Enter valid BOX Length, Width & Face Velocity to calculate
                               </span>
                             )}
                           </div>
@@ -1451,6 +1488,85 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                       </FormField>
                     </div>
                   </div>
+
+                  {/* Overall Dimensions Card based on Construction Type */}
+                  {filterConstructionType === 'FLANGE' && (
+                    <div className="mt-4 border border-blue-200 bg-blue-50/70 p-3.5 rounded-md">
+                      <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-blue-200">
+                        <div className="text-xs font-bold text-blue-900 uppercase">
+                          Overall Flange Dimensions (Auto-Calculated)
+                        </div>
+                        <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded">
+                          +60 mm Flange Applied (+30 mm/side)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="bg-white p-2.5 rounded border border-blue-100">
+                          <span className="text-[10px] uppercase font-bold text-blue-600 block">Overall Flange Length</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {overallDims?.length ? `${overallDims.length} mm` : '—'}
+                          </div>
+                          <span className="text-[10px] text-slate-400">BOX {formData.filterLength || 0} + 60 mm</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-blue-100">
+                          <span className="text-[10px] uppercase font-bold text-blue-600 block">Overall Flange Width</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {overallDims?.width ? `${overallDims.width} mm` : '—'}
+                          </div>
+                          <span className="text-[10px] text-slate-400">BOX {formData.filterWidth || 0} + 60 mm</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-blue-100">
+                          <span className="text-[10px] uppercase font-bold text-blue-600 block">Overall Depth</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {overallDims?.depth !== null && overallDims?.depth !== undefined ? `${overallDims.depth} mm` : (formData.filterDepth ? `${formData.filterDepth} mm` : '—')}
+                          </div>
+                          <span className="text-[10px] text-slate-400">Unchanged (Same as BOX Depth)</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-blue-700 mt-2 font-medium">
+                        * Confirmed rule: The flange projects 30 mm on each opposite side (+60 mm total per dimension). Airflow CFM is strictly calculated from original BOX dimensions ({formData.filterLength || 0} × {formData.filterWidth || 0} mm), never overall flange dimensions.
+                      </p>
+                    </div>
+                  )}
+
+                  {filterConstructionType === 'BOX' && (
+                    <div className="mt-4 border border-slate-200 bg-slate-100/60 p-3.5 rounded-md">
+                      <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-200">
+                        <div className="text-xs font-bold text-slate-800 uppercase">
+                          Overall Dimensions (BOX Construction)
+                        </div>
+                        <span className="text-[10px] font-semibold bg-slate-200 text-slate-700 border border-slate-300 px-2 py-0.5 rounded">
+                          Equal to BOX Dimensions (No Flange)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="bg-white p-2.5 rounded border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Length</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {formData.filterLength ? `${formData.filterLength} mm` : '—'}
+                          </div>
+                          <span className="text-[10px] text-slate-400">Equal to BOX Length</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Width</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {formData.filterWidth ? `${formData.filterWidth} mm` : '—'}
+                          </div>
+                          <span className="text-[10px] text-slate-400">Equal to BOX Width</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Depth</span>
+                          <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">
+                            {formData.filterDepth ? `${formData.filterDepth} mm` : '—'}
+                          </div>
+                          <span className="text-[10px] text-slate-400">Equal to BOX Depth</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-2 font-medium">
+                        * BOX Construction: Overall dimensions equal BOX dimensions. No flange projection is added.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Section B: Construction & Thermal Ratings */}

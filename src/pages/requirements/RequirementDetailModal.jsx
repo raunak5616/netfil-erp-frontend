@@ -352,7 +352,7 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
                           <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: 'var(--neutral-500)' }}>Unit: mm</span>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: constTypeStr === 'FLANGE' ? '1fr 1fr' : '1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
                           <div>
                             <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>A. Filter Body (BOX) Dimensions</span>
                             <strong style={{ color: 'var(--neutral-900)' }}>
@@ -360,12 +360,20 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
                             </strong>
                           </div>
 
-                          {constTypeStr === 'FLANGE' && (
+                          {constTypeStr === 'FLANGE' ? (
                             <div>
                               <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block' }}>B. Overall Flange Dimensions (+60 mm total flange)</span>
                               <strong style={{ color: 'var(--primary-800)' }}>
                                 {reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || '—'} × {reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
                               </strong>
+                            </div>
+                          ) : (
+                            <div>
+                              <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>B. Overall Dimensions (Equal to BOX)</span>
+                              <strong style={{ color: 'var(--neutral-900)' }}>
+                                {reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—'} × {reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
+                              </strong>
+                              <span style={{ fontSize: '10px', color: 'var(--neutral-400)', display: 'block' }}>No flange projection added</span>
                             </div>
                           )}
                         </div>

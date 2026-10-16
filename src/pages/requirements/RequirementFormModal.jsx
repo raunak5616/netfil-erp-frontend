@@ -505,11 +505,63 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
     setFormData((prev) => {
       const updated = [...prev.items];
+      const curItem = updated[index];
+
+      let nextConstruction = curItem.constructionType;
+      let nextFlangeDesign = curItem.flangeDesign;
+      let nextDims = { ...curItem.dimensions };
+
+      const itemConst = selectedItemObj.constructionType ? String(selectedItemObj.constructionType).toUpperCase() : '';
+      if (itemConst === 'BOX' || itemConst === 'FLANGE') {
+        nextConstruction = itemConst;
+      }
+
+      const itemBoxL = selectedItemObj.filterLength !== null && selectedItemObj.filterLength !== undefined ? Number(selectedItemObj.filterLength) : null;
+      const itemBoxW = selectedItemObj.filterWidth !== null && selectedItemObj.filterWidth !== undefined ? Number(selectedItemObj.filterWidth) : null;
+      const itemBoxD = selectedItemObj.filterDepth !== null && selectedItemObj.filterDepth !== undefined ? Number(selectedItemObj.filterDepth) : null;
+
+      if (itemBoxW || itemBoxL || itemBoxD !== null) {
+        if (itemBoxW) nextDims.bodyWidth = itemBoxW;
+        if (itemBoxL) nextDims.bodyHeight = itemBoxL;
+        if (itemBoxD !== null && itemBoxD !== undefined) nextDims.depth = itemBoxD;
+      }
+
+      if (selectedItemObj.faceVelocity) {
+        nextDims.faceVelocity = Number(selectedItemObj.faceVelocity);
+      }
+
+      if (nextConstruction === 'FLANGE') {
+        const itemFlangeId = selectedItemObj.flangeType?._id || selectedItemObj.flangeType;
+        if (itemFlangeId) nextFlangeDesign = String(itemFlangeId);
+
+        const bw = Number(nextDims.bodyWidth);
+        const bh = Number(nextDims.bodyHeight);
+        nextDims.overallFlangeWidth = (!Number.isNaN(bw) && bw > 0) ? bw + 60 : '';
+        nextDims.overallFlangeHeight = (!Number.isNaN(bh) && bh > 0) ? bh + 60 : '';
+      } else {
+        nextFlangeDesign = '';
+        nextDims.overallFlangeWidth = '';
+        nextDims.overallFlangeHeight = '';
+      }
+
+      // Recalculate CFM strictly from BOX dimensions
+      const bw = Number(nextDims.bodyWidth);
+      const bh = Number(nextDims.bodyHeight);
+      const fpm = Number(nextDims.faceVelocity || 500);
+      if (bw > 0 && bh > 0 && fpm > 0) {
+        const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
+        const rounded10 = Math.round(rawCfm / 10) * 10;
+        nextDims.cfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
+      }
+
       updated[index] = {
-        ...updated[index],
+        ...curItem,
         item: selectedItemObj._id,
-        itemCategory: itemCatId || updated[index].itemCategory,
-        uom: itemUomId || updated[index].uom,
+        itemCategory: itemCatId || curItem.itemCategory,
+        uom: itemUomId || curItem.uom,
+        constructionType: nextConstruction,
+        flangeDesign: nextFlangeDesign,
+        dimensions: nextDims,
         itemSearch: `${selectedItemObj.itemCode ? selectedItemObj.itemCode + ' - ' : ''}${selectedItemObj.itemName}`,
         isItemDropdownOpen: false,
         saveToCatalog: false,
@@ -1552,6 +1604,50 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                     </FormField>
 
                                     <FormField label="Overall Flange Depth (mm)" helperText="Same as BOX Depth">
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                        value={itemObj.dimensions.depth || ''}
+                                        disabled={true}
+                                      />
+                                    </FormField>
+                                  </div>
+                                </div>
+                              )}
+
+                              {itemObj.constructionType === 'BOX' && (
+                                <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
+                                      B. Overall Dimensions (BOX Construction)
+                                    </div>
+                                    <span style={{ fontSize: '10.5px', color: '#475569', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                      Equal to BOX Dimensions (No Flange)
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                    <FormField label="Overall Length / Height (mm)" helperText="Equal to BOX Height">
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                        value={itemObj.dimensions.bodyHeight || ''}
+                                        disabled={true}
+                                      />
+                                    </FormField>
+
+                                    <FormField label="Overall Width (mm)" helperText="Equal to BOX Width">
+                                      <Input
+                                        type="number"
+                                        readOnly
+                                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                                        value={itemObj.dimensions.bodyWidth || ''}
+                                        disabled={true}
+                                      />
+                                    </FormField>
+
+                                    <FormField label="Overall Depth (mm)" helperText="Equal to BOX Depth">
                                       <Input
                                         type="number"
                                         readOnly

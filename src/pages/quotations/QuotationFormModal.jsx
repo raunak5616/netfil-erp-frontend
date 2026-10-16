@@ -418,7 +418,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
   const calculateLineCFM = (line) => {
     const dims = line.dimensions || {};
-    let w = Number(dims.bodyWidth || dims.width || dims.length) || 0;
+    let w = Number(dims.bodyWidth || dims.width) || 0;
     let h = Number(dims.bodyHeight || dims.height) || 0;
     const unit = dims.unit || 'mm';
 
@@ -951,7 +951,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                             {line.dimensions.bodyWidth || line.dimensions.width} × {line.dimensions.bodyHeight || line.dimensions.height} × {line.dimensions.depth || line.dimensions.length || 0} mm
                           </span>
                         </div>
-                        {line.constructionType === 'FLANGE' && (
+                        {line.constructionType === 'FLANGE' ? (
                           <>
                             <div className="flex items-center space-x-1">
                               <span className="text-blue-700 font-medium">Overall Flange:</span>
@@ -963,6 +963,16 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                               +60 mm Flange Applied
                             </span>
                           </>
+                        ) : (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-slate-600 font-medium">Overall Size:</span>
+                            <span className="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              {line.dimensions.bodyWidth || line.dimensions.width} × {line.dimensions.bodyHeight || line.dimensions.height} × {line.dimensions.depth || line.dimensions.length || 0} mm
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-normal">
+                              (Equal to BOX, no flange)
+                            </span>
+                          </div>
                         )}
                         {(line.flangeDesignSnapshot?.designCode || line.flangeDesign?.designCode) && (
                           <div className="flex items-center space-x-1 ml-auto text-[11px] text-slate-600">

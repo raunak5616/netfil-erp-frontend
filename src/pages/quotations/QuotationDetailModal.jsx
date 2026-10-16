@@ -87,8 +87,10 @@ const getItemTechnicalSpecs = (it) => {
   } else if (isBox) {
     if (boxW && boxH && boxD) {
       specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} × ${boxD} ${unit}` });
+      specs.push({ label: 'Overall Size', value: `${boxW} × ${boxH} × ${boxD} ${unit} (Equal to BOX)` });
     } else if (boxW && boxH) {
       specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} ${unit}` });
+      specs.push({ label: 'Overall Size', value: `${boxW} × ${boxH} ${unit} (Equal to BOX)` });
     }
   } else {
     // General / legacy sizing fallback
