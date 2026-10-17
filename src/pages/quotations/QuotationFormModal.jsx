@@ -408,7 +408,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
   const sanitizeNumberInput = (val) => {
     if (val === null || val === undefined) return '';
-    const str = String(val);
+    let str = String(val).trim();
+    if (str.includes(',')) {
+      str = str.replace(/,/g, '');
+    }
     if (str.length > 1 && str.startsWith('0') && !str.startsWith('0.')) {
       const cleaned = str.replace(/^0+/, '');
       return cleaned === '' ? '0' : cleaned;

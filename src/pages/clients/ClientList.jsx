@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Power,
   Phone,
-  Mail
+  Mail,
+  MapPin
 } from 'lucide-react';
 
 const ClientList = () => {
@@ -107,6 +108,7 @@ const ClientList = () => {
       const email = (client.email || '').toLowerCase();
       const city = (client.city || '').toLowerCase();
       const state = (client.state || '').toLowerCase();
+      const country = (client.country || '').toLowerCase();
 
       return (
         code.toLowerCase().includes(term) ||
@@ -115,7 +117,8 @@ const ClientList = () => {
         mobile.includes(term) ||
         email.includes(term) ||
         city.includes(term) ||
-        state.includes(term)
+        state.includes(term) ||
+        country.includes(term)
       );
     });
   }, [clients, searchTerm, statusFilter, typeFilter]);
@@ -165,9 +168,10 @@ const ClientList = () => {
             <Mail size={12} color="var(--primary-600)" />
             {row.email || '—'}
           </span>
-          {(row.city || row.state) && (
-            <span style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }}>
-              {[row.city, row.state].filter(Boolean).join(', ')}
+          {(row.city || row.state || (row.country && row.country !== 'India')) && (
+            <span style={{ fontSize: '11.5px', color: 'var(--neutral-500)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <MapPin size={11} color="var(--neutral-400)" />
+              {[row.city, row.state, row.country && row.country !== 'India' ? row.country : null].filter(Boolean).join(', ')}
             </span>
           )}
         </div>

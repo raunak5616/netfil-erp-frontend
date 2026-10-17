@@ -18,7 +18,16 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
     });
   };
 
-  const fullLocation = [client.address, client.city, client.state, client.pincode]
+  const isIndia = (client.country || 'India').trim().toLowerCase() === 'india';
+
+  const fullLocation = [
+    client.address,
+    client.addressLine2,
+    client.city,
+    client.state,
+    client.pincode,
+    client.country || 'India',
+  ]
     .filter(Boolean)
     .join(', ');
 
@@ -122,8 +131,13 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit }) => {
 
         {/* Location / Address Box */}
         <div>
-          <div style={{ fontSize: '12px', color: 'var(--neutral-500)', fontWeight: 600, marginBottom: '4px' }}>
-            Registered Address
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--neutral-500)', fontWeight: 600 }}>
+              Registered Address
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: isIndia ? 'var(--neutral-600)' : '#1d4ed8', backgroundColor: isIndia ? 'var(--neutral-100)' : '#dbeafe', padding: '1px 8px', borderRadius: '10px' }}>
+              {client.country || 'India'}
+            </span>
           </div>
           <div
             style={{

@@ -19,9 +19,101 @@ import {
   Printer,
 } from 'lucide-react';
 
+const findFilterGradeVariant = (filterGrade, itemDoc = {}, it = {}) => {
+  if (!filterGrade || !Array.isArray(filterGrade.variants) || filterGrade.variants.length === 0) {
+    return null;
+  }
+  const variants = filterGrade.variants;
+  if (variants.length === 1) return variants[0];
+
+  const variantKey = (itemDoc.filterGradeVariant || it.filterGradeVariant || '').trim();
+  const construction = (it.constructionType || it.dimensions?.constructionType || itemDoc.constructionType || '').trim().toUpperCase();
+
+  if (variantKey) {
+    const found = variants.find((v) => {
+      const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||').toLowerCase();
+      const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||').toLowerCase();
+      const vk = variantKey.toLowerCase();
+      return vk === k1 || vk === k2;
+    });
+    if (found) return found;
+
+    if (variantKey.includes('||')) {
+      const parts = variantKey.split('||').map((p) => p.trim().toLowerCase()).filter(Boolean);
+      const foundPartial = variants.find((v) => {
+        const vParts = [v.filterClass, v.mountingType, v.filterType, v.temperature, v.media].map((x) => (x || '').toLowerCase());
+        return parts.every((part) => vParts.some((vp) => vp.includes(part) || part.includes(vp)));
+      });
+      if (foundPartial) return foundPartial;
+    }
+
+    const foundByName = variants.find((v) => {
+      const fc = (v.filterClass || '').toLowerCase();
+      const ft = (v.filterType || '').toLowerCase();
+      const mt = (v.mountingType || '').toLowerCase();
+      const vk = variantKey.toLowerCase();
+      return fc === vk || ft === vk || mt === vk || vk.includes(fc) || vk.includes(ft);
+    });
+    if (foundByName) return foundByName;
+  }
+
+  if (construction) {
+    const constMatches = variants.filter((v) => {
+      const m = (v.mountingType || v.filterType || '').toUpperCase();
+      return m.includes(construction);
+    });
+    if (constMatches.length > 0) return constMatches[0];
+  }
+
+  return variants[0];
+};
+
+const formatPressureDropValue = (rawInit, rawFinal, rawGeneral) => {
+  const cleanPd = (val) => {
+    if (val === undefined || val === null) return null;
+    const str = String(val).trim();
+    if (!str || str === '—' || str === '-' || str.toLowerCase() === 'undefined' || str.toLowerCase() === 'null' || str.toLowerCase() === 'nan') {
+      return null;
+    }
+    const numMatch = str.match(/^0+(?:\.0+)?(?:\s*(?:mm\s*w[cg]|pa))?$/i);
+    if (numMatch) return null;
+    return str;
+  };
+
+  const initStr = cleanPd(rawInit);
+  const finalStr = cleanPd(rawFinal);
+  const genStr = cleanPd(rawGeneral);
+
+  if (!initStr && !finalStr && !genStr) return null;
+
+  const formatSingle = (val) => {
+    if (/mm\s*w[cg]/i.test(val)) return val.replace(/mm\s*w[cg]/gi, 'mm WC');
+    if (/(?:pa|kpa|bar|mbar|in\s*w[cg])/i.test(val)) return val;
+    return `${val} mm WC`;
+  };
+
+  if (initStr && finalStr) {
+    return `Init ${formatSingle(initStr)} / Final ${formatSingle(finalStr)}`;
+  } else if (initStr) {
+    if (/initial/i.test(initStr) || /final/i.test(initStr)) return initStr;
+    return `Init ${formatSingle(initStr)}`;
+  } else if (finalStr) {
+    if (/final/i.test(finalStr)) return finalStr;
+    return `Final ${formatSingle(finalStr)}`;
+  } else if (genStr) {
+    if (/initial/i.test(genStr) || /final/i.test(genStr)) return genStr;
+    return formatSingle(genStr);
+  }
+  return null;
+};
+
 const getItemTechnicalSpecs = (it) => {
   const itemDoc = (typeof it.item === 'object' ? it.item : {}) || {};
-  const filterGrade = typeof itemDoc.filterGrade === 'object' ? itemDoc.filterGrade : null;
+  const filterGrade = (typeof itemDoc.filterGrade === 'object' && itemDoc.filterGrade !== null)
+    ? itemDoc.filterGrade
+    : (typeof it.filterGrade === 'object' && it.filterGrade !== null ? it.filterGrade : null);
+
+  const matchedVariant = findFilterGradeVariant(filterGrade, itemDoc, it);
   const dims = it.dimensions || {};
   const specsArr = Array.isArray(it.specifications) ? it.specifications : [];
   const remarksStr = it.remarks || '';
@@ -34,7 +126,7 @@ const getItemTechnicalSpecs = (it) => {
     }
     for (const k of keys) {
       const match = specsArr.find((s) => {
-        const name = (s.name || s.specificationCode || '').toLowerCase();
+        const name = (s.name || s.specificationCode || s.key || '').toLowerCase();
         return name.includes(k.toLowerCase());
       });
       if (match && match.value !== undefined && match.value !== null && String(match.value).trim() !== '') {
@@ -138,42 +230,68 @@ const getItemTechnicalSpecs = (it) => {
   }
 
   // 3. MOC
-  const moc = findSpecValue(['moc', 'material', 'frameMaterial', 'casing']);
+  const moc = findSpecValue(['moc', 'material', 'frameMaterial', 'casing']) || itemDoc.moc;
   if (moc) {
     specs.push({ label: 'MOC', value: moc });
   }
 
   // 4. Temperature (°C)
-  const temp = findSpecValue(['temperature', 'temp', 'maxTemp', 'operatingTemp']);
+  const temp = findSpecValue(['temperature', 'temp', 'maxTemp', 'operatingTemp'])
+    || itemDoc.temperatureRating
+    || itemDoc.grade_items?.filterTemp
+    || matchedVariant?.temperature;
   if (temp) {
-    const cleanTemp = temp.replace(/(?:degree|celcious|celsius|°c)/gi, '').trim();
-    specs.push({ label: 'Temp', value: `${cleanTemp} °C` });
+    const cleanTemp = String(temp).replace(/(?:degree|celcious|celsius|°c)/gi, '').trim();
+    if (cleanTemp && cleanTemp !== '0' && cleanTemp.toLowerCase() !== 'null' && cleanTemp.toLowerCase() !== 'undefined') {
+      specs.push({ label: 'Temp', value: `${cleanTemp} °C` });
+    }
   }
 
-  // 5. Filter Media
-  const media = findSpecValue(['media', 'filterMedia', 'mediaType']);
-  if (media) {
-    specs.push({ label: 'Media', value: media });
+  // 5. Efficiency
+  let efficiency = findSpecValue(['efficiency', 'eff', 'rating', 'filtration efficiency', 'spec_efficiency']);
+  if (!efficiency && matchedVariant && matchedVariant.efficiency) {
+    const effVal = String(matchedVariant.efficiency).trim();
+    if (effVal && effVal !== '-' && effVal !== '—' && effVal.toLowerCase() !== 'undefined' && effVal.toLowerCase() !== 'null') {
+      efficiency = effVal;
+    }
   }
-
-  // 6. Efficiency
-  const efficiency = findSpecValue(['efficiency', 'eff', 'rating']);
-  if (efficiency) {
-    specs.push({ label: 'Efficiency', value: efficiency });
-  } else if (filterGrade) {
+  if (!efficiency && filterGrade) {
     const effStr = [filterGrade.eurovent ? `EU ${filterGrade.eurovent}` : '', filterGrade.iso ? `ISO ${filterGrade.iso}` : ''].filter(Boolean).join(' / ');
-    if (effStr) specs.push({ label: 'Efficiency', value: effStr });
+    if (effStr) efficiency = effStr;
+  }
+  if (efficiency) {
+    const cleanEff = String(efficiency).trim();
+    if (cleanEff && cleanEff !== '0' && cleanEff !== '—' && cleanEff.toLowerCase() !== 'undefined' && cleanEff.toLowerCase() !== 'null') {
+      specs.push({ label: 'Efficiency', value: cleanEff });
+    }
   }
 
-  // 7. Pressure Drop
-  const initPD = findSpecValue(['initialPressureDrop', 'initial pressure', 'initial pd', 'init pd']);
-  const finalPD = findSpecValue(['finalPressureDrop', 'final pressure', 'final pd']);
-  if (initPD || finalPD) {
-    let pdStr = '';
-    if (initPD && finalPD) pdStr = `Init ${initPD} / Final ${finalPD} mm WC`;
-    else if (initPD) pdStr = `Init ${initPD} mm WC`;
-    else if (finalPD) pdStr = `Final ${finalPD} mm WC`;
+  // 6. Pressure Drop
+  let initPD = findSpecValue(['initialPressureDrop', 'initial_pressure_drop', 'initial pressure', 'initial pd', 'init pd', 'init_pd']);
+  let finalPD = findSpecValue(['finalPressureDrop', 'final_pressure_drop', 'final pressure', 'final pd', 'final_pd']);
+  let generalPD = findSpecValue(['pressureDrop', 'pressure_drop', 'pressure drop', 'pd']);
+
+  if (!initPD && !finalPD && !generalPD && matchedVariant) {
+    initPD = matchedVariant.initialPressureDrop;
+    finalPD = matchedVariant.finalPressureDrop;
+  }
+
+  const pdStr = formatPressureDropValue(initPD, finalPD, generalPD);
+  if (pdStr) {
     specs.push({ label: 'Pressure Drop', value: pdStr });
+  }
+
+  // 7. Filter Media
+  const media = findSpecValue(['media', 'filterMedia', 'mediaType'])
+    || itemDoc.grade_items?.media
+    || itemDoc.filterMedia
+    || itemDoc.media
+    || matchedVariant?.media;
+  if (media) {
+    const cleanMedia = String(media).trim();
+    if (cleanMedia && cleanMedia !== '—' && cleanMedia.toLowerCase() !== 'null' && cleanMedia.toLowerCase() !== 'undefined') {
+      specs.push({ label: 'Media', value: cleanMedia });
+    }
   }
 
   return specs;

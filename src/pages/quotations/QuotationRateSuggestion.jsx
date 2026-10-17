@@ -47,8 +47,20 @@ const QuotationRateSuggestion = ({ customerId, itemId, onSelectRate }) => {
 
   if (!customerId || !itemId) return null;
 
-  const handleUseRate = (rate, index) => {
-    onSelectRate(rate);
+  const handleUseRate = (rateOrItem, index) => {
+    let rateToApply = rateOrItem;
+    // If an object was passed instead of primitive rate
+    if (typeof rateOrItem === 'object' && rateOrItem !== null) {
+      rateToApply = rateOrItem.unitRate ?? rateOrItem.unitPrice ?? rateOrItem.rate;
+    }
+    // Clean currency formatting if any (e.g. ₹ or commas or non-numeric characters)
+    if (typeof rateToApply === 'string') {
+      rateToApply = rateToApply.replace(/[^0-9.-]/g, '');
+    }
+    const numericRate = Number(rateToApply);
+    const finalRate = (!isNaN(numericRate) && isFinite(numericRate)) ? numericRate : 0;
+
+    onSelectRate(finalRate);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
@@ -103,6 +115,11 @@ const QuotationRateSuggestion = ({ customerId, itemId, onSelectRate }) => {
                 <span className="font-semibold text-slate-900">Latest:</span><br/>
                 {latest.quotationNumber} &middot; {formatDate(latest.quotationDate)}<br/>
                 <span className="font-bold text-slate-900">{formatCurrency(latest.unitRate)}</span> / piece &middot; Qty {latest.quantity}
+                {latest.lineTotal > 0 && latest.quantity > 1 && (
+                  <span className="text-slate-500 text-[9px] block">
+                    (Line Total: {formatCurrency(latest.lineTotal)})
+                  </span>
+                )}
               </div>
               <Button 
                 type="button" 
@@ -130,7 +147,12 @@ const QuotationRateSuggestion = ({ customerId, itemId, onSelectRate }) => {
               <div key={s.quotationId || idx} className="flex justify-between items-start border-b border-indigo-100 pb-1 last:border-0 last:pb-0">
                 <div>
                   {s.quotationNumber} &middot; {formatDate(s.quotationDate)}<br/>
-                  <span className="font-bold text-slate-900">{formatCurrency(s.unitRate)}</span> &middot; Qty {s.quantity}
+                  <span className="font-bold text-slate-900">{formatCurrency(s.unitRate)}</span> / piece &middot; Qty {s.quantity}
+                  {s.lineTotal > 0 && s.quantity > 1 && (
+                    <span className="text-slate-500 text-[9px] block">
+                      (Line Total: {formatCurrency(s.lineTotal)})
+                    </span>
+                  )}
                 </div>
                 <Button 
                   type="button" 

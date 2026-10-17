@@ -4,6 +4,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
+import { COUNTRIES } from '../../constants/countries';
 
 const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!client;
@@ -14,7 +15,9 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
     contactPerson: '',
     mobile: '',
     email: '',
+    country: 'India',
     address: '',
+    addressLine2: '',
     city: '',
     state: '',
     pincode: '',
@@ -33,7 +36,9 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
         contactPerson: client.contactPerson || '',
         mobile: client.mobile || '',
         email: client.email || '',
+        country: client.country || 'India',
         address: client.address || '',
+        addressLine2: client.addressLine2 || '',
         city: client.city || '',
         state: client.state || '',
         pincode: client.pincode || '',
@@ -46,7 +51,9 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
         contactPerson: '',
         mobile: '',
         email: '',
+        country: 'India',
         address: '',
+        addressLine2: '',
         city: '',
         state: '',
         pincode: '',
@@ -58,6 +65,8 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
   }, [client, isOpen]);
 
   if (!isOpen) return null;
+
+  const isIndia = (formData.country || 'India').trim().toLowerCase() === 'india';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,16 +83,38 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
     if (!formData.companyName.trim()) {
       return 'Party Name / Company Name is required.';
     }
-    if (formData.email.trim()) {
+    if (!formData.country || !formData.country.trim()) {
+      return 'Country is required.';
+    }
+    if (formData.email && formData.email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email.trim())) {
         return 'Please enter a valid email address.';
       }
     }
-    if (formData.mobile.trim()) {
-      const mobileRegex = /^\d{10}$/;
-      if (!mobileRegex.test(formData.mobile.trim())) {
-        return 'Mobile number must be a valid 10-digit number.';
+    if (formData.mobile && formData.mobile.trim()) {
+      if (isIndia) {
+        const mobileRegex = /^\d{10}$/;
+        if (!mobileRegex.test(formData.mobile.trim())) {
+          return 'Mobile number must be a valid 10-digit number for India.';
+        }
+      } else {
+        const intlMobilePattern = /^[+\d\s\-()]{6,20}$/;
+        if (!intlMobilePattern.test(formData.mobile.trim())) {
+          return 'International mobile number must be valid (6-20 digits and optional +, -, spaces).';
+        }
+      }
+    }
+    if (formData.pincode && formData.pincode.trim()) {
+      if (isIndia) {
+        const pinRegex = /^\d{6}$/;
+        if (!pinRegex.test(formData.pincode.trim())) {
+          return 'Pincode must be a valid 6-digit number for India.';
+        }
+      } else {
+        if (formData.pincode.trim().length > 16) {
+          return 'Postal code must not exceed 16 characters.';
+        }
       }
     }
     if (!['active', 'inactive'].includes(formData.status)) {
@@ -215,10 +246,10 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
               />
             </FormField>
 
-            <FormField label="Mobile Number" helperText="10-digit primary mobile contact">
+            <FormField label="Mobile Number" helperText={isIndia ? "10-digit primary mobile contact" : "International contact number (e.g. +1 555-0199)"}>
               <Input
                 name="mobile"
-                placeholder="e.g. 9876543210"
+                placeholder={isIndia ? "e.g. 9876543210" : "e.g. +1 555-123-4567"}
                 value={formData.mobile}
                 onChange={handleChange}
                 disabled={submitting}
@@ -240,15 +271,44 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
 
         {/* SECTION 3: ADDRESS & LOCATION */}
         <div style={{ backgroundColor: 'var(--neutral-50)', padding: '12px', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '10px' }}>
-            3. Address & Location
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase' }}>
+              3. Address & Location
+            </div>
+            {!isIndia && (
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '10px' }}>
+                International Address
+              </span>
+            )}
           </div>
           <div className="form-grid">
             <div style={{ gridColumn: 'span 2' }}>
-              <FormField label="Street Address" fullWidth helperText="Registered Office or Works plant address">
+              <FormField label="Country" required helperText="Select party country (searchable list, defaults to India)">
+                <Select
+                  name="country"
+                  value={formData.country || 'India'}
+                  onChange={handleChange}
+                  disabled={submitting}
+                  required
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+
+            <div style={{ gridColumn: 'span 2' }}>
+              <FormField
+                label={isIndia ? "Street Address" : "Street Address / Address Line 1"}
+                fullWidth
+                helperText={isIndia ? "Registered Office or Works plant address" : "Primary street or facility address"}
+              >
                 <Input
                   name="address"
-                  placeholder="e.g. Plot No. 45, GIDC Industrial Estate"
+                  placeholder={isIndia ? "e.g. Plot No. 45, GIDC Industrial Estate" : "e.g. 100 Main Street, Suite 400"}
                   value={formData.address}
                   onChange={handleChange}
                   disabled={submitting}
@@ -256,30 +316,51 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
               </FormField>
             </div>
 
-            <FormField label="City">
+            {!isIndia && (
+              <div style={{ gridColumn: 'span 2' }}>
+                <FormField
+                  label="Address Line 2 (Optional)"
+                  fullWidth
+                  helperText="Apartment, suite, unit, building, floor, etc."
+                >
+                  <Input
+                    name="addressLine2"
+                    placeholder="e.g. Building B, Floor 3"
+                    value={formData.addressLine2}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
+              </div>
+            )}
+
+            <FormField label={isIndia ? "City" : "City / Town"}>
               <Input
                 name="city"
-                placeholder="e.g. Vadodara"
+                placeholder={isIndia ? "e.g. Vadodara" : "e.g. New York, Dubai, London"}
                 value={formData.city}
                 onChange={handleChange}
                 disabled={submitting}
               />
             </FormField>
 
-            <FormField label="State">
+            <FormField label={isIndia ? "State" : "State / Province / Region (Optional)"}>
               <Input
                 name="state"
-                placeholder="e.g. Gujarat"
+                placeholder={isIndia ? "e.g. Gujarat" : "e.g. California, Dubai, Ontario"}
                 value={formData.state}
                 onChange={handleChange}
                 disabled={submitting}
               />
             </FormField>
 
-            <FormField label="Pincode / Zip Code">
+            <FormField
+              label={isIndia ? "Pincode / Zip Code" : "Postal Code / ZIP Code (Optional)"}
+              helperText={isIndia ? "6-digit PIN code" : "Postal code (optional where country does not use one)"}
+            >
               <Input
                 name="pincode"
-                placeholder="e.g. 390010"
+                placeholder={isIndia ? "e.g. 390010" : "e.g. 90210, SW1A 1AA"}
                 value={formData.pincode}
                 onChange={handleChange}
                 disabled={submitting}
