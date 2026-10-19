@@ -125,7 +125,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         };
 
         const [cRes, iRes, catRes, uRes, eRes, fRes] = await Promise.all([
-          getClients({ typeFilter: 'MASTER' }),
+          getClients({ typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' }),
           getItems({ typeFilter: 'MASTER' }),
           getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),

@@ -110,7 +110,7 @@ const PurchaseOrderForm = () => {
       const [prRes, peRes, supplierRes, deptRes, itemRes, uomRes] = await Promise.all([
         getPurchaseRequisitions({ status: 'APPROVED', limit: 100 }).catch(() => ({ success: false, purchaseRequisitions: [] })),
         getPurchaseEnquiries({ limit: 100 }).catch(() => ({ success: false, purchaseEnquiries: [] })),
-        getSuppliers({ status: 'active', limit: 100 }).catch(() => getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100 })),
+        getSuppliers({ status: 'active', limit: 100, approvalStatus: 'APPROVED' }).catch(() => getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' })),
         getDepartments().catch(() => ({ success: false, departments: [] })),
         getItems().catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getClients, updateClientStatus } from '../../services/clientService';
+import { getClients, updateClientStatus, approveOrRejectClient } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -19,11 +19,13 @@ import {
   Power,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 const ClientList = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
 
   const canCreate = hasPermission('CLIENT_CREATE');
   const canEdit = hasPermission('CLIENT_EDIT');
@@ -36,6 +38,7 @@ const ClientList = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('MASTER');
 
   // Modal states
@@ -48,7 +51,7 @@ const ClientList = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getClients();
+      const data = await getClients({ approvalStatus: 'all' });
       if (data.success && Array.isArray(data.clients)) {
         setClients(data.clients);
       } else {
@@ -98,6 +101,10 @@ const ClientList = () => {
       // Status filter
       if (statusFilter !== 'all' && client.status !== statusFilter) return false;
 
+      // Approval filter
+      const appStatus = client.approvalStatus || 'APPROVED';
+      if (approvalFilter !== 'all' && appStatus !== approvalFilter) return false;
+
       // Search filter
       if (!searchTerm.trim()) return true;
 
@@ -121,7 +128,7 @@ const ClientList = () => {
         country.includes(term)
       );
     });
-  }, [clients, searchTerm, statusFilter, typeFilter]);
+  }, [clients, searchTerm, statusFilter, approvalFilter, typeFilter]);
 
   const columns = [
     {
@@ -180,8 +187,14 @@ const ClientList = () => {
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
+      width: '100px',
       render: (val) => <StatusBadge status={val} />,
+    },
+    {
+      key: 'approvalStatus',
+      header: 'Approval',
+      width: '130px',
+      render: (val) => <StatusBadge status={val || 'APPROVED'} />,
     },
     {
       key: 'actions',
@@ -201,6 +214,53 @@ const ClientList = () => {
           >
             View
           </Button>
+
+          {isAdmin && row.approvalStatus === 'PENDING_APPROVAL' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={CheckCircle}
+                style={{ color: '#059669' }}
+                title="Approve Party"
+                onClick={async () => {
+                  if (!window.confirm(`Approve party "${row.companyName}" (${row.clientCode})?`)) return;
+                  try {
+                    const res = await approveOrRejectClient(row._id, { action: 'APPROVE' });
+                    if (res.success) {
+                      setClients((prev) => prev.map((c) => (c._id === row._id ? res.client : c)));
+                    }
+                  } catch (e) {
+                    setError(e.response?.data?.message || 'Approval failed');
+                  }
+                }}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={XCircle}
+                style={{ color: '#dc2626' }}
+                title="Reject Party"
+                onClick={async () => {
+                  const reason = window.prompt(`Enter rejection reason for party "${row.companyName}":`);
+                  if (!reason || !reason.trim()) return;
+                  try {
+                    const res = await approveOrRejectClient(row._id, { action: 'REJECT', rejectionReason: reason.trim() });
+                    if (res.success) {
+                      setClients((prev) => prev.map((c) => (c._id === row._id ? res.client : c)));
+                    }
+                  } catch (e) {
+                    setError(e.response?.data?.message || 'Rejection failed');
+                  }
+                }}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+
           {canEdit && (
             <>
               <Button
@@ -295,11 +355,22 @@ const ClientList = () => {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '140px' }}
+              style={{ width: '130px' }}
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
               <option value="inactive">Inactive Only</option>
+            </Select>
+
+            <Select
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value)}
+              style={{ width: '150px' }}
+            >
+              <option value="all">All Approvals</option>
+              <option value="PENDING_APPROVAL">Pending Approval</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
             </Select>
           </div>
         </div>
@@ -341,6 +412,10 @@ const ClientList = () => {
           setIsFormOpen(true);
         }}
         canEdit={canEdit}
+        onStatusUpdate={(updatedClient) => {
+          setClients((prev) => prev.map((c) => (c._id === updatedClient._id ? updatedClient : c)));
+          setSelectedClient(updatedClient);
+        }}
       />
     </div>
   );

@@ -88,7 +88,7 @@ const PurchaseEnquiryForm = () => {
     try {
       const [prRes, supplierRes, deptRes, itemRes, uomRes] = await Promise.all([
         getPurchaseRequisitions({ status: 'APPROVED', limit: 100 }).catch(() => ({ success: false, purchaseRequisitions: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100 }).catch(() => ({ success: false, clients: [], parties: [] })),
+        getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] })),
         getDepartments().catch(() => ({ success: false, departments: [] })),
         getItems().catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))

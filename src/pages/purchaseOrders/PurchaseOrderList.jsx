@@ -137,7 +137,7 @@ const PurchaseOrderList = () => {
     try {
       const [deptRes, supplierRes] = await Promise.all([
         getDepartments().catch(() => ({ success: false, departments: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active' }).catch(() => ({ success: false, clients: [], parties: [] }))
+        getClients({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] }))
       ]);
 
       if (deptRes.success && Array.isArray(deptRes.departments)) {

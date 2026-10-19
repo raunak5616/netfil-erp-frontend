@@ -25,6 +25,12 @@ export const updateSupplierStatus = async (id, status) => {
   return response.data;
 };
 
+export const approveOrRejectSupplier = async (id, { action, rejectionReason }) => {
+  const response = await api.patch(`/suppliers/${id}/approval`, { action, rejectionReason });
+  return response.data;
+};
+
+
 export const deleteSupplier = async (id) => {
   const response = await api.delete(`/suppliers/${id}`);
   return response.data;

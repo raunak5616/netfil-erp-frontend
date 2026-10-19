@@ -4,7 +4,8 @@ import {
   getSupplierById,
   getSupplierPurchaseSummary,
   getSupplierPurchaseHistory,
-  getSupplierItemPriceHistory
+  getSupplierItemPriceHistory,
+  approveOrRejectSupplier
 } from '../../services/supplierService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -35,13 +36,17 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-  ExternalLink
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react';
 
 const SupplierDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
 
   const canEdit = hasPermission('SUPPLIER_EDIT') || hasPermission('PARTY_EDIT');
 
@@ -49,6 +54,13 @@ const SupplierDetail = () => {
   const [supplier, setSupplier] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Approval Action States
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   // Active Tab State: 'overview' | 'history' | 'price-history'
   const [activeTab, setActiveTab] = useState('overview');
@@ -187,6 +199,61 @@ const SupplierDetail = () => {
     });
   };
 
+  const handleApprove = async () => {
+    if (!window.confirm(`Approve Supplier "${supplier.supplierName}" (${supplier.supplierCode})?`)) return;
+    setActionLoading(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const res = await approveOrRejectSupplier(id, { action: 'APPROVE' });
+      if (res.success) {
+        setSupplier(res.supplier);
+        setActionSuccess('Supplier approved successfully.');
+      }
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to approve supplier');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectSubmit = async (e) => {
+    e.preventDefault();
+    if (!rejectionReason.trim()) {
+      setActionError('Please specify a rejection reason.');
+      return;
+    }
+    setActionLoading(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const res = await approveOrRejectSupplier(id, {
+        action: 'REJECT',
+        rejectionReason: rejectionReason.trim(),
+      });
+      if (res.success) {
+        setSupplier(res.supplier);
+        setIsRejecting(false);
+        setRejectionReason('');
+        setActionSuccess('Supplier rejected.');
+      }
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to reject supplier');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getActorName = (actor) => {
+    if (!actor) return '—';
+    if (typeof actor === 'object') {
+      return actor.fullName || actor.name || actor.username || actor.email || '—';
+    }
+    return String(actor);
+  };
+
+  const currentApprovalStatus = supplier.approvalStatus || 'APPROVED';
+
   return (
     <div className="space-y-6">
       
@@ -196,6 +263,7 @@ const SupplierDetail = () => {
           <div className="flex items-center gap-3">
             <span>Supplier: {supplier.supplierName}</span>
             <StatusBadge status={supplier.status} />
+            <StatusBadge status={currentApprovalStatus} />
           </div>
         }
         subtitle={`Supplier Code: ${supplier.supplierCode} | ${supplier.legalName ? `Legal: ${supplier.legalName}` : 'Procurement Master'}`}
@@ -209,6 +277,28 @@ const SupplierDetail = () => {
             <Button variant="secondary" size="sm" onClick={() => navigate('/suppliers')}>
               <ArrowLeft size={14} className="mr-1.5" /> Back
             </Button>
+            {isAdmin && currentApprovalStatus === 'PENDING_APPROVAL' && !isRejecting && (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 border-emerald-600"
+                  loading={actionLoading}
+                  onClick={handleApprove}
+                >
+                  <CheckCircle size={14} className="mr-1.5" /> Approve Supplier
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  disabled={actionLoading}
+                  onClick={() => setIsRejecting(true)}
+                >
+                  <XCircle size={14} className="mr-1.5" /> Reject...
+                </Button>
+              </>
+            )}
             {canEdit && (
               <Button variant="primary" size="sm" onClick={() => navigate(`/suppliers/${id}/edit`)}>
                 <Edit size={14} className="mr-1.5" /> Edit Supplier
@@ -217,6 +307,74 @@ const SupplierDetail = () => {
           </div>
         }
       />
+
+      {/* Action Alerts */}
+      {actionError && <Alert type="danger" message={actionError} onClose={() => setActionError('')} />}
+      {actionSuccess && <Alert type="success" message={actionSuccess} onClose={() => setActionSuccess('')} />}
+
+      {/* Rejection Alert */}
+      {currentApprovalStatus === 'REJECTED' && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-800 space-y-1">
+          <div className="flex items-center gap-2 font-bold text-sm text-red-900">
+            <AlertTriangle size={16} className="text-red-600 shrink-0" />
+            Supplier Record Rejected
+          </div>
+          <p className="text-xs text-red-700">
+            <strong>Rejection Reason:</strong> {supplier.rejectionReason || 'No reason specified.'}
+          </p>
+          {(supplier.rejectedBy || supplier.rejectedAt) && (
+            <p className="text-[11px] text-red-600">
+              Rejected by {getActorName(supplier.rejectedBy)} on {formatDate(supplier.rejectedAt)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Inline Rejection Form */}
+      {isRejecting && (
+        <form
+          onSubmit={handleRejectSubmit}
+          className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3"
+        >
+          <div className="flex items-center gap-2 text-sm font-bold text-amber-900">
+            <AlertTriangle size={16} className="text-amber-600" />
+            Reject Supplier Record
+          </div>
+          <p className="text-xs text-amber-800">
+            Please enter a mandatory rejection reason describing why this supplier cannot be approved.
+          </p>
+          <textarea
+            rows={3}
+            required
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="Reason for rejection..."
+            className="w-full p-2.5 text-xs bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setIsRejecting(false);
+                setRejectionReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={actionLoading}
+              className="bg-red-600 hover:bg-red-700 border-red-600"
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </form>
+      )}
 
       {/* SIMPLE SUMMARY METRIC CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -418,6 +576,68 @@ const SupplierDetail = () => {
                 <span className="text-slate-500 block">Remarks</span>
                 <span className="text-slate-700">{supplier.remarks || '—'}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Approval & Audit Information Card */}
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4 md:col-span-2">
+            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+              <ShieldCheck size={16} className="text-blue-600" />
+              Approval & Audit Information
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+              <div>
+                <span className="text-slate-500 block">Approval Status</span>
+                <div className="mt-1">
+                  <StatusBadge status={currentApprovalStatus} />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-slate-500 block">Submitted By</span>
+                <span className="font-semibold text-slate-900">{getActorName(supplier.createdBy)}</span>
+              </div>
+
+              <div>
+                <span className="text-slate-500 block">Submission Date</span>
+                <span className="font-semibold text-slate-900">{formatDate(supplier.createdAt)}</span>
+              </div>
+
+              <div>
+                <span className="text-slate-500 block">Last Updated</span>
+                <span className="font-semibold text-slate-900">{formatDate(supplier.updatedAt)}</span>
+              </div>
+
+              {currentApprovalStatus === 'APPROVED' && supplier.approvedAt && (
+                <>
+                  <div>
+                    <span className="text-slate-500 block">Approved By</span>
+                    <span className="font-semibold text-emerald-800">{getActorName(supplier.approvedBy)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Approval Date</span>
+                    <span className="font-semibold text-emerald-800">{formatDate(supplier.approvedAt)}</span>
+                  </div>
+                </>
+              )}
+
+              {currentApprovalStatus === 'REJECTED' && (
+                <>
+                  <div>
+                    <span className="text-slate-500 block">Rejected By</span>
+                    <span className="font-semibold text-red-800">{getActorName(supplier.rejectedBy)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Rejection Date</span>
+                    <span className="font-semibold text-red-800">{formatDate(supplier.rejectedAt)}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 block">Rejection Reason</span>
+                    <span className="font-semibold text-red-700">{supplier.rejectionReason || '—'}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

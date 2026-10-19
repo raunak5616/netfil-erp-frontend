@@ -40,6 +40,7 @@ import SupplierList from './pages/suppliers/SupplierList';
 import SupplierForm from './pages/suppliers/SupplierForm';
 import SupplierDetail from './pages/suppliers/SupplierDetail';
 import StoreList from './pages/store/StoreList';
+import AdminApprovals from './pages/admin/AdminApprovals';
 
 function App() {
   return (
@@ -67,6 +68,11 @@ function App() {
               {/* Protected Role Management Route */}
               <Route element={<ProtectedRoute requiredPermission="ROLE_VIEW" />}>
                 <Route path="/roles" element={<RoleList />} />
+              </Route>
+
+              {/* Protected Admin Approvals Route */}
+              <Route element={<ProtectedRoute adminOnly={true} />}>
+                <Route path="/admin/approvals" element={<AdminApprovals />} />
               </Route>
 
               {/* Protected Department Module Route */}

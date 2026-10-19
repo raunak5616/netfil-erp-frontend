@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSuppliers, updateSupplierStatus } from '../../services/supplierService';
+import { getSuppliers, updateSupplierStatus, approveOrRejectSupplier } from '../../services/supplierService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -20,12 +20,14 @@ import {
   Mail,
   Truck,
   Building2,
-  FileText
+  FileText,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 const SupplierList = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
 
   const canCreate = hasPermission('SUPPLIER_CREATE') || hasPermission('PARTY_CREATE');
   const canEdit = hasPermission('SUPPLIER_EDIT') || hasPermission('PARTY_EDIT');
@@ -38,12 +40,13 @@ const SupplierList = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
 
   const fetchSupplierData = async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getSuppliers({ limit: 200 });
+      const data = await getSuppliers({ approvalStatus: 'all', limit: 200 });
       if (data.success && Array.isArray(data.suppliers)) {
         setSuppliers(data.suppliers);
       } else {
@@ -87,6 +90,10 @@ const SupplierList = () => {
       // Status filter
       if (statusFilter !== 'all' && supplier.status !== statusFilter) return false;
 
+      // Approval filter
+      const appStatus = supplier.approvalStatus || 'APPROVED';
+      if (approvalFilter !== 'all' && appStatus !== approvalFilter) return false;
+
       // Search filter
       if (!searchTerm.trim()) return true;
 
@@ -111,7 +118,7 @@ const SupplierList = () => {
         gstin.includes(term)
       );
     });
-  }, [suppliers, searchTerm, statusFilter]);
+  }, [suppliers, searchTerm, statusFilter, approvalFilter]);
 
   const columns = [
     {
@@ -211,10 +218,16 @@ const SupplierList = () => {
       render: (val) => <StatusBadge status={val} />,
     },
     {
+      key: 'approvalStatus',
+      header: 'Approval',
+      width: '130px',
+      render: (val) => <StatusBadge status={val || 'APPROVED'} />,
+    },
+    {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '180px',
+      width: '220px',
       render: (_, row) => (
         <div className="inline-flex gap-1 items-center">
           <Button
@@ -226,6 +239,53 @@ const SupplierList = () => {
             <Eye size={14} className="mr-1" />
             View
           </Button>
+
+          {isAdmin && row.approvalStatus === 'PENDING_APPROVAL' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-emerald-600 hover:bg-emerald-50"
+                title="Approve Supplier"
+                onClick={async () => {
+                  if (!window.confirm(`Approve supplier "${row.supplierName}" (${row.supplierCode})?`)) return;
+                  try {
+                    const res = await approveOrRejectSupplier(row._id, { action: 'APPROVE' });
+                    if (res.success) {
+                      setSuppliers((prev) => prev.map((s) => (s._id === row._id ? res.supplier : s)));
+                    }
+                  } catch (e) {
+                    setError(e.response?.data?.message || 'Approval failed');
+                  }
+                }}
+              >
+                <CheckCircle size={14} className="mr-1" />
+                Approve
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:bg-red-50"
+                title="Reject Supplier"
+                onClick={async () => {
+                  const reason = window.prompt(`Enter rejection reason for supplier "${row.supplierName}":`);
+                  if (!reason || !reason.trim()) return;
+                  try {
+                    const res = await approveOrRejectSupplier(row._id, { action: 'REJECT', rejectionReason: reason.trim() });
+                    if (res.success) {
+                      setSuppliers((prev) => prev.map((s) => (s._id === row._id ? res.supplier : s)));
+                    }
+                  } catch (e) {
+                    setError(e.response?.data?.message || 'Rejection failed');
+                  }
+                }}
+              >
+                <XCircle size={14} className="mr-1" />
+                Reject
+              </Button>
+            </>
+          )}
+
           {canEdit && (
             <>
               <Button
@@ -302,11 +362,22 @@ const SupplierList = () => {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-40"
+              className="w-36"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
               <option value="inactive">Inactive Only</option>
+            </Select>
+
+            <Select
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value)}
+              className="w-44"
+            >
+              <option value="all">All Approvals</option>
+              <option value="PENDING_APPROVAL">Pending Approval</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
             </Select>
           </div>
         </div>

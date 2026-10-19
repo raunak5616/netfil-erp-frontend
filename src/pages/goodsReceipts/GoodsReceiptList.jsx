@@ -115,7 +115,7 @@ const GoodsReceiptList = () => {
       const [plantRes, storeRes, supplierRes] = await Promise.all([
         getPlants().catch(() => ({ success: false, plants: [] })),
         getStores().catch(() => ({ success: false, stores: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active' }).catch(() => ({ success: false, clients: [], parties: [] }))
+        getClients({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] }))
       ]);
 
       if (plantRes.success && Array.isArray(plantRes.plants)) {

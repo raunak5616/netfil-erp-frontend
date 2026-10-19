@@ -24,3 +24,9 @@ export const updateClientStatus = async (clientId, status) => {
   const response = await api.patch(`/clients/${clientId}/status`, { status });
   return response.data;
 };
+
+export const approveOrRejectClient = async (clientId, { action, rejectionReason }) => {
+  const response = await api.patch(`/clients/${clientId}/approval`, { action, rejectionReason });
+  return response.data;
+};
+

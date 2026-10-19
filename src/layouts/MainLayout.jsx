@@ -24,10 +24,11 @@ import {
   User,
   Truck,
   Database,
+  ShieldCheck,
 } from 'lucide-react';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -206,6 +207,7 @@ const MainLayout = () => {
       '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
       '/purchase-orders': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Orders' }],
       '/goods-receipts': [{ label: 'Purchase & Procurement' }, { label: 'Goods Receipts (GRN)' }],
+      '/admin/approvals': [{ label: 'Administration' }, { label: 'Master Approvals' }],
     };
     return map[path] || [{ label: 'Workspace' }];
   };
@@ -225,6 +227,7 @@ const MainLayout = () => {
         { label: 'User Accounts', path: '/users', icon: UserCheck, permission: 'USER_VIEW' },
         { label: 'Role Management', path: '/roles', icon: Shield, permission: 'ROLE_VIEW' },
         { label: 'Departments', path: '/departments', icon: Building2, permission: 'DEPARTMENT_VIEW' },
+        { label: 'Master Approvals', path: '/admin/approvals', icon: ShieldCheck, adminOnly: true },
       ],
     },
     {
@@ -361,6 +364,9 @@ const MainLayout = () => {
         .filter(Boolean);
       if (visibleChildren.length === 0) return null;
       return { ...navItem, children: visibleChildren };
+    }
+    if (navItem.adminOnly && !isAdmin) {
+      return null;
     }
     if (!navItem.permission || hasPermission(navItem.permission)) {
       return navItem;

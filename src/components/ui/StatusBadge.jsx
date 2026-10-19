@@ -23,6 +23,8 @@ const StatusBadge = ({ status = 'neutral', label, className = '' }) => {
     'cancelled': redBadge,
     'lost': redBadge,
     'pending': amberBadge,
+    'pending-approval': amberBadge,
+    'pending_approval': amberBadge,
     'draft': amberBadge,
     'warning': amberBadge,
     'follow-up': purpleBadge,

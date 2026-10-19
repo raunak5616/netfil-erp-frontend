@@ -112,6 +112,16 @@ export const AuthProvider = ({ children }) => {
     });
   }, [user]);
 
+  const isAdmin = React.useMemo(() => {
+    if (!user) return false;
+    const rolesArray = user.roles ? user.roles : user.role ? [user.role] : [];
+    return rolesArray.some((r) => {
+      if (!r) return false;
+      const roleName = typeof r === 'string' ? r : r.roleName;
+      return roleName?.toLowerCase() === 'admin';
+    });
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -122,6 +132,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         hasPermission,
+        isAdmin,
         isAuthenticated: !!token && !!user,
       }}
     >

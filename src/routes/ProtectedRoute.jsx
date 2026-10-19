@@ -3,8 +3,8 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ShieldAlert } from 'lucide-react';
 
-const ProtectedRoute = ({ requiredPermission }) => {
-  const { isAuthenticated, loading, hasPermission } = useAuth();
+const ProtectedRoute = ({ requiredPermission, adminOnly }) => {
+  const { isAuthenticated, loading, hasPermission, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,21 @@ const ProtectedRoute = ({ requiredPermission }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return (
+      <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ maxWidth: '500px', margin: '60px auto', textAlign: 'center', padding: '40px' }}>
+        <ShieldAlert size={48} color="var(--danger-500)" style={{ margin: '0 auto 16px' }} />
+        <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Admin Access Only</h2>
+        <p className="text-muted" style={{ marginBottom: '20px' }}>
+          This module is strictly restricted to authorized Administrators.
+        </p>
+        <button className="px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => window.history.back()}>
+          Go Back
+        </button>
+      </div>
+    );
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {

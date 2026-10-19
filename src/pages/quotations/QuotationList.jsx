@@ -107,7 +107,7 @@ const QuotationList = () => {
 
   const loadClientOptions = async (inputValue) => {
     try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active' });
+      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
       if (res.success && Array.isArray(res.clients)) {
         return res.clients.map((c) => ({
           value: c._id,
