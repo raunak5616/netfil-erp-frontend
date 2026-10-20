@@ -37,13 +37,21 @@ const ProtectedRoute = ({ requiredPermission, adminOnly }) => {
     );
   }
 
-  if (requiredPermission && !hasPermission(requiredPermission)) {
+  const hasAccess = Array.isArray(requiredPermission)
+    ? requiredPermission.some((perm) => hasPermission(perm))
+    : !requiredPermission || hasPermission(requiredPermission);
+
+  if (requiredPermission && !hasAccess) {
+    const displayPermission = Array.isArray(requiredPermission)
+      ? requiredPermission.join(' or ')
+      : requiredPermission;
+
     return (
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ maxWidth: '500px', margin: '60px auto', textAlign: 'center', padding: '40px' }}>
         <ShieldAlert size={48} color="var(--danger-500)" style={{ margin: '0 auto 16px' }} />
         <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Access Denied</h2>
         <p className="text-muted" style={{ marginBottom: '20px' }}>
-          You do not have permission code <code>{requiredPermission}</code> required to access this module.
+          You do not have permission code <code>{displayPermission}</code> required to access this module.
         </p>
         <button className="px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => window.history.back()}>
           Go Back

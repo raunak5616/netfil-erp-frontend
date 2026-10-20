@@ -1,6 +1,25 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
+export const PERMISSION_ALIASES = {
+  CLIENT_VIEW: ['CLIENT_VIEW', 'PARTY_VIEW'],
+  PARTY_VIEW: ['PARTY_VIEW', 'CLIENT_VIEW'],
+  CLIENT_CREATE: ['CLIENT_CREATE', 'PARTY_CREATE'],
+  PARTY_CREATE: ['PARTY_CREATE', 'CLIENT_CREATE'],
+  CLIENT_EDIT: ['CLIENT_EDIT', 'PARTY_EDIT'],
+  PARTY_EDIT: ['PARTY_EDIT', 'CLIENT_EDIT'],
+  CLIENT_DELETE: ['CLIENT_DELETE', 'PARTY_DELETE'],
+  PARTY_DELETE: ['PARTY_DELETE', 'CLIENT_DELETE'],
+};
+
+export const getEquivalentPermissionCodes = (permissionCode) => {
+  if (!permissionCode) return [];
+  if (Array.isArray(permissionCode)) {
+    return Array.from(new Set(permissionCode.flatMap((c) => getEquivalentPermissionCodes(c))));
+  }
+  return PERMISSION_ALIASES[permissionCode] || [permissionCode];
+};
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -72,15 +91,19 @@ export const AuthProvider = ({ children }) => {
   const hasPermission = useCallback((permissionCode) => {
     if (!user) return false;
 
+    const codesToCheck = getEquivalentPermissionCodes(permissionCode);
+
     // 1. Check user-level permission overrides
     if (user.permissions && Array.isArray(user.permissions)) {
-      const userOverride = user.permissions.find(
-        (item) => item.permission?.permissionCode === permissionCode
-      );
-      if (userOverride) {
-        if (userOverride.effect === 'DENY') return false;
-        if (userOverride.effect === 'ALLOW') return true;
-      }
+      const userOverrides = user.permissions.filter((item) => {
+        const code = typeof item.permission === 'string'
+          ? item.permission
+          : item.permission?.permissionCode;
+        return codesToCheck.includes(code);
+      });
+
+      if (userOverrides.some((item) => item.effect === 'DENY')) return false;
+      if (userOverrides.some((item) => item.effect === 'ALLOW')) return true;
     }
 
     // Support both user.roles (array) and fallback user.role (object)
@@ -106,8 +129,8 @@ export const AuthProvider = ({ children }) => {
       if (!role || typeof role === 'string' || !role.permissions || !Array.isArray(role.permissions)) return false;
       return role.permissions.some((perm) => {
         if (!perm) return false;
-        if (typeof perm === 'string') return perm === permissionCode;
-        return perm.permissionCode === permissionCode;
+        const permCode = typeof perm === 'string' ? perm : perm.permissionCode;
+        return codesToCheck.includes(permCode);
       });
     });
   }, [user]);

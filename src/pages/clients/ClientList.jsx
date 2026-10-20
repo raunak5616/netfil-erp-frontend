@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getClients, updateClientStatus, approveOrRejectClient } from '../../services/clientService';
+import { getClients, updateClientStatus, approveOrRejectClient, deleteClient } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -21,14 +21,16 @@ import {
   Mail,
   MapPin,
   CheckCircle,
-  XCircle
+  XCircle,
+  Trash2
 } from 'lucide-react';
 
 const ClientList = () => {
   const { hasPermission, isAdmin } = useAuth();
 
-  const canCreate = hasPermission('CLIENT_CREATE');
-  const canEdit = hasPermission('CLIENT_EDIT');
+  const canCreate = hasPermission('PARTY_CREATE') || hasPermission('CLIENT_CREATE');
+  const canEdit = hasPermission('PARTY_EDIT') || hasPermission('CLIENT_EDIT');
+  const canDelete = hasPermission('PARTY_DELETE') || hasPermission('CLIENT_DELETE');
 
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -288,6 +290,33 @@ const ClientList = () => {
                 {row.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
             </>
+          )}
+
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Trash2}
+              loading={actionLoading === `delete_${row._id}`}
+              onClick={async () => {
+                if (!window.confirm(`Are you sure you want to delete party "${row.companyName}" (${row.clientCode})?`)) return;
+                setActionLoading(`delete_${row._id}`);
+                try {
+                  const res = await deleteClient(row._id);
+                  if (res.success) {
+                    setClients((prev) => prev.filter((c) => c._id !== row._id));
+                  }
+                } catch (e) {
+                  setError(e.response?.data?.message || 'Delete failed');
+                } finally {
+                  setActionLoading(null);
+                }
+              }}
+              title="Delete Party"
+              style={{ color: 'var(--danger-600)' }}
+            >
+              Delete
+            </Button>
           )}
         </div>
       ),

@@ -81,7 +81,7 @@ function App() {
               </Route>
 
               {/* Protected Party Master Route */}
-              <Route element={<ProtectedRoute requiredPermission="CLIENT_VIEW" />}>
+              <Route element={<ProtectedRoute requiredPermission={["PARTY_VIEW", "CLIENT_VIEW"]} />}>
                 <Route path="/clients" element={<ClientList />} />
                 <Route path="/parties" element={<ClientList />} />
               </Route>

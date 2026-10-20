@@ -30,3 +30,8 @@ export const approveOrRejectClient = async (clientId, { action, rejectionReason 
   return response.data;
 };
 
+export const deleteClient = async (clientId) => {
+  const response = await api.delete(`/clients/${clientId}`);
+  return response.data;
+};
+

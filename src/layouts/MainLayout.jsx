@@ -286,7 +286,7 @@ const MainLayout = () => {
                 { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
               ],
             },
-            { label: 'Party Master', path: '/clients', icon: Users, permission: 'CLIENT_VIEW' },
+            { label: 'Party Master', path: '/clients', icon: Users, permission: ['PARTY_VIEW', 'CLIENT_VIEW'] },
           ],
         },
         {
@@ -339,7 +339,7 @@ const MainLayout = () => {
     { label: 'Filter Grades', path: '/filter-grades', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
     { label: 'Flange Designs', path: '/flange-designs', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
     { label: 'Units of Measure', path: '/uoms', category: 'Item Master', permission: 'UOM_VIEW' },
-    { label: 'Party Master', path: '/clients', category: 'Master', permission: 'CLIENT_VIEW' },
+    { label: 'Party Master', path: '/clients', category: 'Master', permission: ['PARTY_VIEW', 'CLIENT_VIEW'] },
     { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },
     { label: 'Quotation Register', path: '/quotations', category: 'Commercial', permission: 'QUOTATION_VIEW' },
     { label: 'Sales Orders', path: '/sales-orders', category: 'Commercial', permission: 'SALES_ORDER_VIEW' },
@@ -368,7 +368,7 @@ const MainLayout = () => {
     if (navItem.adminOnly && !isAdmin) {
       return null;
     }
-    if (!navItem.permission || hasPermission(navItem.permission)) {
+    if (!navItem.permission || (Array.isArray(navItem.permission) ? navItem.permission.some((p) => hasPermission(p)) : hasPermission(navItem.permission))) {
       return navItem;
     }
     return null;
