@@ -3,6 +3,7 @@ import { getClients, approveOrRejectClient } from '../../services/clientService'
 import { getSuppliers, approveOrRejectSupplier } from '../../services/supplierService';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
+import Tabs from '../../components/ui/Tabs';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
@@ -15,11 +16,6 @@ import {
   Eye,
   Search,
   RefreshCw,
-  Users,
-  Truck,
-  ShieldCheck,
-  Building2,
-  Calendar,
   User,
   Phone,
   Mail,
@@ -192,34 +188,29 @@ const AdminApprovals = () => {
   const tabData = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
+    const matchesSearch = (item) => {
+      if (!term) return true;
+      return (
+        (item.code || '').toLowerCase().includes(term) ||
+        (item.name || '').toLowerCase().includes(term) ||
+        (item.legalName || '').toLowerCase().includes(term) ||
+        (item.contactPerson || '').toLowerCase().includes(term) ||
+        (item.city || '').toLowerCase().includes(term)
+      );
+    };
+
     if (activeTab === 'pending-parties') {
       return parties
         .filter((p) => p.approvalStatus === 'PENDING_APPROVAL')
         .map((p) => ({ ...p, masterType: 'party', code: p.clientCode, name: p.companyName }))
-        .filter((item) => {
-          if (!term) return true;
-          return (
-            (item.code || '').toLowerCase().includes(term) ||
-            (item.name || '').toLowerCase().includes(term) ||
-            (item.contactPerson || '').toLowerCase().includes(term) ||
-            (item.city || '').toLowerCase().includes(term)
-          );
-        });
+        .filter(matchesSearch);
     }
 
     if (activeTab === 'pending-suppliers') {
       return suppliers
         .filter((s) => s.approvalStatus === 'PENDING_APPROVAL')
         .map((s) => ({ ...s, masterType: 'supplier', code: s.supplierCode, name: s.supplierName }))
-        .filter((item) => {
-          if (!term) return true;
-          return (
-            (item.code || '').toLowerCase().includes(term) ||
-            (item.name || '').toLowerCase().includes(term) ||
-            (item.contactPerson || '').toLowerCase().includes(term) ||
-            (item.city || '').toLowerCase().includes(term)
-          );
-        });
+        .filter(matchesSearch);
     }
 
     if (activeTab === 'approved') {
@@ -235,15 +226,7 @@ const AdminApprovals = () => {
       else if (masterTypeFilter === 'party') combined = pList;
       else if (masterTypeFilter === 'supplier') combined = sList;
 
-      return combined.filter((item) => {
-        if (!term) return true;
-        return (
-          (item.code || '').toLowerCase().includes(term) ||
-          (item.name || '').toLowerCase().includes(term) ||
-          (item.contactPerson || '').toLowerCase().includes(term) ||
-          (item.city || '').toLowerCase().includes(term)
-        );
-      });
+      return combined.filter(matchesSearch);
     }
 
     if (activeTab === 'rejected') {
@@ -259,33 +242,24 @@ const AdminApprovals = () => {
       else if (masterTypeFilter === 'party') combined = pList;
       else if (masterTypeFilter === 'supplier') combined = sList;
 
-      return combined.filter((item) => {
-        if (!term) return true;
-        return (
-          (item.code || '').toLowerCase().includes(term) ||
-          (item.name || '').toLowerCase().includes(term) ||
-          (item.contactPerson || '').toLowerCase().includes(term) ||
-          (item.city || '').toLowerCase().includes(term) ||
-          (item.rejectionReason || '').toLowerCase().includes(term)
-        );
-      });
+      return combined.filter(matchesSearch);
     }
 
     return [];
   }, [activeTab, parties, suppliers, searchTerm, masterTypeFilter]);
 
-  // Columns definition
+  // Columns definition (6 clean columns)
   const columns = useMemo(() => {
-    const base = [
+    return [
       {
         key: 'code',
         header: 'Code',
         width: '130px',
         render: (val, row) => (
           <div className="flex flex-col">
-            <span className="font-mono font-semibold text-primary-700">{val}</span>
+            <span className="font-mono font-medium text-slate-800 text-xs">{val}</span>
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-              {row.masterType === 'party' ? 'Party Master' : 'Supplier Master'}
+              {row.masterType === 'party' ? 'Party' : 'Supplier'}
             </span>
           </div>
         ),
@@ -293,12 +267,12 @@ const AdminApprovals = () => {
       {
         key: 'name',
         header: 'Company / Trade Name',
-        width: '230px',
+        width: '240px',
         render: (val, row) => (
           <div>
-            <div className="font-semibold text-slate-900">{val}</div>
+            <div className="font-medium text-slate-900 text-xs">{val}</div>
             {row.legalName && row.legalName !== val && (
-              <div className="text-xs text-slate-500 truncate">{row.legalName}</div>
+              <div className="text-[11px] text-slate-500 truncate">{row.legalName}</div>
             )}
           </div>
         ),
@@ -306,13 +280,12 @@ const AdminApprovals = () => {
       {
         key: 'contactPerson',
         header: 'Contact & Phone',
-        width: '200px',
+        width: '180px',
         render: (_, row) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-slate-800 text-xs">{row.contactPerson || '—'}</span>
+          <div className="flex flex-col gap-0.5 text-xs">
+            <span className="font-medium text-slate-800">{row.contactPerson || '—'}</span>
             {(row.mobile || row.phone) && (
-              <span className="text-xs text-slate-600 flex items-center gap-1">
-                <Phone size={11} className="text-primary-600 shrink-0" />
+              <span className="text-slate-500 text-[11px]">
                 {row.mobile || row.phone}
               </span>
             )}
@@ -321,111 +294,94 @@ const AdminApprovals = () => {
       },
       {
         key: 'submittedBy',
-        header: 'Creator & Date',
-        width: '200px',
+        header: 'Created By / Date',
+        width: '180px',
         render: (_, row) => {
           const creator = row.createdBy?.fullName || row.createdBy?.username || 'System / Legacy';
           return (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-slate-800 flex items-center gap-1">
-                <User size={11} className="text-slate-400" />
-                {creator}
-              </span>
-              <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                <Clock size={11} className="text-slate-400" />
-                {formatDate(row.createdAt)}
-              </span>
+            <div className="flex flex-col gap-0.5 text-xs">
+              <span className="font-medium text-slate-800">{creator}</span>
+              <span className="text-slate-500 text-[11px]">{formatDate(row.createdAt)}</span>
             </div>
           );
         },
       },
       {
         key: 'approvalStatus',
-        header: 'Approval Status',
+        header: 'Status',
         width: '140px',
-        render: (val) => <StatusBadge status={val || 'APPROVED'} />,
-      },
-    ];
-
-    if (activeTab === 'rejected') {
-      base.push({
-        key: 'rejectionReason',
-        header: 'Rejection Reason',
-        width: '250px',
         render: (val, row) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-red-700 font-medium bg-red-50 p-1.5 rounded border border-red-200">
-              {val || 'No reason specified'}
-            </span>
-            {row.rejectedBy && (
-              <span className="text-[10px] text-slate-400">
-                Rejected by: {row.rejectedBy.fullName || row.rejectedBy.username} ({formatDate(row.rejectedAt)})
+          <div className="flex flex-col gap-1 items-start">
+            <StatusBadge status={val || 'APPROVED'} />
+            {row.approvalStatus === 'REJECTED' && row.rejectionReason && (
+              <span className="text-[10.5px] text-red-600 truncate max-w-[180px]" title={row.rejectionReason}>
+                {row.rejectionReason}
               </span>
             )}
           </div>
         ),
-      });
-    }
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        align: 'right',
+        width: '190px',
+        render: (_, row) => (
+          <div className="inline-flex gap-1.5 items-center justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Eye}
+              onClick={() => {
+                setSelectedRecord(row);
+                setIsDetailOpen(true);
+              }}
+            >
+              Review
+            </Button>
 
-    base.push({
-      key: 'actions',
-      header: 'Actions',
-      align: 'right',
-      width: '180px',
-      render: (_, row) => (
-        <div className="inline-flex gap-1.5 items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={Eye}
-            onClick={() => {
-              setSelectedRecord(row);
-              setIsDetailOpen(true);
-            }}
-          >
-            Review
-          </Button>
+            {row.approvalStatus === 'PENDING_APPROVAL' && (
+              <>
+                <Button
+                  size="sm"
+                  className="!bg-emerald-600 hover:!bg-emerald-700 !text-white !border-transparent"
+                  onClick={() => {
+                    setSelectedRecord(row);
+                    setIsApproveOpen(true);
+                  }}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedRecord(row);
+                    setRejectionReason('');
+                    setIsRejectOpen(true);
+                  }}
+                >
+                  Reject
+                </Button>
+              </>
+            )}
+          </div>
+        ),
+      },
+    ];
+  }, []);
 
-          {row.approvalStatus === 'PENDING_APPROVAL' && (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                icon={CheckCircle}
-                style={{ backgroundColor: '#10b981', borderColor: '#059669' }}
-                onClick={() => {
-                  setSelectedRecord(row);
-                  setIsApproveOpen(true);
-                }}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={XCircle}
-                onClick={() => {
-                  setSelectedRecord(row);
-                  setRejectionReason('');
-                  setIsRejectOpen(true);
-                }}
-              >
-                Reject
-              </Button>
-            </>
-          )}
-        </div>
-      ),
-    });
-
-    return base;
-  }, [activeTab]);
+  const approvalTabs = [
+    { key: 'pending-parties', label: 'Pending Parties', count: metrics.pendingPartiesCount },
+    { key: 'pending-suppliers', label: 'Pending Suppliers', count: metrics.pendingSuppliersCount },
+    { key: 'approved', label: 'Approved', count: metrics.approvedCount },
+    { key: 'rejected', label: 'Rejected', count: metrics.rejectedCount },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        title="Admin Approval Center"
-        subtitle="Authorize or reject newly submitted Party and Supplier master records"
+        title="Admin Approvals"
         breadcrumbs={[
           { label: 'Home', path: '/dashboard' },
           { label: 'Admin Approvals' },
@@ -440,161 +396,48 @@ const AdminApprovals = () => {
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
       {successMsg && <Alert type="success" message={successMsg} onClose={() => setSuccessMsg('')} />}
 
-      {/* METRIC COUNTER CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div
-          onClick={() => setActiveTab('pending-parties')}
-          className={`p-4 rounded-lg border cursor-pointer transition-all ${
-            activeTab === 'pending-parties'
-              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pending Parties
-            </span>
-            <Users size={18} className="text-amber-600" />
-          </div>
-          <div className="text-2xl font-bold text-amber-700 mt-2">{metrics.pendingPartiesCount}</div>
-          <div className="text-xs text-slate-500 mt-1">Clients requiring approval</div>
+      {/* Horizontal Tabs */}
+      <Tabs
+        tabs={approvalTabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          {(activeTab === 'approved' || activeTab === 'rejected') && (
+            <Select
+              value={masterTypeFilter}
+              onChange={(e) => setMasterTypeFilter(e.target.value)}
+              style={{ width: '130px', height: '32px', fontSize: '12px' }}
+            >
+              <option value="all">All Types</option>
+              <option value="party">Parties</option>
+              <option value="supplier">Suppliers</option>
+            </Select>
+          )}
         </div>
 
-        <div
-          onClick={() => setActiveTab('pending-suppliers')}
-          className={`p-4 rounded-lg border cursor-pointer transition-all ${
-            activeTab === 'pending-suppliers'
-              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pending Suppliers
-            </span>
-            <Truck size={18} className="text-amber-600" />
-          </div>
-          <div className="text-2xl font-bold text-amber-700 mt-2">{metrics.pendingSuppliersCount}</div>
-          <div className="text-xs text-slate-500 mt-1">Suppliers requiring approval</div>
-        </div>
-
-        <div
-          onClick={() => setActiveTab('approved')}
-          className={`p-4 rounded-lg border cursor-pointer transition-all ${
-            activeTab === 'approved'
-              ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Approved Records
-            </span>
-            <CheckCircle size={18} className="text-emerald-600" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-700 mt-2">{metrics.approvedCount}</div>
-          <div className="text-xs text-slate-500 mt-1">Active in transactions</div>
-        </div>
-
-        <div
-          onClick={() => setActiveTab('rejected')}
-          className={`p-4 rounded-lg border cursor-pointer transition-all ${
-            activeTab === 'rejected'
-              ? 'bg-red-50/80 border-red-300 ring-2 ring-red-400'
-              : 'bg-white border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Rejected Records
-            </span>
-            <XCircle size={18} className="text-red-600" />
-          </div>
-          <div className="text-2xl font-bold text-red-700 mt-2">{metrics.rejectedCount}</div>
-          <div className="text-xs text-slate-500 mt-1">Excluded from transactions</div>
+        <div className="relative w-full sm:w-64 sm:ml-auto">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <Input
+            placeholder="Search code, name, city..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ paddingLeft: '28px' }}
+          />
         </div>
       </div>
 
-      {/* TABS & SEARCH BAR */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('pending-parties')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'pending-parties'
-                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Users size={14} /> Pending Parties ({metrics.pendingPartiesCount})
-            </button>
-
-            <button
-              onClick={() => setActiveTab('pending-suppliers')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'pending-suppliers'
-                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Truck size={14} /> Pending Suppliers ({metrics.pendingSuppliersCount})
-            </button>
-
-            <button
-              onClick={() => setActiveTab('approved')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'approved'
-                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <CheckCircle size={14} /> Approved ({metrics.approvedCount})
-            </button>
-
-            <button
-              onClick={() => setActiveTab('rejected')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'rejected'
-                  ? 'bg-red-100 text-red-900 border border-red-300'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <XCircle size={14} /> Rejected ({metrics.rejectedCount})
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {(activeTab === 'approved' || activeTab === 'rejected') && (
-              <Select
-                value={masterTypeFilter}
-                onChange={(e) => setMasterTypeFilter(e.target.value)}
-                style={{ width: '150px' }}
-              >
-                <option value="all">All Masters</option>
-                <option value="party">Party Only</option>
-                <option value="supplier">Supplier Only</option>
-              </Select>
-            )}
-
-            <div className="relative w-64">
-              <Input
-                placeholder="Search code, name, city..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* DATA TABLE */}
-        <DataTable
-          columns={columns}
-          data={tabData}
-          loading={loading}
-          emptyMessage="No approval records matching this criteria."
-        />
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={columns}
+        data={tabData}
+        loading={loading}
+        emptyTitle="No approval records"
+        emptyDescription="There are no records matching the selected tab or search criteria."
+      />
 
       {/* REVIEW DETAILS MODAL */}
       {selectedRecord && (
