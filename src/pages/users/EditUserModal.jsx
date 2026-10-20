@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { updateUser } from '../../services/userService';
 import { getEmployees } from '../../services/employeeService';
 import { getRoles } from '../../services/roleService';
@@ -27,12 +27,17 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
   const [successMessage, setSuccessMessage] = useState('');
 
   // Other user account employee IDs (excluding current user)
-  const otherUsersEmployeeIds = new Set(
+  const otherUsersEmployeeIds = useMemo(() => new Set(
     existingUsers
       .filter((u) => u._id !== user?._id)
-      .map((u) => u.employee?._id || u.employee)
+      .map((u) => (u.employee?._id || u.employee)?.toString())
       .filter(Boolean)
-  );
+  ), [existingUsers, user]);
+
+  // Eligible employees: only current user's employee or employees without accounts
+  const eligibleEmployees = useMemo(() => {
+    return employees.filter((emp) => !otherUsersEmployeeIds.has(emp._id?.toString()));
+  }, [employees, otherUsersEmployeeIds]);
 
   useEffect(() => {
     if (!isOpen || !user) return;
@@ -204,14 +209,11 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
             disabled={submitting || loadingData}
           >
             <option value="">-- Select Employee --</option>
-            {employees.map((emp) => {
-              const isOtherUserEmployee = otherUsersEmployeeIds.has(emp._id);
-              return (
-                <option key={emp._id} value={emp._id} disabled={isOtherUserEmployee}>
-                  {emp.employeeCode} — {emp.fullName} ({emp.department?.departmentName || 'No Dept'}) {isOtherUserEmployee ? ' [Linked to another account]' : ''}
-                </option>
-              );
-            })}
+            {eligibleEmployees.map((emp) => (
+              <option key={emp._id} value={emp._id}>
+                {emp.employeeCode} — {emp.fullName} ({emp.department?.departmentName || 'No Dept'})
+              </option>
+            ))}
           </Select>
         </FormField>
 

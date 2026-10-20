@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createUser } from '../../services/userService';
 import { getEmployees } from '../../services/employeeService';
 import { getRoles } from '../../services/roleService';
@@ -28,10 +28,17 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Set of employee IDs that already have a User account
-  const existingUserEmployeeIds = new Set(
-    existingUsers.map((u) => u.employee?._id || u.employee).filter(Boolean)
-  );
+  // Set of employee IDs that already have a User account (active or inactive)
+  const existingUserEmployeeIds = useMemo(() => new Set(
+    existingUsers
+      .map((u) => (u.employee?._id || u.employee)?.toString())
+      .filter(Boolean)
+  ), [existingUsers]);
+
+  // Eligible employees: only employees who do not already have a user account
+  const eligibleEmployees = useMemo(() => {
+    return employees.filter((emp) => !existingUserEmployeeIds.has(emp._id?.toString()));
+  }, [employees, existingUserEmployeeIds]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,7 +48,7 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
       setErrorMessage('');
       try {
         const [empRes, roleRes] = await Promise.all([
-          getEmployees(),
+          getEmployees({ withoutUser: true }),
           getRoles(),
         ]);
 
@@ -105,8 +112,8 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
     if (!formData.employeeId) {
       return 'Please select an employee.';
     }
-    if (existingUserEmployeeIds.has(formData.employeeId)) {
-      return 'This employee already has an active ERP user account.';
+    if (existingUserEmployeeIds.has(formData.employeeId?.toString())) {
+      return 'This employee already has a user account.';
     }
     if (!formData.username.trim()) {
       return 'Username is required.';
@@ -197,15 +204,18 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
             onChange={handleChange}
             disabled={submitting || loadingData}
           >
-            <option value="">-- Select Employee --</option>
-            {employees.map((emp) => {
-              const hasAccount = existingUserEmployeeIds.has(emp._id);
-              return (
-                <option key={emp._id} value={emp._id} disabled={hasAccount}>
-                  {emp.employeeCode} — {emp.fullName} ({emp.department?.departmentName || 'No Dept'}) {hasAccount ? ' [Account Exists]' : ''}
-                </option>
-              );
-            })}
+            <option value="">
+              {loadingData
+                ? '-- Loading eligible employees... --'
+                : eligibleEmployees.length === 0
+                ? '-- No eligible employees available --'
+                : '-- Select Employee --'}
+            </option>
+            {eligibleEmployees.map((emp) => (
+              <option key={emp._id} value={emp._id}>
+                {emp.employeeCode} — {emp.fullName} ({emp.department?.departmentName || 'No Dept'})
+              </option>
+            ))}
           </Select>
         </FormField>
 

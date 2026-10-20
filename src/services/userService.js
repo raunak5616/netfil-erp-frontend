@@ -10,6 +10,11 @@ export const getUserById = async (id) => {
   return response.data;
 };
 
+export const getEligibleEmployees = async () => {
+  const response = await api.get('/users/eligible-employees');
+  return response.data;
+};
+
 export const createUser = async (userData) => {
   const response = await api.post('/users', userData);
   return response.data;

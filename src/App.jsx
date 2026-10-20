@@ -45,7 +45,7 @@ import AdminApprovals from './pages/admin/AdminApprovals';
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />
