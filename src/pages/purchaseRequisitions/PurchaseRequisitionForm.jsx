@@ -504,48 +504,79 @@ const PurchaseRequisitionForm = () => {
           </div>
         </div>
 
-        {/* LINE ITEMS TABLE CARD */}
+        {/* REQUISITION LINE ITEMS SECTION */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Package size={16} className="text-blue-600" />
               Requisition Line Items ({lineItems.length})
             </h3>
             {!isFormDisabled && (
-              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                <Plus size={14} className="mr-1" /> Add Line Item
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addLineItem}
+              >
+                <Plus size={14} className="mr-1.5" />
+                Add Line Item
               </Button>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-[11px] uppercase tracking-wider text-left">
-                  <th className="px-3 py-2 w-10 text-center">#</th>
-                  <th className="px-3 py-2 min-w-[200px]">Item <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-28">Item Code</th>
-                  <th className="px-3 py-2 w-28">Qty <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-32">UOM <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-36">Required Date</th>
-                  <th className="px-3 py-2 min-w-[160px]">Specification</th>
-                  <th className="px-3 py-2 min-w-[140px]">Remarks</th>
-                  {!isFormDisabled && <th className="px-3 py-2 w-12 text-center">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {lineItems.map((line, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-3 py-2 text-center text-slate-400 font-medium">{idx + 1}</td>
-                    
-                    {/* Item Select */}
-                    <td className="px-3 py-2">
+          {/* Line Item Cards List */}
+          <div className="space-y-4">
+            {lineItems.map((line, idx) => (
+              <div
+                key={idx}
+                className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3.5 transition-colors hover:border-slate-300"
+              >
+                {/* Line Item Card Header: Item # and Remove Action */}
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-100 text-blue-700 font-bold text-xs shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700 truncate">
+                      Item #{idx + 1}
+                      {line.itemName && (
+                        <span className="text-slate-500 font-normal ml-1.5">
+                          — {line.itemName} {line.itemCode ? `(${line.itemCode})` : ''}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {!isFormDisabled && (
+                    <button
+                      type="button"
+                      onClick={() => removeLineItem(idx)}
+                      disabled={lineItems.length === 1}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        lineItems.length === 1
+                          ? 'text-slate-300 cursor-not-allowed'
+                          : 'text-slate-500 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 cursor-pointer'
+                      }`}
+                      title={lineItems.length === 1 ? 'At least one line item is required' : 'Remove Line Item'}
+                    >
+                      <Trash2 size={13} />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* First Row: Item Selector, Item Code, Quantity, UOM */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
+                  {/* Item Selector (Wide) */}
+                  <div className="md:col-span-5 lg:col-span-6">
+                    <FormField label="Item" required>
                       <Select
                         value={line.item}
                         onChange={(e) => handleItemSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
                         className="text-xs"
+                        placeholder="Search & select item..."
                       >
                         <option value="">-- Select Item --</option>
                         {itemsList.map((itm) => (
@@ -554,22 +585,26 @@ const PurchaseRequisitionForm = () => {
                           </option>
                         ))}
                       </Select>
-                    </td>
+                    </FormField>
+                  </div>
 
-                    {/* Item Code (Readonly) */}
-                    <td className="px-3 py-2">
+                  {/* Item Code (Auto / Readonly) */}
+                  <div className="md:col-span-2 lg:col-span-2">
+                    <FormField label="Item Code">
                       <Input
                         type="text"
                         value={line.itemCode}
                         readOnly
                         disabled
-                        className="bg-slate-100 font-mono text-[11px] text-slate-700"
+                        className="bg-slate-100 font-mono text-xs text-slate-700"
                         placeholder="Auto"
                       />
-                    </td>
+                    </FormField>
+                  </div>
 
-                    {/* Quantity */}
-                    <td className="px-3 py-2">
+                  {/* Quantity */}
+                  <div className="md:col-span-2 lg:col-span-2">
+                    <FormField label="Quantity" required>
                       <Input
                         type="number"
                         step="any"
@@ -579,17 +614,21 @@ const PurchaseRequisitionForm = () => {
                         disabled={isFormDisabled}
                         required
                         className="text-right font-semibold text-slate-900"
+                        placeholder="1.00"
                       />
-                    </td>
+                    </FormField>
+                  </div>
 
-                    {/* UOM Select */}
-                    <td className="px-3 py-2">
+                  {/* UOM */}
+                  <div className="md:col-span-3 lg:col-span-2">
+                    <FormField label="UOM" required>
                       <Select
                         value={line.uom}
                         onChange={(e) => handleUomSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
                         className="text-xs"
+                        placeholder="-- Select UOM --"
                       >
                         <option value="">-- UOM --</option>
                         {uomsList.map((u) => (
@@ -598,66 +637,53 @@ const PurchaseRequisitionForm = () => {
                           </option>
                         ))}
                       </Select>
-                    </td>
+                    </FormField>
+                  </div>
+                </div>
 
-                    {/* Required Date */}
-                    <td className="px-3 py-2">
+                {/* Second Row: Required Date, Specification, Remarks */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start pt-0.5">
+                  {/* Required Date */}
+                  <div className="md:col-span-3">
+                    <FormField label="Required Date">
                       <Input
                         type="date"
                         value={line.requiredDate}
                         onChange={(e) => handleLineFieldChange(idx, 'requiredDate', e.target.value)}
                         disabled={isFormDisabled}
                       />
-                    </td>
+                    </FormField>
+                  </div>
 
-                    {/* Specification */}
-                    <td className="px-3 py-2">
+                  {/* Specification */}
+                  <div className="md:col-span-4 lg:col-span-4">
+                    <FormField label="Specification">
                       <Input
                         type="text"
-                        placeholder="Grade, size, tolerances..."
+                        placeholder="Grade, size, tolerance, specs..."
                         value={line.specification}
                         onChange={(e) => handleLineFieldChange(idx, 'specification', e.target.value)}
                         disabled={isFormDisabled}
                       />
-                    </td>
+                    </FormField>
+                  </div>
 
-                    {/* Remarks */}
-                    <td className="px-3 py-2">
+                  {/* Remarks */}
+                  <div className="md:col-span-5 lg:col-span-5">
+                    <FormField label="Remarks">
                       <Input
                         type="text"
-                        placeholder="Line note..."
+                        placeholder="Procurement notes, preferred brand, instructions..."
                         value={line.remarks}
                         onChange={(e) => handleLineFieldChange(idx, 'remarks', e.target.value)}
                         disabled={isFormDisabled}
                       />
-                    </td>
-
-                    {/* Remove Action */}
-                    {!isFormDisabled && (
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeLineItem(idx)}
-                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Remove Line Item"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </FormField>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-
-          {!isFormDisabled && (
-            <div className="pt-2">
-              <Button type="button" variant="ghost" size="sm" onClick={addLineItem} className="text-blue-600">
-                <Plus size={14} className="mr-1" /> Add Another Line Item
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* SUBMIT BUTTONS BAR */}
