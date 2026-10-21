@@ -16,6 +16,11 @@ export const createSalesOrder = async (salesOrderData) => {
   return response.data;
 };
 
+export const compareQuotationChanges = async (comparisonPayload) => {
+  const response = await api.post('/sales-orders/compare-quotation', comparisonPayload);
+  return response.data;
+};
+
 export const updateSalesOrder = async (salesOrderId, salesOrderData) => {
   const response = await api.put(`/sales-orders/${salesOrderId}`, salesOrderData);
   return response.data;
