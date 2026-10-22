@@ -176,7 +176,14 @@ const getItemTechnicalSpecs = (it) => {
     if (flangeCode || flangeName) {
       specs.push({ label: 'Flange Design', value: flangeCode ? `${flangeCode}${flangeName ? ` (${flangeName})` : ''}` : flangeName });
     }
-  } else if (isBox) {
+  }
+
+  const drwSnap = it.drawingSnapshot || (typeof it.drawing === 'object' ? it.drawing : null) || (typeof itemDoc?.drawing === 'object' ? itemDoc.drawing : null);
+  if (drwSnap && drwSnap.drawingCode) {
+    specs.push({ label: 'Engineering Drawing', value: `${drwSnap.drawingCode}${drwSnap.drawingName ? ` (${drwSnap.drawingName})` : ''}` });
+  }
+
+  if (isBox) {
     if (boxW && boxH && boxD) {
       specs.push({ label: 'BOX Size', value: `${boxW} × ${boxH} × ${boxD} ${unit}` });
       specs.push({ label: 'Overall Size', value: `${boxW} × ${boxH} × ${boxD} ${unit} (Equal to BOX)` });

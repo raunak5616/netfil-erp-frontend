@@ -67,6 +67,7 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      zIndex={1100}
       title={`Technical Drawing Configuration — ${item.description || 'Line Item'}`}
       size="xl"
     >
@@ -142,7 +143,7 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <ImageIcon size={15} className="text-blue-600" />
-                Reference Design Preview — {designCode} {designName ? `(${designName})` : ''}
+                Flange CAD Diagram — {designCode} {designName ? `(${designName})` : ''}
               </span>
             </div>
 
@@ -150,11 +151,64 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
               <img
                 src={referenceImage}
                 alt={designName || 'Flange Design'}
-                className="max-h-[260px] object-contain rounded"
+                className="max-h-[240px] object-contain rounded"
               />
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {/* Drawing Master Assigned Drawing Preview */}
+        {(() => {
+          const drawingSnap = item.drawingSnapshot || (typeof item.drawing === 'object' ? item.drawing : null) || (typeof item.item === 'object' && item.item?.drawing ? item.item.drawing : null);
+          const masterDrawingUrl = drawingSnap?.fileUrl;
+          const masterDrawingCode = drawingSnap?.drawingCode;
+          const masterDrawingName = drawingSnap?.drawingName;
+          const masterGradeName = drawingSnap?.filterGradeName || (typeof item.item?.filterGrade === 'object' ? item.item.filterGrade.filterGrade : '');
+          const isPdf = masterDrawingUrl && (drawingSnap.format === 'pdf' || masterDrawingUrl.toLowerCase().endsWith('.pdf'));
+
+          if (!masterDrawingUrl) return null;
+
+          return (
+            <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                  <ImageIcon size={15} className="text-emerald-700" />
+                  Assigned Engineering Drawing (Drawing Master) — {masterDrawingCode} {masterDrawingName ? `(${masterDrawingName})` : ''}
+                </span>
+                {masterGradeName && (
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded">
+                    Grade: {masterGradeName}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex justify-center bg-white p-3 rounded-lg border border-emerald-200 min-h-[160px]">
+                {isPdf ? (
+                  <div className="flex flex-col items-center justify-center p-4">
+                    <FileText size={40} className="text-red-500 mb-1" />
+                    <span className="font-semibold text-slate-800 text-xs">{masterDrawingCode}.pdf</span>
+                    <a
+                      href={masterDrawingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center gap-1"
+                    >
+                      <ExternalLink size={12} /> Open PDF in Tab
+                    </a>
+                  </div>
+                ) : (
+                  <img
+                    src={masterDrawingUrl}
+                    alt={masterDrawingName || 'Drawing Master'}
+                    className="max-h-[240px] object-contain rounded"
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {!referenceImage && !(item.drawingSnapshot?.fileUrl || (typeof item.drawing === 'object' && item.drawing?.fileUrl)) && (
           <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
             No reference preview image available for this design
           </div>

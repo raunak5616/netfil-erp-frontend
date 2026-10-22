@@ -7,6 +7,8 @@ import { getItemCategories } from '../../services/itemCategoryService';
 import { getUOMs } from '../../services/uomService';
 import { getEmployees } from '../../services/employeeService';
 import { getFlangeDesigns } from '../../services/flangeDesignService';
+import { getFilterGrades } from '../../services/filterGradeService';
+import DrawingSelector from '../../components/drawing/DrawingSelector';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -21,8 +23,88 @@ import {
   Maximize2, 
   Image as ImageIcon,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Sparkles,
+  Info
 } from 'lucide-react';
+
+// Standard MOC options discovered from master data and historical ERP records
+const STANDARD_MOC_OPTIONS = [
+  'Aluminum',
+  'SS304',
+  'SS316L',
+  'Galvanized Iron (GI)',
+  'CRCA Powder Coated',
+  'Mild Steel'
+];
+
+// Confirmed Bonding options with operating temperature ranges
+const BONDING_OPTIONS = [
+  { value: 'PU Bonding', label: 'PU Bonding (50–150 °C)' },
+  { value: 'Epoxy Bonding', label: 'Epoxy Bonding (200–350 °C)' },
+  { value: 'White Adhesive (Ceramic)', label: 'White Adhesive (Ceramic) (230–400 °C)' }
+];
+
+// Helper to normalize and extract construction from a variant object
+const getVariantConstruction = (v) => {
+  const raw = (v?.mountingType && String(v.mountingType).trim()) || (v?.filterType && String(v.filterType).trim()) || '';
+  return raw.toUpperCase();
+};
+
+const getCatalogDetailsForEnquiryItem = (itemObj, prevCatalogDetails = {}) => {
+  const bw = Number(itemObj?.dimensions?.bodyWidth) || '';
+  const bh = Number(itemObj?.dimensions?.bodyHeight) || '';
+  const bd = Number(itemObj?.dimensions?.depth) || '';
+  const fpm = Number(itemObj?.dimensions?.faceVelocity) || 500;
+  const isFlange = (itemObj?.constructionType || 'FLANGE').toUpperCase() === 'FLANGE';
+
+  return {
+    itemCode: prevCatalogDetails?.itemCode || 'AUTO',
+    itemName: prevCatalogDetails?.itemName || itemObj?.newItemName || itemObj?.itemSearch || '',
+    itemCategory: itemObj?.itemCategory || prevCatalogDetails?.itemCategory || '',
+    productType: prevCatalogDetails?.productType || 'FILTER',
+    itemType: prevCatalogDetails?.itemType || 'finished_goods',
+    inventoryUom: itemObj?.uom || prevCatalogDetails?.inventoryUom || '',
+    purchaseUom: prevCatalogDetails?.purchaseUom || itemObj?.uom || '',
+    salesUom: prevCatalogDetails?.salesUom || itemObj?.uom || '',
+    itemPerPurchaseUnit: prevCatalogDetails?.itemPerPurchaseUnit || 1,
+    itemPerSalesUnit: prevCatalogDetails?.itemPerSalesUnit || 1,
+    hsnCode: prevCatalogDetails?.hsnCode || '',
+    description: prevCatalogDetails?.description || '',
+    // Filter specifics
+    filterGrade: prevCatalogDetails?.filterGrade || '',
+    filterGradeVariant: prevCatalogDetails?.filterGradeVariant || '',
+    drawing: prevCatalogDetails?.drawing || '',
+    constructionType: prevCatalogDetails?.constructionType || itemObj?.constructionType || 'FLANGE',
+    flangeType: isFlange ? (prevCatalogDetails?.flangeType || itemObj?.flangeDesign || '') : '',
+    filterLength: prevCatalogDetails?.filterLength !== undefined && prevCatalogDetails?.filterLength !== ''
+      ? prevCatalogDetails.filterLength
+      : bh,
+    filterWidth: prevCatalogDetails?.filterWidth !== undefined && prevCatalogDetails?.filterWidth !== ''
+      ? prevCatalogDetails.filterWidth
+      : bw,
+    filterDepth: prevCatalogDetails?.filterDepth !== undefined && prevCatalogDetails?.filterDepth !== ''
+      ? prevCatalogDetails.filterDepth
+      : bd,
+    faceVelocity: prevCatalogDetails?.faceVelocity !== undefined && prevCatalogDetails?.faceVelocity !== ''
+      ? prevCatalogDetails.faceVelocity
+      : fpm,
+    moc: prevCatalogDetails?.moc !== undefined && prevCatalogDetails?.moc !== ''
+      ? prevCatalogDetails.moc
+      : (itemObj?.dimensions?.moc || ''),
+    customMoc: prevCatalogDetails?.customMoc || '',
+    temperatureRating: prevCatalogDetails?.temperatureRating !== undefined && prevCatalogDetails?.temperatureRating !== ''
+      ? prevCatalogDetails.temperatureRating
+      : (itemObj?.dimensions?.temperature || ''),
+    bonding: prevCatalogDetails?.bonding || '',
+    reorderLevel: prevCatalogDetails?.reorderLevel || 0,
+    reorderQty: prevCatalogDetails?.reorderQty || 0,
+    minInventory: prevCatalogDetails?.minInventory || 0,
+    maxInventory: prevCatalogDetails?.maxInventory || 0,
+    leadTimeDays: prevCatalogDetails?.leadTimeDays || 0,
+    defaultBin: prevCatalogDetails?.defaultBin || ''
+  };
+};
 
 const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
   id: `item_${Date.now()}_${idIndex}_${Math.random().toString(36).substring(2, 7)}`,
@@ -50,6 +132,39 @@ const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
   isItemDropdownOpen: false,
   saveToCatalog: false,
   newItemName: '',
+  catalogDetails: {
+    itemCode: 'AUTO',
+    itemName: '',
+    itemCategory: '',
+    productType: 'FILTER',
+    itemType: 'finished_goods',
+    inventoryUom: '',
+    purchaseUom: '',
+    salesUom: '',
+    itemPerPurchaseUnit: 1,
+    itemPerSalesUnit: 1,
+    hsnCode: '',
+    description: '',
+    filterGrade: '',
+    filterGradeVariant: '',
+    drawing: '',
+    constructionType: 'FLANGE',
+    flangeType: defaultFlangeId || '',
+    filterLength: '',
+    filterWidth: '',
+    filterDepth: '',
+    faceVelocity: 500,
+    moc: '',
+    customMoc: '',
+    temperatureRating: '',
+    bonding: '',
+    reorderLevel: 0,
+    reorderQty: 0,
+    minInventory: 0,
+    maxInventory: 0,
+    leadTimeDays: 0,
+    defaultBin: ''
+  }
 });
 
 const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
@@ -64,7 +179,17 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const [uoms, setUoms] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [flangeDesigns, setFlangeDesigns] = useState([]);
+  const [filterGrades, setFilterGrades] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
+
+  // Default active FLANGE construction design ID
+  const defaultFlangeId = useMemo(() => {
+    if (!flangeDesigns || flangeDesigns.length === 0) return '';
+    const found =
+      flangeDesigns.find((f) => f.constructionType === 'FLANGE' && f.status === 'active' && f.designCode !== 'BOX-001') ||
+      flangeDesigns.find((f) => f.constructionType === 'FLANGE');
+    return found?._id || '';
+  }, [flangeDesigns]);
 
   // Search states for party dropdown selector
   const [clientSearch, setClientSearch] = useState('');
@@ -124,13 +249,14 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           );
         };
 
-        const [cRes, iRes, catRes, uRes, eRes, fRes] = await Promise.all([
+        const [cRes, iRes, catRes, uRes, eRes, fRes, fgRes] = await Promise.all([
           getClients({ typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' }),
           getItems({ typeFilter: 'MASTER' }),
           getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getEmployees(),
           getFlangeDesigns({ status: 'active' }),
+          getFilterGrades().catch(() => ({ success: false, filterGrades: [] }))
         ]);
 
         if (cRes.success && Array.isArray(cRes.clients)) {
@@ -151,6 +277,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         }
         if (fRes.success && Array.isArray(fRes.flangeDesigns)) {
           setFlangeDesigns(fRes.flangeDesigns.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001'));
+        }
+        if (fgRes && fgRes.success && Array.isArray(fgRes.filterGrades)) {
+          setFilterGrades(fgRes.filterGrades.filter((g) => g.status === 'active'));
         }
       } catch (err) {
         console.error('Failed to load master references:', err);
@@ -393,7 +522,6 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
   // MULTI-ITEM ARRAY HANDLERS
   const handleAddItem = () => {
-    const defaultFlangeId = flangeDesigns.length > 0 ? (flangeDesigns.find(f => f.constructionType === 'FLANGE')?._id || '') : '';
     setFormData((prev) => ({
       ...prev,
       items: [
@@ -495,6 +623,31 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         ...curItem,
         dimensions: nextDims,
       };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleCatalogDetailChange = (index, field, value) => {
+    setFormData((prev) => {
+      const updated = [...prev.items];
+      const curItem = updated[index];
+      const currentCat = curItem.catalogDetails || getCatalogDetailsForEnquiryItem(curItem);
+      const nextCat = { ...currentCat, [field]: value };
+
+      if (field === 'itemName') {
+        curItem.newItemName = value;
+      }
+      if (field === 'filterGrade') {
+        nextCat.filterGradeVariant = '';
+        nextCat.drawing = '';
+      }
+      if (field === 'productType' && value !== 'FILTER') {
+        nextCat.filterGrade = '';
+        nextCat.filterGradeVariant = '';
+        nextCat.drawing = '';
+      }
+
+      updated[index] = { ...curItem, catalogDetails: nextCat };
       return { ...prev, items: updated };
     });
   };
@@ -648,12 +801,42 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           if (!canCreateItem) {
             return `${numLabel}: You do not have permission to save products to the Item Catalog. Please uncheck 'Save to Item Catalog'.`;
           }
-          const enteredName = (itemObj.newItemName || itemObj.itemSearch || '').trim();
+          const catDetails = getCatalogDetailsForEnquiryItem(itemObj, itemObj.catalogDetails);
+          const enteredName = (catDetails.itemName || itemObj.newItemName || itemObj.itemSearch || '').trim();
           if (!enteredName) {
-            return `${numLabel}: Item Name is required when 'Save to Item Catalog' is checked.`;
+            return `${numLabel}: Catalog Item Name is required when 'Save to Item Catalog' is checked.`;
           }
-          if (!itemObj.itemCategory) {
+          const targetCatId = catDetails.itemCategory || itemObj.itemCategory;
+          if (!targetCatId) {
             return `${numLabel}: Item Category is required when 'Save to Item Catalog' is checked.`;
+          }
+          const targetUomId = catDetails.inventoryUom || itemObj.uom;
+          if (!targetUomId) {
+            return `${numLabel}: UOM is required when 'Save to Item Catalog' is checked.`;
+          }
+
+          if (catDetails.productType === 'FILTER') {
+            if (catDetails.filterGrade && !catDetails.filterGradeVariant) {
+              return `${numLabel}: Filter Grade Variant is required when a Filter Grade is selected for the catalog item.`;
+            }
+            if (catDetails.filterLength !== '' && (Number(catDetails.filterLength) <= 0 || isNaN(Number(catDetails.filterLength)))) {
+              return `${numLabel}: Catalog Filter Length must be a positive number in mm.`;
+            }
+            if (catDetails.filterWidth !== '' && (Number(catDetails.filterWidth) <= 0 || isNaN(Number(catDetails.filterWidth)))) {
+              return `${numLabel}: Catalog Filter Width must be a positive number in mm.`;
+            }
+            if (catDetails.filterDepth !== '' && (Number(catDetails.filterDepth) <= 0 || isNaN(Number(catDetails.filterDepth)))) {
+              return `${numLabel}: Catalog Filter Depth must be a positive number in mm.`;
+            }
+            if (catDetails.faceVelocity !== '' && (Number(catDetails.faceVelocity) <= 0 || isNaN(Number(catDetails.faceVelocity)))) {
+              return `${numLabel}: Catalog Face Velocity must be a positive number in FPM.`;
+            }
+            if (catDetails.moc === 'OTHER' && !catDetails.customMoc?.trim()) {
+              return `${numLabel}: Please specify the custom Material of Construction (MOC) for the catalog item.`;
+            }
+            if (catDetails.temperatureRating !== '' && isNaN(Number(catDetails.temperatureRating))) {
+              return `${numLabel}: Catalog Temperature Rating must be a valid number in °C.`;
+            }
           }
         }
 
@@ -667,8 +850,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         if (!d || d <= 0) return `${numLabel}: Depth must be a positive number.`;
 
         if (cType === 'FLANGE') {
-          if (!itemObj.flangeDesign) {
-            return `${numLabel}: Flange Design selection is required when constructionType is FLANGE.`;
+          if (!itemObj.flangeDesign && defaultFlangeId) {
+            itemObj.flangeDesign = defaultFlangeId;
           }
           const fw = Number(itemObj.dimensions.overallFlangeWidth) || (bw > 0 ? bw + 60 : 0);
           const fh = Number(itemObj.dimensions.overallFlangeHeight) || (bh > 0 ? bh + 60 : 0);
@@ -715,11 +898,26 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         computedCfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
       }
 
+      const isSaveToCat = !itemObj.item && Boolean(itemObj.saveToCatalog);
+      const rawCatDetails = isSaveToCat ? getCatalogDetailsForEnquiryItem(itemObj, itemObj.catalogDetails) : undefined;
+      const targetItemName = isSaveToCat ? (rawCatDetails?.itemName || itemObj.newItemName || itemObj.itemSearch || '').trim() : '';
+
+      const resolvedCatDetails = isSaveToCat ? {
+        ...rawCatDetails,
+        itemName: targetItemName,
+        itemCategory: itemObj.itemCategory || rawCatDetails.itemCategory,
+        inventoryUom: itemObj.uom || rawCatDetails.inventoryUom,
+        purchaseUom: rawCatDetails.purchaseUom || itemObj.uom || rawCatDetails.inventoryUom,
+        salesUom: rawCatDetails.salesUom || itemObj.uom || rawCatDetails.inventoryUom,
+        moc: rawCatDetails.moc === 'OTHER' ? (rawCatDetails.customMoc || 'OTHER') : rawCatDetails.moc,
+      } : undefined;
+
       return {
         itemCategory: itemObj.itemCategory || null,
         item: itemObj.item || null,
-        saveToCatalog: !itemObj.item && Boolean(itemObj.saveToCatalog),
-        newItemName: !itemObj.item && itemObj.saveToCatalog ? (itemObj.newItemName || itemObj.itemSearch || '').trim() : '',
+        saveToCatalog: isSaveToCat,
+        newItemName: targetItemName,
+        catalogDetails: resolvedCatDetails,
         quantity: itemObj.quantity ? Number(itemObj.quantity) : null,
         uom: itemObj.uom || null,
         constructionType: itemObj.constructionType || 'FLANGE',
@@ -761,6 +959,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       item: firstItem.item || null,
       saveToCatalog: firstItem.saveToCatalog || false,
       newItemName: firstItem.newItemName || '',
+      catalogDetails: firstItem.catalogDetails || undefined,
       quantity: firstItem.quantity || null,
       uom: firstItem.uom || null,
       constructionType: firstItem.constructionType || 'FLANGE',
@@ -1264,22 +1463,26 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                               )}
 
                               {!selectedCatalogItem && (
-                                <div style={{ marginTop: '8px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canCreateItem ? 'pointer' : 'not-allowed', fontSize: '12.5px', fontWeight: 600, color: 'var(--neutral-800)' }}>
+                                <div style={{ marginTop: '8px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: itemObj.saveToCatalog ? '1.5px solid #3b82f6' : '1px solid #cbd5e1', transition: 'all 0.2s ease-in-out' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: canCreateItem ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: 600, color: itemObj.saveToCatalog ? '#1d4ed8' : 'var(--neutral-800)' }}>
                                     <input
                                       type="checkbox"
                                       checked={itemObj.saveToCatalog || false}
                                       onChange={(e) => {
                                         const isChecked = e.target.checked;
                                         handleItemFieldChange(itemIndex, 'saveToCatalog', isChecked);
-                                        if (isChecked && !itemObj.newItemName) {
-                                          handleItemFieldChange(itemIndex, 'newItemName', itemObj.itemSearch || '');
+                                        if (isChecked) {
+                                          const initialCat = getCatalogDetailsForEnquiryItem(itemObj, itemObj.catalogDetails);
+                                          handleCatalogDetailChange(itemIndex, 'itemName', initialCat.itemName || itemObj.itemSearch || '');
                                         }
                                       }}
                                       disabled={submitting || !canCreateItem}
                                       style={{ width: '16px', height: '16px', cursor: canCreateItem ? 'pointer' : 'not-allowed' }}
                                     />
-                                    <span>Save to Item Catalog</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <Sparkles size={15} style={{ color: itemObj.saveToCatalog ? '#2563eb' : '#64748b' }} />
+                                      <span>Save to Item Master Catalog (Reusable Product)</span>
+                                    </span>
                                   </label>
 
                                   {!canCreateItem && (
@@ -1288,50 +1491,328 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                     </div>
                                   )}
 
-                                  {itemObj.saveToCatalog && (
-                                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px' }}>
-                                      <FormField label="Catalog Item Name" required helperText="Enter reusable commercial product name to save in Item Master.">
-                                        <Input
-                                          placeholder="e.g. Synthetic Pocket Filter 592x592x500"
-                                          value={itemObj.newItemName !== undefined ? itemObj.newItemName : (itemObj.itemSearch || '')}
-                                          onChange={(e) => handleItemFieldChange(itemIndex, 'newItemName', e.target.value)}
-                                          disabled={submitting}
-                                        />
-                                      </FormField>
+                                  {itemObj.saveToCatalog && (() => {
+                                    const catDetails = getCatalogDetailsForEnquiryItem(itemObj, itemObj.catalogDetails);
+                                    const isFilterProduct = (catDetails.productType || 'FILTER') === 'FILTER';
+                                    const selectedFgDoc = filterGrades.find((fg) => String(fg._id) === String(catDetails.filterGrade));
+                                    const currentConst = (catDetails.constructionType || itemObj.constructionType || 'FLANGE').toUpperCase();
+                                    const applicableVariants = (selectedFgDoc?.variants || []).filter((v) => {
+                                      const c = getVariantConstruction(v);
+                                      return !c || c === currentConst;
+                                    });
 
-                                      {/* Live Duplicate Item Warning */}
-                                      {(() => {
-                                        const nameToCheck = (itemObj.newItemName || itemObj.itemSearch || '').trim().toLowerCase();
-                                        if (!nameToCheck) return null;
-                                        const duplicate = items.find((i) => {
-                                          const matchesName = (i.itemName || '').toLowerCase() === nameToCheck;
-                                          if (!matchesName) return false;
-                                          if (itemObj.itemCategory) {
-                                            const catId = typeof i.itemCategory === 'object' ? i.itemCategory?._id : i.itemCategory;
-                                            return catId === itemObj.itemCategory;
-                                          }
-                                          return true;
-                                        });
+                                    const cL = Number(catDetails.filterLength !== undefined && catDetails.filterLength !== '' ? catDetails.filterLength : itemObj.dimensions.bodyHeight);
+                                    const cW = Number(catDetails.filterWidth !== undefined && catDetails.filterWidth !== '' ? catDetails.filterWidth : itemObj.dimensions.bodyWidth);
+                                    const cFpm = Number(catDetails.faceVelocity !== undefined && catDetails.faceVelocity !== '' ? catDetails.faceVelocity : (itemObj.dimensions.faceVelocity || 500));
+                                    let catalogCalculatedCfm = null;
+                                    if (cL > 0 && cW > 0 && cFpm > 0) {
+                                      const raw = (cL / 304.8) * (cW / 304.8) * cFpm;
+                                      const r10 = Math.round(raw / 10) * 10;
+                                      catalogCalculatedCfm = r10 === 0 && raw > 0 ? Math.round(raw) : r10;
+                                    }
 
-                                        if (!duplicate) return null;
+                                    const nameToCheck = (catDetails.itemName || itemObj.newItemName || itemObj.itemSearch || '').trim().toLowerCase();
+                                    const duplicate = nameToCheck ? items.find((i) => {
+                                      const matchesName = (i.itemName || '').toLowerCase() === nameToCheck;
+                                      if (!matchesName) return false;
+                                      const targetCat = catDetails.itemCategory || itemObj.itemCategory;
+                                      if (targetCat) {
+                                        const catId = typeof i.itemCategory === 'object' ? i.itemCategory?._id : i.itemCategory;
+                                        return String(catId) === String(targetCat);
+                                      }
+                                      return true;
+                                    }) : null;
 
-                                        return (
-                                          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                            <div style={{ fontSize: '11.5px', color: '#92400e' }}>
-                                              ⚠️ An active item with this name already exists in catalog: <strong>{duplicate.itemName}</strong> ({duplicate.itemCode})
+                                    return (
+                                      <div style={{ marginTop: '12px', padding: '14px', backgroundColor: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        {/* Banner */}
+                                        <div style={{ padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #dbeafe', fontSize: '12px', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Info size={15} style={{ flexShrink: 0, color: '#2563eb' }} />
+                                            <span><strong>Item Master Registration:</strong> Enter standard catalog specifications for reusable master records. Customer requirement dimensions ({itemObj.dimensions.bodyWidth || 0} × {itemObj.dimensions.bodyHeight || 0} × {itemObj.dimensions.depth || 0} mm) will be preserved separately on this enquiry.</span>
+                                          </div>
+                                        </div>
+
+                                        {/* Duplicate Warning */}
+                                        {duplicate && (
+                                          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                            <div style={{ fontSize: '12px', color: '#92400e' }}>
+                                              ⚠️ An active catalog item with this name already exists in this category: <strong>{duplicate.itemName}</strong> ({duplicate.itemCode})
                                             </div>
                                             <button
                                               type="button"
                                               onClick={() => handleSelectItemForIndex(itemIndex, duplicate)}
-                                              style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                              style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                                             >
                                               Select Existing Item
                                             </button>
                                           </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
+                                        )}
+
+                                        {/* Row 1: Item Name, Code, Product Type */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                                          <FormField label="Catalog Item Name" required helperText="Reusable standard product name in Item Master">
+                                            <Input
+                                              placeholder="e.g. Synthetic Pocket Filter 592x592x500"
+                                              value={catDetails.itemName}
+                                              onChange={(e) => handleCatalogDetailChange(itemIndex, 'itemName', e.target.value)}
+                                              disabled={submitting}
+                                            />
+                                          </FormField>
+
+                                          <FormField label="Item Code" helperText="'AUTO' for sequential numbering (e.g. ITEM-000123)">
+                                            <Input
+                                              placeholder="AUTO"
+                                              value={catDetails.itemCode}
+                                              onChange={(e) => handleCatalogDetailChange(itemIndex, 'itemCode', e.target.value.toUpperCase())}
+                                              disabled={submitting}
+                                            />
+                                          </FormField>
+
+                                          <FormField label="Product Type" required>
+                                            <Select
+                                              value={catDetails.productType || 'FILTER'}
+                                              onChange={(e) => handleCatalogDetailChange(itemIndex, 'productType', e.target.value)}
+                                              disabled={submitting}
+                                            >
+                                              <option value="FILTER">FILTER (Air Filter Product)</option>
+                                              <option value="RAW_ITEM">RAW_ITEM (Raw Material / Component)</option>
+                                              <option value="COIL">COIL (Cooling / Heating Coil)</option>
+                                              <option value="AHU">AHU (Air Handling Unit)</option>
+                                            </Select>
+                                          </FormField>
+                                        </div>
+
+                                        {/* Row 2: Category, Inventory UOM, HSN */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                                          <FormField label="Item Category" required helperText="Item Master classification category">
+                                            <Select
+                                              value={catDetails.itemCategory || itemObj.itemCategory}
+                                              onChange={(e) => {
+                                                handleCatalogDetailChange(itemIndex, 'itemCategory', e.target.value);
+                                                if (!itemObj.itemCategory) handleItemFieldChange(itemIndex, 'itemCategory', e.target.value);
+                                              }}
+                                              disabled={submitting || loadingMasters}
+                                            >
+                                              <option value="">-- Select Category --</option>
+                                              {itemCategories.map((c) => (
+                                                <option key={c._id} value={c._id}>
+                                                  {c.categoryName} ({c.categoryCode})
+                                                </option>
+                                              ))}
+                                            </Select>
+                                          </FormField>
+
+                                          <FormField label="Inventory UOM" required helperText="Base stock measurement unit">
+                                            <Select
+                                              value={catDetails.inventoryUom || itemObj.uom}
+                                              onChange={(e) => {
+                                                handleCatalogDetailChange(itemIndex, 'inventoryUom', e.target.value);
+                                                if (!itemObj.uom) handleItemFieldChange(itemIndex, 'uom', e.target.value);
+                                              }}
+                                              disabled={submitting || loadingMasters}
+                                            >
+                                              <option value="">-- Select UOM --</option>
+                                              {uoms.map((u) => (
+                                                <option key={u._id} value={u._id}>
+                                                  {u.uomName} ({u.uomCode})
+                                                </option>
+                                              ))}
+                                            </Select>
+                                          </FormField>
+
+                                          <FormField label="HSN Code" helperText="Goods and Services Tax Tariff Code">
+                                            <Input
+                                              placeholder="e.g. 84213920"
+                                              value={catDetails.hsnCode}
+                                              onChange={(e) => handleCatalogDetailChange(itemIndex, 'hsnCode', e.target.value)}
+                                              disabled={submitting}
+                                            />
+                                          </FormField>
+                                        </div>
+
+                                        {/* Filter Specifications Section */}
+                                        {isFilterProduct && (
+                                          <div style={{ marginTop: '4px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--neutral-800)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                              <Package size={15} className="text-blue-600" />
+                                              <span>Filter Grade & Technical Specifications</span>
+                                            </div>
+
+                                            {/* Filter Grade & Variant */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                              <FormField label="Filter Grade" helperText="Standard Eurovent / EN779 / EN1822 classification">
+                                                <Select
+                                                  value={catDetails.filterGrade}
+                                                  onChange={(e) => handleCatalogDetailChange(itemIndex, 'filterGrade', e.target.value)}
+                                                  disabled={submitting || loadingMasters}
+                                                >
+                                                  <option value="">-- None / Select Filter Grade --</option>
+                                                  {filterGrades.map((g) => (
+                                                    <option key={g._id} value={g._id}>
+                                                      {g.filterGrade} {g.eurovent ? `(${g.eurovent})` : ''}
+                                                    </option>
+                                                  ))}
+                                                </Select>
+                                              </FormField>
+
+                                              <FormField label="Filter Grade Variant" helperText="Mounting, temperature & media variant" required={!!catDetails.filterGrade}>
+                                                <Select
+                                                  value={catDetails.filterGradeVariant}
+                                                  onChange={(e) => handleCatalogDetailChange(itemIndex, 'filterGradeVariant', e.target.value)}
+                                                  disabled={submitting || !catDetails.filterGrade}
+                                                >
+                                                  <option value="">-- Select Variant --</option>
+                                                  {applicableVariants.map((v, vIdx) => {
+                                                    const key = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
+                                                    return (
+                                                      <option key={`fg_var_${vIdx}`} value={key}>
+                                                        {v.filterClass || 'Standard'} | {v.mountingType || v.filterType || 'Any'} | {v.temperature || 'Ambient'} | {v.media || 'Standard Media'}
+                                                      </option>
+                                                    );
+                                                  })}
+                                                </Select>
+                                              </FormField>
+                                            </div>
+
+                                            {/* Drawing Selector Integration */}
+                                            <div style={{ width: '100%' }}>
+                                              <DrawingSelector
+                                                selectedDrawingId={catDetails.drawing}
+                                                filterGradeId={catDetails.filterGrade}
+                                                onSelect={(drawingId) => {
+                                                  handleCatalogDetailChange(itemIndex, 'drawing', drawingId);
+                                                }}
+                                                disabled={submitting}
+                                              />
+                                            </div>
+
+                                            {/* Catalog Standard Dimensions Grid */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-700)' }}>
+                                                Catalog Standard Dimensions (mm) & Face Velocity
+                                              </div>
+                                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                                                <FormField label="Box Length (mm)">
+                                                  <Input
+                                                    type="number"
+                                                    min="1"
+                                                    placeholder={itemObj.dimensions.bodyHeight || 'e.g. 592'}
+                                                    value={catDetails.filterLength !== undefined && catDetails.filterLength !== '' ? catDetails.filterLength : (itemObj.dimensions.bodyHeight || '')}
+                                                    onChange={(e) => handleCatalogDetailChange(itemIndex, 'filterLength', e.target.value)}
+                                                    disabled={submitting}
+                                                  />
+                                                </FormField>
+                                                <FormField label="Box Width (mm)">
+                                                  <Input
+                                                    type="number"
+                                                    min="1"
+                                                    placeholder={itemObj.dimensions.bodyWidth || 'e.g. 592'}
+                                                    value={catDetails.filterWidth !== undefined && catDetails.filterWidth !== '' ? catDetails.filterWidth : (itemObj.dimensions.bodyWidth || '')}
+                                                    onChange={(e) => handleCatalogDetailChange(itemIndex, 'filterWidth', e.target.value)}
+                                                    disabled={submitting}
+                                                  />
+                                                </FormField>
+                                                <FormField label="Box Depth (mm)">
+                                                  <Input
+                                                    type="number"
+                                                    min="1"
+                                                    placeholder={itemObj.dimensions.depth || 'e.g. 292'}
+                                                    value={catDetails.filterDepth !== undefined && catDetails.filterDepth !== '' ? catDetails.filterDepth : (itemObj.dimensions.depth || '')}
+                                                    onChange={(e) => handleCatalogDetailChange(itemIndex, 'filterDepth', e.target.value)}
+                                                    disabled={submitting}
+                                                  />
+                                                </FormField>
+                                                <FormField label="Velocity (FPM)">
+                                                  <Input
+                                                    type="number"
+                                                    min="1"
+                                                    placeholder="500"
+                                                    value={catDetails.faceVelocity !== undefined && catDetails.faceVelocity !== '' ? catDetails.faceVelocity : (itemObj.dimensions.faceVelocity || 500)}
+                                                    onChange={(e) => handleCatalogDetailChange(itemIndex, 'faceVelocity', e.target.value)}
+                                                    disabled={submitting}
+                                                  />
+                                                </FormField>
+                                              </div>
+
+                                              {/* Standard Airflow (CFM) badge */}
+                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '4px 8px', alignSelf: 'flex-start', marginTop: '2px' }}>
+                                                <span>Standard Catalog Airflow:</span>
+                                                <strong>{catalogCalculatedCfm !== null ? `${catalogCalculatedCfm} CFM` : '—'}</strong>
+                                                <span style={{ fontSize: '10.5px', color: '#64748b' }}>(calculated from Box Length × Width @ {cFpm} FPM)</span>
+                                              </div>
+                                            </div>
+
+                                            {/* MOC, Temperature, Bonding */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                                              <FormField label="Material of Construction (MOC)">
+                                                <Select
+                                                  value={catDetails.moc || ''}
+                                                  onChange={(e) => handleCatalogDetailChange(itemIndex, 'moc', e.target.value)}
+                                                  disabled={submitting}
+                                                >
+                                                  <option value="">-- Select MOC --</option>
+                                                  {STANDARD_MOC_OPTIONS.map((opt) => (
+                                                    <option key={opt} value={opt}>
+                                                      {opt}
+                                                    </option>
+                                                  ))}
+                                                  <option value="OTHER">Other / Custom MOC</option>
+                                                </Select>
+                                              </FormField>
+
+                                              {catDetails.moc === 'OTHER' && (
+                                                <FormField label="Custom MOC Description" required>
+                                                  <Input
+                                                    placeholder="Specify custom material..."
+                                                    value={catDetails.customMoc || ''}
+                                                    onChange={(e) => handleCatalogDetailChange(itemIndex, 'customMoc', e.target.value)}
+                                                    disabled={submitting}
+                                                  />
+                                                </FormField>
+                                              )}
+
+                                              <FormField label="Operating Temperature (°C)">
+                                                <Input
+                                                  type="number"
+                                                  placeholder="e.g. 80"
+                                                  value={catDetails.temperatureRating !== undefined && catDetails.temperatureRating !== '' ? catDetails.temperatureRating : (itemObj.dimensions.temperature || '')}
+                                                  onChange={(e) => handleCatalogDetailChange(itemIndex, 'temperatureRating', e.target.value)}
+                                                  disabled={submitting}
+                                                />
+                                              </FormField>
+
+                                              <FormField label="Bonding Adhesive">
+                                                <Select
+                                                  value={catDetails.bonding || ''}
+                                                  onChange={(e) => handleCatalogDetailChange(itemIndex, 'bonding', e.target.value)}
+                                                  disabled={submitting}
+                                                >
+                                                  <option value="">-- Select Bonding --</option>
+                                                  {BONDING_OPTIONS.map((b) => (
+                                                    <option key={b.value} value={b.value}>
+                                                      {b.label}
+                                                    </option>
+                                                  ))}
+                                                </Select>
+                                              </FormField>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Catalog Description */}
+                                        <FormField label="Catalog Description / Master Engineering Notes">
+                                          <Textarea
+                                            rows={2}
+                                            placeholder="Optional master specifications or catalog description..."
+                                            value={catDetails.description || ''}
+                                            onChange={(e) => handleCatalogDetailChange(itemIndex, 'description', e.target.value)}
+                                            disabled={submitting}
+                                          />
+                                        </FormField>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </FormField>
@@ -1431,78 +1912,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                 </div>
                               </button>
                             </div>
-
-                            {/* FLANGE DESIGN VISUAL CARDS SELECTOR */}
-                            {itemObj.constructionType === 'FLANGE' && (
-                              <div style={{ marginTop: '6px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-700)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span>Select Flange Design Specification <span style={{ color: 'red' }}>*</span></span>
-                                  <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Choose flange geometry & slot pattern</span>
-                                </div>
-
-                                {flangeDesigns.filter((f) => f.constructionType === 'FLANGE' && f.status === 'active' && f.designCode !== 'BOX-001').length === 0 ? (
-                                  <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', color: '#b91c1c' }}>
-                                    ⚠️ No active FLANGE designs found in master data.
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                                  {flangeDesigns
-                                    .filter((f) => f.constructionType === 'FLANGE')
-                                    .map((design) => {
-                                      const isSelected = itemObj.flangeDesign === design._id;
-                                      return (
-                                        <div
-                                          key={design._id}
-                                          onClick={() => handleItemFieldChange(itemIndex, 'flangeDesign', design._id)}
-                                          style={{
-                                            padding: '10px 12px',
-                                            borderRadius: '8px',
-                                            border: isSelected ? '2px solid #2563eb' : '1px solid var(--neutral-300)',
-                                            backgroundColor: isSelected ? '#ffffff' : '#f8fafc',
-                                            boxShadow: isSelected ? '0 2px 8px rgba(37,99,235,0.15)' : 'none',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.15s ease-in-out',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'space-between',
-                                            gap: '8px'
-                                          }}
-                                        >
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: isSelected ? '#dbeafe' : 'var(--neutral-200)', color: isSelected ? '#1e40af' : 'var(--neutral-700)', fontFamily: 'monospace' }}>
-                                              {design.designCode}
-                                            </span>
-                                            <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: isSelected ? '4px solid #2563eb' : '1px solid var(--neutral-400)', backgroundColor: '#fff' }} />
-                                          </div>
-
-                                          <div>
-                                            <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--neutral-900)' }}>
-                                              {design.designName}
-                                            </div>
-                                            {design.description && (
-                                              <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginTop: '2px', lineHeight: '1.3' }}>
-                                                {design.description}
-                                              </div>
-                                            )}
-                                          </div>
-
-                                          {design.referenceImage && (
-                                            <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '4px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '2px' }}>
-                                              <img
-                                                src={design.referenceImage}
-                                                alt={design.designName}
-                                                style={{ maxHeight: '55px', objectFit: 'contain' }}
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                          </div>
 
                           {/* ENGINEERING DIMENSION SPECIFICATION SECTION (RESTORED) */}
                           <div style={{ gridColumn: 'span 2', marginTop: '6px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid var(--neutral-300)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -1687,29 +2097,6 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   </FormField>
                                 </div>
                               </div>
-
-                              {/* Reference Design Preview Box */}
-                              {itemObj.constructionType === 'FLANGE' && selectedFlangeDesignObj && (
-                                <div style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <ImageIcon size={15} className="text-blue-600" />
-                                    <span>Reference Design Preview — {selectedFlangeDesignObj.designCode} ({selectedFlangeDesignObj.designName})</span>
-                                  </div>
-                                  {selectedFlangeDesignObj.referenceImage ? (
-                                    <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                                      <img
-                                        src={selectedFlangeDesignObj.referenceImage}
-                                        alt={selectedFlangeDesignObj.designName}
-                                        style={{ maxHeight: '180px', objectFit: 'contain' }}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div style={{ fontSize: '11.5px', color: '#64748b', fontStyle: 'italic', padding: '6px' }}>
-                                      No reference image uploaded for this design.
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>

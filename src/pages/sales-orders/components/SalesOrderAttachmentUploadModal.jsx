@@ -32,11 +32,14 @@ const SalesOrderAttachmentUploadModal = ({
   salesOrderId,
   salesOrderNo,
   existingAttachment = null,
+  initialDocumentType = 'TAX_INVOICE',
   onSuccess
 }) => {
   const isReplaceMode = Boolean(existingAttachment);
 
-  const [documentType, setDocumentType] = useState('TAX_INVOICE');
+  const [documentType, setDocumentType] = useState(
+    existingAttachment?.documentType || ((initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'TAX_INVOICE')
+  );
   const [documentTitle, setDocumentTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState('');
@@ -84,7 +87,8 @@ const SalesOrderAttachmentUploadModal = ({
         setRemarks(existingAttachment.remarks || '');
         setChangeSummary('');
       } else {
-        setDocumentType('TAX_INVOICE');
+        const resolvedType = (initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'TAX_INVOICE';
+        setDocumentType(resolvedType);
         setDocumentTitle('');
         setInvoiceNumber('');
         setInvoiceDate('');
@@ -102,7 +106,7 @@ const SalesOrderAttachmentUploadModal = ({
         setChangeSummary('');
       }
     }
-  }, [isOpen, existingAttachment]);
+  }, [isOpen, existingAttachment, initialDocumentType]);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -211,6 +215,7 @@ const SalesOrderAttachmentUploadModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      zIndex={1100}
       title={
         <div className="flex items-center gap-2">
           <span>{isReplaceMode ? `Upload Newer Version — v${(existingAttachment.version || 1) + 1}` : 'Attach Document to Sales Order'}</span>

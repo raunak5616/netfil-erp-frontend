@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
+import DrawingSelector from '../../components/drawing/DrawingSelector';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
   RAW_ITEM: 'raw_material',
@@ -73,6 +74,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     productType: initialProductType || 'RAW_ITEM',
     filterGrade: '',
     filterGradeVariant: '',
+    drawing: '',
+    drawingSnapshot: null,
     status: 'active',
     // Technical Filter Fields
     constructionType: '',
@@ -215,6 +218,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         productType: item.productType || (item.filterGrade ? 'FILTER' : 'RAW_ITEM'),
         filterGrade: item.filterGrade?._id || item.filterGrade || '',
         filterGradeVariant: item.filterGradeVariant || '',
+        drawing: item.drawing?._id || item.drawing || '',
+        drawingSnapshot: item.drawingSnapshot || null,
         status: item.status || 'active',
         constructionType: item.constructionType || initialConstruction,
         moc: initialMoc,
@@ -287,6 +292,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         productType: pType,
         filterGrade: '',
         filterGradeVariant: '',
+        drawing: '',
+        drawingSnapshot: null,
         status: 'active',
         constructionType: '',
         moc: '',
@@ -612,6 +619,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
       if (name === 'filterGrade') {
         next.filterGradeVariant = '';
+        next.drawing = '';
+        next.drawingSnapshot = null;
       }
 
       return next;
@@ -1186,6 +1195,27 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                           <div className="font-semibold text-slate-800 mt-0.5">{selectedVariantObj.finalPressureDrop || '—'}</div>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Filter Grade-Based Drawing Master Assignment */}
+                  {formData.filterGrade && (
+                    <div className="mt-4 pt-3 border-t border-blue-200/80 bg-white p-3 rounded-lg border border-blue-100">
+                      <DrawingSelector
+                        filterGradeId={formData.filterGrade}
+                        filterGradeName={selectedFg?.filterGrade || ''}
+                        value={formData.drawing}
+                        drawingSnapshot={formData.drawingSnapshot}
+                        onChange={(drawingId, drawingSnapshot) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            drawing: drawingId || '',
+                            drawingSnapshot: drawingSnapshot || null
+                          }));
+                        }}
+                        disabled={submitting || loadingData}
+                        label="Assigned Engineering Drawing (Filter Grade Master)"
+                      />
                     </div>
                   )}
                 </div>

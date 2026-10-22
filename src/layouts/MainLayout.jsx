@@ -25,6 +25,7 @@ import {
   Truck,
   Database,
   ShieldCheck,
+  FileImage,
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -105,7 +106,7 @@ const MainLayout = () => {
   // Auto-expand parent group on route change
   useEffect(() => {
     const path = location.pathname;
-    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/flange-designs'];
+    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/flange-designs', '/drawing-master'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
     const partyMasterPaths = ['/clients', '/parties'];
@@ -192,6 +193,7 @@ const MainLayout = () => {
       '/specifications': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Specifications' }],
       '/filter-grades': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Filter Grades' }],
       '/flange-designs': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Flange Designs' }],
+      '/drawing-master': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Drawing Master' }],
       '/clients': [{ label: 'Master' }, { label: 'Party Master' }],
       '/parties': [{ label: 'Master' }, { label: 'Party Master' }],
       '/requirements': [{ label: 'Commercial' }, { label: 'Client Requirements' }],
@@ -283,6 +285,7 @@ const MainLayout = () => {
                 { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
                 { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
                 { label: 'Flange Designs', path: '/flange-designs', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
+                { label: 'Drawing Master', path: '/drawing-master', icon: FileImage, permission: 'FILTER_GRADE_VIEW' },
                 { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
               ],
             },
@@ -338,6 +341,7 @@ const MainLayout = () => {
     { label: 'Specifications', path: '/specifications', category: 'Item Master', permission: 'SPECIFICATION_VIEW' },
     { label: 'Filter Grades', path: '/filter-grades', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
     { label: 'Flange Designs', path: '/flange-designs', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
+    { label: 'Drawing Master', path: '/drawing-master', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
     { label: 'Units of Measure', path: '/uoms', category: 'Item Master', permission: 'UOM_VIEW' },
     { label: 'Party Master', path: '/clients', category: 'Master', permission: ['PARTY_VIEW', 'CLIENT_VIEW'] },
     { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },

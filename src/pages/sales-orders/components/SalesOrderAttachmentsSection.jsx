@@ -62,7 +62,6 @@ const SalesOrderAttachmentsSection = ({
   canEdit = false,
   onRefresh
 }) => {
-  const [selectedFilter, setSelectedFilter] = useState('ALL');
   const [expandedHistories, setExpandedHistories] = useState({});
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
@@ -121,20 +120,6 @@ const SalesOrderAttachmentsSection = ({
     }
   };
 
-  // Filter attachments
-  const filteredAttachments = attachments.filter((att) => {
-    if (selectedFilter === 'ALL') return true;
-    return att.documentType === selectedFilter;
-  });
-
-  // Counts
-  const counts = {
-    ALL: attachments.length,
-    TAX_INVOICE: attachments.filter((a) => a.documentType === 'TAX_INVOICE').length,
-    PROFORMA_INVOICE: attachments.filter((a) => a.documentType === 'PROFORMA_INVOICE').length,
-    DOCKET_COPY: attachments.filter((a) => a.documentType === 'DOCKET_COPY').length,
-    APPROVED_DRAWING: attachments.filter((a) => a.documentType === 'APPROVED_DRAWING').length
-  };
 
   const handleDownload = async (attachment, version = null) => {
     setActionError('');
@@ -196,6 +181,11 @@ const SalesOrderAttachmentsSection = ({
           <h4 className="text-sm font-semibold text-slate-800 uppercase tracking-wide flex items-center gap-2">
             <Paperclip size={16} className="text-blue-600" />
             Documents & Attachments
+            {attachments.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                {attachments.length}
+              </span>
+            )}
           </h4>
           <p className="text-xs text-slate-500 mt-0.5">
             Manage tax invoices, proforma invoices, docket copies, and approved engineering drawings for this Sales Order.
@@ -217,82 +207,15 @@ const SalesOrderAttachmentsSection = ({
         )}
       </div>
 
-      {/* Filter Tabs / Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-        <button
-          type="button"
-          onClick={() => setSelectedFilter('ALL')}
-          className={`px-3 py-1.5 rounded-md font-medium transition-all ${
-            selectedFilter === 'ALL'
-              ? 'bg-slate-800 text-white shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          All Documents ({counts.ALL})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedFilter('TAX_INVOICE')}
-          className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-            selectedFilter === 'TAX_INVOICE'
-              ? 'bg-emerald-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <FileText size={13} />
-          Tax Invoices ({counts.TAX_INVOICE})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedFilter('PROFORMA_INVOICE')}
-          className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-            selectedFilter === 'PROFORMA_INVOICE'
-              ? 'bg-blue-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <FileCheck size={13} />
-          Proforma Invoices ({counts.PROFORMA_INVOICE})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedFilter('DOCKET_COPY')}
-          className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-            selectedFilter === 'DOCKET_COPY'
-              ? 'bg-amber-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Truck size={13} />
-          Docket Copies ({counts.DOCKET_COPY})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedFilter('APPROVED_DRAWING')}
-          className={`px-3 py-1.5 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-            selectedFilter === 'APPROVED_DRAWING'
-              ? 'bg-purple-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Layers size={13} />
-          Approved Drawings ({counts.APPROVED_DRAWING})
-        </button>
-      </div>
-
       {/* Attachments List */}
       {loading ? (
         <div className="text-center py-10 text-slate-400 text-xs">
           Loading document attachments...
         </div>
-      ) : filteredAttachments.length === 0 ? (
+      ) : attachments.length === 0 ? (
         <EmptyState
           icon={Paperclip}
-          title={selectedFilter === 'ALL' ? 'No documents attached' : `No ${selectedFilter.replace('_', ' ').toLowerCase()} documents`}
+          title="No documents attached"
           description="Upload tax invoices, proforma invoices, dispatch dockets, or approved drawings to attach them directly to this order."
           action={
             canEdit && (
@@ -312,7 +235,7 @@ const SalesOrderAttachmentsSection = ({
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {filteredAttachments.map((attachment) => {
+          {attachments.map((attachment) => {
             const typeConfig = DOC_TYPE_CONFIG[attachment.documentType] || {
               label: attachment.documentType,
               icon: FileText,
@@ -611,6 +534,7 @@ const SalesOrderAttachmentsSection = ({
           salesOrderId={salesOrderId}
           salesOrderNo={salesOrderNo}
           existingAttachment={replaceTarget}
+          initialDocumentType="TAX_INVOICE"
           onSuccess={(attachment, isReplaced) => {
             setActionSuccess(
               isReplaced

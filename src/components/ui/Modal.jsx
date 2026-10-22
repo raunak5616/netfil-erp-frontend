@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Button from './Button';
 
@@ -19,6 +20,7 @@ const Modal = ({
   footer = null,
   maxWidth,
   size = 'md',
+  zIndex = 1000,
 }) => {
   const effectiveMaxWidth = maxWidth || sizeMap[size] || sizeMap.md;
 
@@ -27,17 +29,27 @@ const Modal = ({
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      const remainingModals = document.querySelectorAll('[data-netfil-modal="true"]');
+      if (remainingModals.length <= 1) {
+        document.body.style.overflow = 'unset';
+      }
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      const remainingModals = document.querySelectorAll('[data-netfil-modal="true"]');
+      if (remainingModals.length <= 1) {
+        document.body.style.overflow = 'unset';
+      }
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-md flex items-center justify-center z-[1000] p-3 sm:p-4 animate-fadeIn">
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-slate-950/50 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
+      style={{ zIndex }}
+      data-netfil-modal="true"
+    >
       <div
         className="bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col border border-slate-200/90 w-full animate-scaleUp overflow-hidden"
         style={{ maxWidth: effectiveMaxWidth }}
@@ -64,6 +76,12 @@ const Modal = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 };
 
 export default Modal;

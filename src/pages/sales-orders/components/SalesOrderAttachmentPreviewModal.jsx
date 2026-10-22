@@ -20,6 +20,7 @@ const SalesOrderAttachmentPreviewModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      zIndex={1100}
       title={
         <div className="flex items-center gap-2">
           <span>{attachment.documentTitle || attachment.originalName || 'Document Preview'}</span>
