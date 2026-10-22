@@ -71,3 +71,103 @@ export const getSalesOrderDrawings = async (salesOrderId) => {
   });
   return response.data;
 };
+
+// ===================================================
+// DOCUMENT ATTACHMENT ENDPOINTS
+// ===================================================
+
+export const getSalesOrderAttachments = async (salesOrderId, params = {}) => {
+  const response = await api.get(`/sales-orders/${salesOrderId}/attachments`, { params });
+  return response.data;
+};
+
+export const getSalesOrderAttachmentById = async (salesOrderId, attachmentId) => {
+  const response = await api.get(`/sales-orders/${salesOrderId}/attachments/${attachmentId}`);
+  return response.data;
+};
+
+export const uploadSalesOrderAttachment = async (salesOrderId, formData) => {
+  const response = await api.post(`/sales-orders/${salesOrderId}/attachments`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
+
+export const replaceSalesOrderAttachment = async (salesOrderId, attachmentId, formData) => {
+  const response = await api.post(`/sales-orders/${salesOrderId}/attachments/${attachmentId}/replace`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return response.data;
+};
+
+export const updateSalesOrderAttachmentMetadata = async (salesOrderId, attachmentId, metadata) => {
+  const response = await api.patch(`/sales-orders/${salesOrderId}/attachments/${attachmentId}`, metadata);
+  return response.data;
+};
+
+export const deleteSalesOrderAttachment = async (salesOrderId, attachmentId) => {
+  const response = await api.delete(`/sales-orders/${salesOrderId}/attachments/${attachmentId}`);
+  return response.data;
+};
+
+export const downloadSalesOrderAttachment = async (salesOrderId, attachmentId, fileName, version = null) => {
+  try {
+    const params = { download: 'true' };
+    if (version) params.version = version;
+
+    const response = await api.get(`/sales-orders/${salesOrderId}/attachments/${attachmentId}/download`, {
+      params,
+      responseType: 'blob'
+    });
+
+    const contentType = response.headers['content-type'] || 'application/octet-stream';
+    const blob = new Blob([response.data], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName || 'attachment_document';
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  } catch (error) {
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const json = JSON.parse(text);
+        if (json.message) error.message = json.message;
+      } catch (e) {
+        // fallback
+      }
+    }
+    throw error;
+  }
+};
+
+export const previewSalesOrderAttachment = async (salesOrderId, attachmentId, version = null) => {
+  try {
+    const params = { download: 'false' };
+    if (version) params.version = version;
+
+    const response = await api.get(`/sales-orders/${salesOrderId}/attachments/${attachmentId}/download`, {
+      params,
+      responseType: 'blob'
+    });
+
+    const contentType = response.headers['content-type'] || 'application/pdf';
+    const blob = new Blob([response.data], { type: contentType });
+    const blobUrl = window.URL.createObjectURL(blob);
+    return { blobUrl, contentType };
+  } catch (error) {
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const json = JSON.parse(text);
+        if (json.message) error.message = json.message;
+      } catch (e) {
+        // fallback
+      }
+    }
+    throw error;
+  }
+};

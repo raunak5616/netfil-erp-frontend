@@ -3,7 +3,14 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { getSalesOrderById, updateSalesOrderStatus, getSalesOrderReferences, getSalesOrderItemDrawing, getSalesOrderDrawings } from '../../services/salesOrderService';
+import { 
+  getSalesOrderById, 
+  updateSalesOrderStatus, 
+  getSalesOrderReferences, 
+  getSalesOrderItemDrawing, 
+  getSalesOrderDrawings,
+  getSalesOrderAttachments 
+} from '../../services/salesOrderService';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
@@ -20,12 +27,14 @@ import {
   ShieldCheck,
   Ban,
   Image as ImageIcon,
-  Printer
+  Printer,
+  Paperclip
 } from 'lucide-react';
 
 import TechnicalDrawingModal from './TechnicalDrawingModal';
+import SalesOrderAttachmentsSection from './components/SalesOrderAttachmentsSection';
 
-const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated }) => {
+const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated, initialTab = 'details' }) => {
   const { hasPermission } = useAuth();
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
@@ -34,7 +43,9 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
   const [salesOrder, setSalesOrder] = useState(null);
   const [items, setItems] = useState([]);
   const [references, setReferences] = useState(null);
-  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'traceability'
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTab || 'details'); // 'details' | 'attachments' | 'traceability'
 
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   const [drawingTargetItem, setDrawingTargetItem] = useState(null);
@@ -48,9 +59,10 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
     setLoading(true);
     setError('');
     try {
-      const [res, refRes] = await Promise.all([
+      const [res, refRes, attRes] = await Promise.all([
         getSalesOrderById(salesOrderId),
-        getSalesOrderReferences(salesOrderId).catch(() => ({ success: false }))
+        getSalesOrderReferences(salesOrderId).catch(() => ({ success: false })),
+        getSalesOrderAttachments(salesOrderId).catch(() => ({ success: false, attachments: [] }))
       ]);
 
       if (res.success && res.salesOrder) {
@@ -63,6 +75,10 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
       if (refRes.success && refRes.references) {
         setReferences(refRes.references);
       }
+
+      if (attRes.success && Array.isArray(attRes.attachments)) {
+        setAttachments(attRes.attachments);
+      }
     } catch (err) {
       console.error('Error fetching sales order details:', err);
       setError(err.response?.data?.message || 'Server connection error');
@@ -71,9 +87,27 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
     }
   };
 
+  const refreshAttachments = async () => {
+    if (!salesOrderId) return;
+    setAttachmentsLoading(true);
+    try {
+      const res = await getSalesOrderAttachments(salesOrderId);
+      if (res.success && Array.isArray(res.attachments)) {
+        setAttachments(res.attachments);
+      }
+    } catch (err) {
+      console.error('Error refreshing attachments:', err);
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchDetails();
-  }, [salesOrderId, isOpen]);
+    if (isOpen) {
+      if (initialTab) setActiveTab(initialTab);
+      fetchDetails();
+    }
+  }, [salesOrderId, isOpen, initialTab]);
 
   const handleStatusTransition = async (targetStatus) => {
     if (!salesOrder) return;
@@ -289,6 +323,37 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('attachments')}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                background: 'none',
+                borderBottom: activeTab === 'attachments' ? '2px solid var(--primary-600)' : 'none',
+                fontWeight: activeTab === 'attachments' ? 600 : 400,
+                color: activeTab === 'attachments' ? 'var(--primary-700)' : 'var(--neutral-600)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Documents & Attachments</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  background: attachments.length > 0 ? '#eff6ff' : '#f1f5f9',
+                  color: attachments.length > 0 ? '#1d4ed8' : '#64748b',
+                  border: attachments.length > 0 ? '1px solid #bfdbfe' : '1px solid #e2e8f0'
+                }}
+              >
+                {attachments.length}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('traceability')}
               style={{
                 padding: '8px 16px',
@@ -485,7 +550,19 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
             </div>
           )}
 
-          {/* TAB 2: TRACEABILITY & REFERENCES */}
+          {/* TAB 2: DOCUMENTS & ATTACHMENTS */}
+          {activeTab === 'attachments' && (
+            <SalesOrderAttachmentsSection
+              salesOrderId={salesOrderId}
+              salesOrderNo={salesOrder.salesOrderNo}
+              attachments={attachments}
+              loading={attachmentsLoading}
+              canEdit={canEdit && salesOrder.status !== 'cancelled'}
+              onRefresh={refreshAttachments}
+            />
+          )}
+
+          {/* TAB 3: TRACEABILITY & REFERENCES */}
           {activeTab === 'traceability' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">

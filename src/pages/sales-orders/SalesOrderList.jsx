@@ -24,7 +24,8 @@ import {
   CheckCircle2,
   Clock,
   Ban,
-  RotateCcw
+  RotateCcw,
+  Paperclip
 } from 'lucide-react';
 
 const SalesOrderList = () => {
@@ -57,6 +58,7 @@ const SalesOrderList = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedSOId, setSelectedSOId] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState('details');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingSO, setEditingSO] = useState(null);
 
@@ -280,6 +282,16 @@ const SalesOrderList = () => {
               icon: Eye,
               onClick: () => {
                 setSelectedSOId(row._id);
+                setDetailInitialTab('details');
+                setIsDetailOpen(true);
+              }
+            },
+            {
+              label: 'Documents & Attachments',
+              icon: Paperclip,
+              onClick: () => {
+                setSelectedSOId(row._id);
+                setDetailInitialTab('attachments');
                 setIsDetailOpen(true);
               }
             },
@@ -330,6 +342,7 @@ const SalesOrderList = () => {
                 size="xs"
                 onClick={() => {
                   setSelectedSOId(row._id);
+                  setDetailInitialTab('details');
                   setIsDetailOpen(true);
                 }}
                 title="View Details"
@@ -527,9 +540,11 @@ const SalesOrderList = () => {
         <SalesOrderDetailModal
           isOpen={isDetailOpen}
           salesOrderId={selectedSOId}
+          initialTab={detailInitialTab}
           onClose={() => {
             setIsDetailOpen(false);
             setSelectedSOId(null);
+            setDetailInitialTab('details');
           }}
           onEdit={(so) => {
             setIsDetailOpen(false);
