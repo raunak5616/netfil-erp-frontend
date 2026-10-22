@@ -3,13 +3,23 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import api from '../../services/api';
-import { Printer, Image as ImageIcon, Box, Maximize2, ShieldCheck } from 'lucide-react';
+import DrawingSelector from '../../components/drawing/DrawingSelector';
+import { Printer, Image as ImageIcon, Box, Maximize2, ShieldCheck, FileText, ExternalLink } from 'lucide-react';
 
-const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
+const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingUpdated }) => {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
   if (!isOpen || !item) return null;
+
+  const filterGradeId = item.filterGrade?._id || item.filterGrade || item.item?.filterGrade?._id || item.item?.filterGrade || null;
+  const filterGradeName = item.filterGrade?.filterGrade || item.item?.filterGrade?.filterGrade || item.drawingSnapshot?.filterGradeName || '';
+
+  const [selectedDrawingId, setSelectedDrawingId] = useState(
+    item.drawing?._id || item.drawing || item.drawingSnapshot?.drawingId || ''
+  );
+  const [selectedSnapshot, setSelectedSnapshot] = useState(item.drawingSnapshot || null);
+  const [selectedDrawingDoc, setSelectedDrawingDoc] = useState(null);
 
   const dims = item.dimensions || {};
   const constructionType = (item.constructionType || dims.constructionType || item.flangeDesignSnapshot?.constructionType || 'FLANGE').toUpperCase();
@@ -47,13 +57,20 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
     setError('');
 
     try {
-      const response = await api.get(`/sales-orders/${salesOrderId}/items/${item._id}/drawing`, {
+      const url = selectedDrawingId
+        ? `/sales-orders/${salesOrderId}/items/${item._id}/drawing?drawingId=${selectedDrawingId}`
+        : `/sales-orders/${salesOrderId}/items/${item._id}/drawing`;
+
+      const response = await api.get(url, {
         responseType: 'blob'
       });
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      const blobUrl = window.URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      if (onDrawingUpdated) {
+        onDrawingUpdated(selectedDrawingId, selectedSnapshot);
+      }
       onClose();
     } catch (err) {
       console.error('Generate PDF error:', err);
@@ -137,6 +154,23 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
           </div>
         </div>
 
+        {/* Drawing Master Filter Grade-Based Selector */}
+        <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+          <DrawingSelector
+            filterGradeId={filterGradeId}
+            filterGradeName={filterGradeName}
+            value={selectedDrawingId}
+            drawingSnapshot={selectedSnapshot}
+            onChange={(drawingId, snapshot, doc) => {
+              setSelectedDrawingId(drawingId);
+              setSelectedSnapshot(snapshot);
+              setSelectedDrawingDoc(doc);
+            }}
+            compact={false}
+            label="Assigned Engineering Drawing (Drawing Master)"
+          />
+        </div>
+
         {/* Reference Design Preview */}
         {referenceImage ? (
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
@@ -159,12 +193,12 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
 
         {/* Drawing Master Assigned Drawing Preview */}
         {(() => {
-          const drawingSnap = item.drawingSnapshot || (typeof item.drawing === 'object' ? item.drawing : null) || (typeof item.item === 'object' && item.item?.drawing ? item.item.drawing : null);
-          const masterDrawingUrl = drawingSnap?.fileUrl;
-          const masterDrawingCode = drawingSnap?.drawingCode;
-          const masterDrawingName = drawingSnap?.drawingName;
-          const masterGradeName = drawingSnap?.filterGradeName || (typeof item.item?.filterGrade === 'object' ? item.item.filterGrade.filterGrade : '');
-          const isPdf = masterDrawingUrl && (drawingSnap.format === 'pdf' || masterDrawingUrl.toLowerCase().endsWith('.pdf'));
+          const drawingSnap = selectedSnapshot || item.drawingSnapshot || (typeof item.drawing === 'object' ? item.drawing : null) || (typeof item.item === 'object' && item.item?.drawing ? item.item.drawing : null);
+          const masterDrawingUrl = selectedDrawingDoc?.fileUrl || drawingSnap?.fileUrl;
+          const masterDrawingCode = selectedDrawingDoc?.drawingCode || drawingSnap?.drawingCode;
+          const masterDrawingName = selectedDrawingDoc?.drawingName || drawingSnap?.drawingName;
+          const masterGradeName = selectedDrawingDoc?.filterGrade?.filterGrade || drawingSnap?.filterGradeName || filterGradeName;
+          const isPdf = masterDrawingUrl && ((selectedDrawingDoc?.format === 'pdf' || drawingSnap?.format === 'pdf') || masterDrawingUrl.toLowerCase().endsWith('.pdf'));
 
           if (!masterDrawingUrl) return null;
 
@@ -173,7 +207,7 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose }) => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
                   <ImageIcon size={15} className="text-emerald-700" />
-                  Assigned Engineering Drawing (Drawing Master) — {masterDrawingCode} {masterDrawingName ? `(${masterDrawingName})` : ''}
+                  Drawing Master Asset Preview — {masterDrawingCode} {masterDrawingName ? `(${masterDrawingName})` : ''}
                 </span>
                 {masterGradeName && (
                   <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded">

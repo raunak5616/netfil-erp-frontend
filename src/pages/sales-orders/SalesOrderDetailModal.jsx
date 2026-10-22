@@ -482,7 +482,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                                 className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
                               >
                                 <ImageIcon size={14} className="text-blue-600" />
-                                <span>{it.flangeDesignSnapshot?.designCode || (it.constructionType === 'BOX' ? 'BOX' : 'Drawing')}</span>
+                                <span>{it.drawingSnapshot?.drawingCode || it.drawing?.drawingCode || it.flangeDesignSnapshot?.designCode || (it.constructionType === 'BOX' ? 'BOX' : 'Drawing')}</span>
                               </button>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>

@@ -18,6 +18,7 @@ import Alert from '../../components/ui/Alert';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import { Plus, Trash2, Calculator, Layers, Package, Maximize2 } from 'lucide-react';
 import QuotationRateSuggestion from './QuotationRateSuggestion';
+import DrawingSelector from '../../components/drawing/DrawingSelector';
 
 const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, initialRequirement = null }) => {
   const isEdit = Boolean(quotation && quotation._id);
@@ -71,6 +72,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       uom: '',
       unitPrice: 0,
       hsnCode: '',
+      filterGrade: null,
+      filterGradeName: '',
+      drawing: null,
+      drawingSnapshot: null,
       remarks: '',
     },
   ]);
@@ -189,6 +194,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         }
       }
 
+      const filterGradeRef = reqItem.filterGrade || itemObj?.filterGrade || selectedReq.filterGrade || null;
+      const filterGradeId = typeof filterGradeRef === 'object' ? filterGradeRef?._id : filterGradeRef;
+      const filterGradeName = typeof filterGradeRef === 'object' ? filterGradeRef?.filterGrade : '';
+
       return {
         item: itemId,
         itemCategory: itemCatId,
@@ -197,6 +206,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         uom: uomId,
         unitPrice: 0,
         hsnCode: hsnCode,
+        filterGrade: filterGradeId || null,
+        filterGradeName: filterGradeName,
+        drawing: reqItem.drawing?._id || reqItem.drawing || itemObj?.drawing?._id || itemObj?.drawing || null,
+        drawingSnapshot: reqItem.drawingSnapshot || itemObj?.drawingSnapshot || null,
         constructionType: constructionTypeVal,
         flangeDesign: flangeDesignId,
         flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq.flangeDesignSnapshot || null,
@@ -257,6 +270,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 constructionType: it.constructionType || 'FLANGE',
                 flangeDesign: it.flangeDesign?._id || it.flangeDesign || null,
                 flangeDesignSnapshot: it.flangeDesignSnapshot || null,
+                filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
+                filterGradeName: it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.drawingSnapshot?.filterGradeName || '',
+                drawing: it.drawing?._id || it.drawing || null,
+                drawingSnapshot: it.drawingSnapshot || null,
                 dimensions: it.dimensions || {},
                 specifications: it.specifications || [],
                 faceVelocity: it.dimensions?.faceVelocity || '',
@@ -392,11 +409,18 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   // Line Item Handlers
   const handleItemSelect = (index, itemId) => {
     const targetItem = items.find((i) => i._id === itemId);
+    const fgRef = targetItem?.filterGrade;
+    const fgId = typeof fgRef === 'object' ? fgRef?._id : fgRef;
+    const fgName = typeof fgRef === 'object' ? fgRef?.filterGrade : '';
     setLineItems((prev) => {
       const next = [...prev];
       next[index] = {
         ...next[index],
         item: itemId,
+        filterGrade: fgId || null,
+        filterGradeName: fgName,
+        drawing: targetItem?.drawing?._id || targetItem?.drawing || null,
+        drawingSnapshot: targetItem?.drawingSnapshot || null,
         itemCategory: targetItem ? targetItem.itemCategory?._id || targetItem.itemCategory : '',
         description: targetItem ? targetItem.itemName : next[index].description,
         uom: targetItem ? targetItem.inventoryUom?._id || targetItem.inventoryUom : next[index].uom,
@@ -595,6 +619,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         constructionType: item.constructionType || 'FLANGE',
         flangeDesign: item.flangeDesign || null,
         flangeDesignSnapshot: item.flangeDesignSnapshot || null,
+        filterGrade: item.filterGrade || null,
+        drawing: item.drawing || null,
+        drawingSnapshot: item.drawingSnapshot || null,
         dimensions: item.dimensions || {},
         specifications: item.specifications || [],
         remarks: item.remarks || '',
@@ -1012,6 +1039,29 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                           <span className="text-[10px] font-normal text-indigo-600">H(ft) × W(ft) × FPM</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Engineering Drawing Assignment (Drawing Master) */}
+                    <div className="col-span-12 mt-1">
+                      <DrawingSelector
+                        filterGradeId={line.filterGrade}
+                        filterGradeName={line.filterGradeName}
+                        value={line.drawing}
+                        drawingSnapshot={line.drawingSnapshot}
+                        onChange={(drawingId, snapshot) => {
+                          setLineItems((prev) => {
+                            const next = [...prev];
+                            next[idx] = {
+                              ...next[idx],
+                              drawing: drawingId,
+                              drawingSnapshot: snapshot,
+                            };
+                            return next;
+                          });
+                        }}
+                        compact={false}
+                        label="Item Catalog Drawing (Drawing Master)"
+                      />
                     </div>
                   </div>
 
