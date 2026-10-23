@@ -386,6 +386,16 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
       return;
     }
 
+    if (loadingDetails) {
+      setError('Quotation details are currently loading. Please wait before submitting.');
+      return;
+    }
+
+    if (!lineItems || lineItems.length === 0) {
+      setError('Cannot create Sales Order: No line items found. Please select a quotation that contains line items.');
+      return;
+    }
+
     const payload = buildSalesOrderPayload();
 
     // Compare proposed Sales Order with authoritative source quotation
@@ -1098,7 +1108,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
             <Button
               type="submit"
               variant="primary"
-              disabled={!selectedQuotationId || submitting || loadingDetails}
+              disabled={!selectedQuotationId || submitting || loadingDetails || !lineItems || lineItems.length === 0}
             >
               {submitting ? 'Generating Sales Order...' : 'Confirm & Create Sales Order'}
             </Button>
@@ -1114,7 +1124,15 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
         quotationNo={selectedQuotationDetails?.header?.quotationNo || ''}
         onReview={() => setShowChangesModal(false)}
         onCancel={() => setShowChangesModal(false)}
-        onConfirm={() => executeCreateSalesOrder(buildSalesOrderPayload())}
+        onConfirm={() => {
+          const payload = buildSalesOrderPayload();
+          if (!payload.items || payload.items.length === 0) {
+            setError('Cannot create Sales Order without line items.');
+            setShowChangesModal(false);
+            return;
+          }
+          executeCreateSalesOrder(payload);
+        }}
         submitting={submitting}
       />
     </>
