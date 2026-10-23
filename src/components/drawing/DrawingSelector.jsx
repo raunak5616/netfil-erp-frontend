@@ -12,12 +12,17 @@ const DrawingSelector = ({
   filterGradeId,
   filterGradeName = '',
   value,
+  selectedDrawingId,
   drawingSnapshot = null,
   onChange,
+  onSelect,
   disabled = false,
   compact = false,
   label = 'Engineering Drawing'
 }) => {
+  const effectiveValue = value !== undefined ? value : selectedDrawingId;
+  const triggerChange = onChange || onSelect;
+
   const [drawings, setDrawings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [previewDrawing, setPreviewDrawing] = useState(null);
@@ -34,16 +39,16 @@ const DrawingSelector = ({
   // Build snapshot object to persist with historical records
   const createSnapshot = (doc) => {
     if (!doc) return null;
-    const fgName = typeof doc.filterGrade === 'object'
-      ? doc.filterGrade?.filterGrade
-      : (filterGradeName || '');
+    const matchedGradeName = (Array.isArray(doc.filterGrades) && doc.filterGrades.find(g => String(g._id || g) === String(gradeId))?.filterGrade)
+      || (typeof doc.filterGrade === 'object' ? doc.filterGrade?.filterGrade : '')
+      || (filterGradeName || '');
 
     return {
       drawingId: doc._id,
       drawingCode: doc.drawingCode,
       drawingName: doc.drawingName,
       filterGradeId: gradeId,
-      filterGradeName: fgName,
+      filterGradeName: matchedGradeName,
       fileUrl: doc.fileUrl,
       format: doc.format || (doc.fileUrl?.split('.').pop() || '').toLowerCase(),
       mimeType: doc.mimeType
@@ -54,8 +59,8 @@ const DrawingSelector = ({
     if (!gradeId) {
       setDrawings([]);
       prevGradeIdRef.current = null;
-      if (value) {
-        onChange?.('', null, null);
+      if (effectiveValue) {
+        triggerChange?.('', null, null);
       }
       return;
     }
@@ -76,28 +81,33 @@ const DrawingSelector = ({
 
           if (activeDrawings.length > 0) {
             // Check if current value exists in the active drawings of this grade
-            const matchingCurrent = activeDrawings.find(d => String(d._id) === String(value));
+            const matchingCurrent = activeDrawings.find(d => String(d._id) === String(effectiveValue));
 
             if (matchingCurrent && !gradeChanged) {
               // Current selection is already valid for this grade and grade did not change; preserve it!
             } else if (matchingCurrent && gradeChanged) {
               // Same ID valid in new grade, preserve snapshot
-              onChange?.(matchingCurrent._id, createSnapshot(matchingCurrent), matchingCurrent);
+              triggerChange?.(matchingCurrent._id, createSnapshot(matchingCurrent), matchingCurrent);
             } else {
               // Value missing or incompatible with new grade: auto-select default drawing!
-              // Deterministic: designated default (isDefault: true) or first in sorted list
-              const defaultDrawing = activeDrawings.find(d => d.isDefault) || activeDrawings[0];
-              onChange?.(defaultDrawing._id, createSnapshot(defaultDrawing), defaultDrawing);
+              // Deterministic: designated default for this grade or first in list
+              const defaultDrawing = (res.defaultDrawing && res.defaultDrawing.status === 'active')
+                ? activeDrawings.find(d => String(d._id) === String(res.defaultDrawing._id)) || res.defaultDrawing
+                : activeDrawings.find(d => (d.defaultForGrades || []).map(g => String(g._id || g)).includes(String(gradeId)))
+                  || activeDrawings.find(d => d.isDefault)
+                  || activeDrawings[0];
+
+              triggerChange?.(defaultDrawing._id, createSnapshot(defaultDrawing), defaultDrawing);
             }
           } else {
             // No active drawings available for this Filter Grade
-            if (value) {
-              onChange?.('', null, null);
+            if (effectiveValue) {
+              triggerChange?.('', null, null);
             }
           }
         } else {
           setDrawings([]);
-          if (value) onChange?.('', null, null);
+          if (effectiveValue) triggerChange?.('', null, null);
         }
       } catch (err) {
         if (!isMounted) return;
@@ -116,7 +126,7 @@ const DrawingSelector = ({
   }, [gradeId]);
 
   // Find currently selected drawing object (from loaded drawings list or from historical snapshot)
-  const currentDrawing = drawings.find(d => String(d._id) === String(value)) || (
+  const currentDrawing = drawings.find(d => String(d._id) === String(effectiveValue)) || (
     drawingSnapshot && drawingSnapshot.drawingId
       ? {
           _id: drawingSnapshot.drawingId,
@@ -133,13 +143,13 @@ const DrawingSelector = ({
   const handleSelectChange = (e) => {
     const selectedId = e.target.value;
     if (!selectedId) {
-      onChange?.('', null, null);
+      triggerChange?.('', null, null);
       return;
     }
 
     const picked = drawings.find(d => String(d._id) === String(selectedId));
     if (picked) {
-      onChange?.(picked._id, createSnapshot(picked), picked);
+      triggerChange?.(picked._id, createSnapshot(picked), picked);
     }
   };
 
@@ -184,16 +194,22 @@ const DrawingSelector = ({
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <Select
-                value={value || ''}
+                value={effectiveValue || ''}
                 onChange={handleSelectChange}
                 disabled={disabled || loading || drawings.length === 0}
                 className="w-full text-xs"
               >
-                {drawings.map((d) => (
-                  <option key={d._id} value={d._id}>
-                    {d.drawingCode} — {d.drawingName} {d.isDefault ? '★ (Default)' : ''}
-                  </option>
-                ))}
+                {drawings.map((d) => {
+                  const isDef = (Array.isArray(d.defaultForGrades) ? d.defaultForGrades : [])
+                    .map(g => String(g?._id || g))
+                    .includes(String(gradeId)) || d.isDefault;
+                  const typeLabel = d.drawingType === 'FLANGE' ? '[Flange] ' : '';
+                  return (
+                    <option key={d._id} value={d._id}>
+                      {typeLabel}{d.drawingCode} — {d.drawingName} {isDef ? '★ (Default)' : ''}
+                    </option>
+                  );
+                })}
               </Select>
             </div>
 

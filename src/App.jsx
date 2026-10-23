@@ -207,7 +207,7 @@ function App() {
               {/* Protected Filter Grades & Drawing Master Module Route */}
               <Route element={<ProtectedRoute requiredPermission="FILTER_GRADE_VIEW" />}>
                 <Route path="/filter-grades" element={<FilterGradeList />} />
-                <Route path="/flange-designs" element={<FlangeDesignList />} />
+                <Route path="/flange-designs" element={<Navigate to="/drawing-master" replace />} />
                 <Route path="/drawing-master" element={<DrawingMasterList />} />
                 <Route path="/drawings" element={<DrawingMasterList />} />
               </Route>

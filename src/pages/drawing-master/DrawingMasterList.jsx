@@ -15,6 +15,7 @@ import { Input, Select } from '../../components/ui/FormField';
 import DrawingMasterFormModal from './DrawingMasterFormModal';
 import DrawingPreviewModal from './DrawingPreviewModal';
 import ActionDropdown from '../../components/ui/ActionDropdown';
+import Modal from '../../components/ui/Modal';
 import {
   Layers,
   Plus,
@@ -47,6 +48,7 @@ const DrawingMasterList = () => {
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -56,6 +58,8 @@ const DrawingMasterList = () => {
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewDrawing, setPreviewDrawing] = useState(null);
+
+  const [viewGradesModalDrawing, setViewGradesModalDrawing] = useState(null);
 
   const fetchDrawings = async () => {
     setLoading(true);
@@ -140,9 +144,12 @@ const DrawingMasterList = () => {
         drw.drawingName?.toLowerCase().includes(term) ||
         drw.description?.toLowerCase().includes(term);
 
-      // 2. Filter Grade filter
-      const drwGradeId = drw.filterGrade?._id || drw.filterGrade;
-      const matchGrade = !gradeFilter || String(drwGradeId) === String(gradeFilter);
+      // 2. Filter Grade filter (supports multi-grade array and legacy single field)
+      const assignedIds = Array.isArray(drw.filterGrades) && drw.filterGrades.length > 0
+        ? drw.filterGrades.map(g => String(g?._id || g))
+        : (drw.filterGrade ? [String(drw.filterGrade?._id || drw.filterGrade)] : []);
+
+      const matchGrade = !gradeFilter || assignedIds.includes(String(gradeFilter));
 
       // 3. Status filter
       const matchStatus =
@@ -150,9 +157,16 @@ const DrawingMasterList = () => {
         (statusFilter === 'active' && drw.status === 'active') ||
         (statusFilter === 'inactive' && drw.status === 'inactive');
 
-      return matchSearch && matchGrade && matchStatus;
+      // 4. Drawing Type filter
+      const isFlange = drw.drawingType === 'FLANGE';
+      const matchType =
+        typeFilter === 'all' ||
+        (typeFilter === 'standard' && !isFlange) ||
+        (typeFilter === 'flange' && isFlange);
+
+      return matchSearch && matchGrade && matchStatus && matchType;
     });
-  }, [drawings, searchTerm, gradeFilter, statusFilter]);
+  }, [drawings, searchTerm, typeFilter, gradeFilter, statusFilter]);
 
   // Table Columns
   const columns = useMemo(
@@ -194,7 +208,7 @@ const DrawingMasterList = () => {
                 {val || row.drawingCode}
               </span>
               {row.isDefault && (
-                <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded" title="Designated Default Drawing for this Filter Grade">
+                <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded" title="Designated Default Drawing">
                   <Star size={10} className="mr-0.5 fill-emerald-600 text-emerald-600" /> Default
                 </span>
               )}
@@ -206,6 +220,31 @@ const DrawingMasterList = () => {
             )}
           </div>
         )
+      },
+      {
+        key: 'drawingType',
+        header: 'Type',
+        align: 'center',
+        width: '105px',
+        render: (_, row) => {
+          const isFlange = row.drawingType === 'FLANGE';
+          return (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                isFlange 
+                  ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+              }`}>
+                {isFlange ? 'Flange' : 'Standard'}
+              </span>
+              {isFlange && row.constructionType && (
+                <span className="text-[10px] text-slate-500 font-mono font-medium">
+                  {row.constructionType}
+                </span>
+              )}
+            </div>
+          );
+        }
       },
       {
         key: 'drawingName',
@@ -221,19 +260,65 @@ const DrawingMasterList = () => {
         key: 'filterGrade',
         header: 'Assigned Filter Grade',
         render: (_, row) => {
-          const fg = row.filterGrade;
-          const name = fg?.filterGrade || (typeof fg === 'string' ? fg : '—');
-          const standards = [fg?.eurovent ? `EU: ${fg.eurovent}` : '', fg?.iso ? `ISO: ${fg.iso}` : ''].filter(Boolean).join(' • ');
+          const assigned = Array.isArray(row.filterGrades) && row.filterGrades.length > 0
+            ? row.filterGrades
+            : (row.filterGrade ? [row.filterGrade] : []);
+
+          if (assigned.length === 0) {
+            if (row.drawingType === 'FLANGE') {
+              return (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                  Universal (All Grades)
+                </span>
+              );
+            }
+            return <span className="text-slate-400 italic text-xs">—</span>;
+          }
+
+          const defaultIds = new Set(
+            (Array.isArray(row.defaultForGrades) ? row.defaultForGrades : [])
+              .map(g => String(g?._id || g))
+          );
+          if (row.isDefault && defaultIds.size === 0 && row.filterGrade) {
+            defaultIds.add(String(row.filterGrade?._id || row.filterGrade));
+          }
+
+          const visibleGrades = assigned.slice(0, 2);
+          const remainingCount = assigned.length - 2;
+
+          const remainingNames = remainingCount > 0
+            ? assigned.slice(2).map(g => g?.filterGrade || (typeof g === 'string' ? g : 'Grade')).join(', ')
+            : '';
 
           return (
-            <div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                {name}
-              </span>
-              {standards && (
-                <span className="text-[10px] text-slate-500 block mt-0.5">
-                  {standards}
-                </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {visibleGrades.map((g, idx) => {
+                const name = g?.filterGrade || (typeof g === 'string' ? g : 'Grade');
+                const gid = String(g?._id || g);
+                const isDef = defaultIds.has(gid);
+                return (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200"
+                    title={g?.eurovent ? `Eurovent: ${g.eurovent}` : ''}
+                  >
+                    <span>{name}</span>
+                    {isDef && (
+                      <Star size={10} className="fill-emerald-600 text-emerald-600" title="Default drawing for this grade" />
+                    )}
+                  </span>
+                );
+              })}
+
+              {remainingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setViewGradesModalDrawing(row)}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 border border-slate-300 hover:border-blue-300 transition-colors cursor-pointer"
+                  title={`View all assigned grades: ${remainingNames}`}
+                >
+                  +{remainingCount} more
+                </button>
               )}
             </div>
           );
@@ -349,8 +434,21 @@ const DrawingMasterList = () => {
             />
           </div>
 
+          {/* Drawing Type Filter */}
+          <div className="w-40">
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="text-xs"
+            >
+              <option value="all">All Drawing Types</option>
+              <option value="standard">Standard Drawings</option>
+              <option value="flange">Flange Designs</option>
+            </Select>
+          </div>
+
           {/* Filter Grade Dropdown Filter */}
-          <div className="w-52">
+          <div className="w-48">
             <Select
               value={gradeFilter}
               onChange={(e) => setGradeFilter(e.target.value)}
@@ -412,6 +510,68 @@ const DrawingMasterList = () => {
           onClose={() => setIsPreviewOpen(false)}
           drawing={previewDrawing}
         />
+      )}
+
+      {/* Complete Assigned Filter Grades Modal */}
+      {viewGradesModalDrawing && (
+        <Modal
+          isOpen={Boolean(viewGradesModalDrawing)}
+          onClose={() => setViewGradesModalDrawing(null)}
+          title={`Assigned Filter Grades — ${viewGradesModalDrawing.drawingCode}`}
+          maxWidth="560px"
+          footer={
+            <div className="flex justify-end w-full">
+              <Button variant="secondary" onClick={() => setViewGradesModalDrawing(null)}>
+                Close
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <span className="font-semibold text-slate-800 block text-xs">
+                {viewGradesModalDrawing.drawingName}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                This drawing is compatible and available for selection with the following Filter Grades:
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white">
+              {(
+                Array.isArray(viewGradesModalDrawing.filterGrades) && viewGradesModalDrawing.filterGrades.length > 0
+                  ? viewGradesModalDrawing.filterGrades
+                  : (viewGradesModalDrawing.filterGrade ? [viewGradesModalDrawing.filterGrade] : [])
+              ).map((g, idx) => {
+                const name = g?.filterGrade || (typeof g === 'string' ? g : 'Grade');
+                const gid = String(g?._id || g);
+                const isDef = (Array.isArray(viewGradesModalDrawing.defaultForGrades) ? viewGradesModalDrawing.defaultForGrades : [])
+                  .map(dg => String(dg?._id || dg))
+                  .includes(gid) || (viewGradesModalDrawing.isDefault && idx === 0);
+
+                return (
+                  <div key={idx} className="p-2.5 flex items-center justify-between hover:bg-slate-50/80">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-800 text-xs">{name}</span>
+                      <span className="text-[11px] text-slate-500">
+                        {[g?.eurovent ? `EU: ${g.eurovent}` : '', g?.iso ? `ISO: ${g.iso}` : ''].filter(Boolean).join(' • ')}
+                      </span>
+                    </div>
+                    {isDef ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                        <Star size={10} className="fill-emerald-600 text-emerald-600" /> Default Drawing
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                        Compatible
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
