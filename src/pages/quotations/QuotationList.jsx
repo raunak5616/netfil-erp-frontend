@@ -36,6 +36,8 @@ import {
   MessageSquare,
   ShoppingBag,
   Printer,
+  ArrowUpDown,
+  RotateCcw,
 } from 'lucide-react';
 
 const QuotationList = () => {
@@ -60,6 +62,9 @@ const QuotationList = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [followUpFrom, setFollowUpFrom] = useState('');
+  const [followUpTo, setFollowUpTo] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -73,18 +78,32 @@ const QuotationList = () => {
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUpTargetQuotation, setFollowUpTargetQuotation] = useState(null);
 
-  const fetchQuotationsData = async () => {
+  const fetchQuotationsData = async (overrides = {}) => {
     setLoading(true);
     setError('');
     try {
+      const activeSearch = overrides.search !== undefined ? overrides.search : searchTerm;
+      const activeClient = overrides.client !== undefined ? overrides.client : clientFilter;
+      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
+      const activeType = overrides.quotationType !== undefined ? overrides.quotationType : typeFilter;
+      const activeCategory = overrides.quotationCategory !== undefined ? overrides.quotationCategory : categoryFilter;
+      const activeFrom = overrides.from !== undefined ? overrides.from : fromDate;
+      const activeTo = overrides.to !== undefined ? overrides.to : toDate;
+      const activeFuFrom = overrides.followUpFrom !== undefined ? overrides.followUpFrom : followUpFrom;
+      const activeFuTo = overrides.followUpTo !== undefined ? overrides.followUpTo : followUpTo;
+      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
+
       const params = {};
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (clientFilter !== 'all') params.client = clientFilter;
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (typeFilter !== 'all') params.quotationType = typeFilter;
-      if (categoryFilter !== 'all') params.quotationCategory = categoryFilter;
-      if (fromDate) params.from = fromDate;
-      if (toDate) params.to = toDate;
+      if (activeSearch.trim()) params.search = activeSearch.trim();
+      if (activeClient !== 'all') params.client = activeClient;
+      if (activeStatus !== 'all') params.status = activeStatus;
+      if (activeType !== 'all') params.quotationType = activeType;
+      if (activeCategory !== 'all') params.quotationCategory = activeCategory;
+      if (activeFrom) params.from = activeFrom;
+      if (activeTo) params.to = activeTo;
+      if (activeFuFrom) params.followUpFrom = activeFuFrom;
+      if (activeFuTo) params.followUpTo = activeFuTo;
+      if (activeSortBy) params.sortBy = activeSortBy;
 
       const qRes = await getQuotations(params);
 
@@ -103,7 +122,20 @@ const QuotationList = () => {
 
   useEffect(() => {
     fetchQuotationsData();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter]);
+  }, [clientFilter, statusFilter, typeFilter, categoryFilter, sortBy]);
+
+  const handleClearDateFilters = () => {
+    setFollowUpFrom('');
+    setFollowUpTo('');
+    setFromDate('');
+    setToDate('');
+    fetchQuotationsData({
+      from: '',
+      to: '',
+      followUpFrom: '',
+      followUpTo: '',
+    });
+  };
 
   const loadClientOptions = async (inputValue) => {
     try {
@@ -201,7 +233,28 @@ const QuotationList = () => {
         key: 'quotationDate',
         header: 'Date',
         sortable: true,
-        render: (val) => (val ? new Date(val).toLocaleDateString('en-GB') : '-'),
+        render: (val, row) => (
+          <div>
+            <div>{val ? new Date(val).toLocaleDateString('en-GB') : '-'}</div>
+            {row.nextFollowUpDate && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--primary-700)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  marginTop: '2px',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Next Scheduled Follow-up"
+              >
+                <Calendar size={11} color="var(--primary-600)" />
+                <span>Next: <strong>{new Date(row.nextFollowUpDate).toLocaleDateString('en-GB')}</strong></span>
+              </div>
+            )}
+          </div>
+        ),
       },
       {
         key: 'client',
@@ -431,85 +484,167 @@ const QuotationList = () => {
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
-        <div className="flex flex-wrap items-center gap-3 mb-4" style={{ padding: '16px', gap: '12px' }}>
-          <form onSubmit={handleApplySearch} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
-            <div className="relative flex-1 min-w-[220px]" style={{ flex: '1', minWidth: '220px' }}>
-              <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
-                placeholder="Search by Quotation No, Party, Remarks..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+        <div className="flex flex-col gap-3 mb-4" style={{ padding: '16px' }}>
+          <form onSubmit={handleApplySearch} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+            {/* Row 1: Search & Categorical Dropdowns */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="relative flex-1 min-w-[220px]" style={{ flex: '1', minWidth: '220px' }}>
+                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search by Quotation No, Party, Remarks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <AsyncSelect
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value || 'all')}
+                loadOptions={loadClientOptions}
+                placeholder="All Parties"
+                style={{ width: '220px' }}
+                initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
               />
+
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ width: '150px' }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="follow_up">Follow Up</option>
+                <option value="won">Won / Converted</option>
+                <option value="lost">Lost</option>
+                <option value="completed">Completed</option>
+                <option value="released">Released</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+                <option value="expired">Expired</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+
+              <Select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                style={{ width: '130px' }}
+              >
+                <option value="all">All Types</option>
+                <option value="domestic">Domestic</option>
+                <option value="export">Export</option>
+              </Select>
+
+              <Select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                style={{ width: '130px' }}
+              >
+                <option value="all">All Categories</option>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+                <option value="spare">Spare</option>
+              </Select>
             </div>
 
-            <AsyncSelect
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value || 'all')}
-              loadOptions={loadClientOptions}
-              placeholder="All Parties"
-              style={{ width: '220px' }}
-              initialLabel={clientFilter === 'all' ? 'All Parties' : undefined}
-            />
-
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '150px' }}
+            {/* Row 2: Date Filters, Sorting & Actions */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: '8px',
+                borderTop: '1px solid var(--neutral-200)',
+              }}
             >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="follow_up">Follow Up</option>
-              <option value="won">Won / Converted</option>
-              <option value="lost">Lost</option>
-              <option value="completed">Completed</option>
-              <option value="released">Released</option>
-              <option value="accepted">Accepted</option>
-              <option value="rejected">Rejected</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Quotation Date Group */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-600)', whiteSpace: 'nowrap' }}>
+                    Quotation Date:
+                  </span>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    style={{ width: '135px' }}
+                    title="Quotation From Date"
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>to</span>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    style={{ width: '135px' }}
+                    title="Quotation To Date"
+                  />
+                </div>
 
-            <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ width: '130px' }}
-            >
-              <option value="all">All Types</option>
-              <option value="domestic">Domestic</option>
-              <option value="export">Export</option>
-            </Select>
+                {/* Follow-up Date Group */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                    <Calendar size={13} color="var(--primary-600)" />
+                    Follow-up Date:
+                  </span>
+                  <Input
+                    type="date"
+                    value={followUpFrom}
+                    onChange={(e) => setFollowUpFrom(e.target.value)}
+                    style={{ width: '135px' }}
+                    title="Follow-up From Date"
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>to</span>
+                  <Input
+                    type="date"
+                    value={followUpTo}
+                    onChange={(e) => setFollowUpTo(e.target.value)}
+                    style={{ width: '135px' }}
+                    title="Follow-up To Date"
+                  />
+                </div>
 
-            <Select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ width: '130px' }}
-            >
-              <option value="all">All Categories</option>
-              <option value="product">Product</option>
-              <option value="service">Service</option>
-              <option value="spare">Spare</option>
-            </Select>
+                {/* Sorting Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-600)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                    <ArrowUpDown size={13} />
+                    Sort By:
+                  </span>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    style={{ width: '225px' }}
+                  >
+                    <option value="newest">Newest Quotation First</option>
+                    <option value="oldest">Oldest Quotation First</option>
+                    <option value="follow_up_earliest">Follow-up Date: Earliest First</option>
+                    <option value="follow_up_latest">Follow-up Date: Latest First</option>
+                  </Select>
+                </div>
+              </div>
 
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              style={{ width: '140px' }}
-              title="From Date"
-            />
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Button type="submit" variant="primary" size="sm">
+                  <Filter size={14} style={{ marginRight: '4px' }} /> Apply Filters
+                </Button>
 
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              style={{ width: '140px' }}
-              title="To Date"
-            />
-
-            <Button type="submit" variant="primary" size="sm">
-              <Filter size={14} style={{ marginRight: '4px' }} /> Filter
-            </Button>
+                {(fromDate || toDate || followUpFrom || followUpTo) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearDateFilters}
+                    title="Reset Date Filters"
+                    style={{ color: 'var(--neutral-600)' }}
+                  >
+                    <RotateCcw size={13} style={{ marginRight: '4px' }} /> Clear Filters
+                  </Button>
+                )}
+              </div>
+            </div>
           </form>
         </div>
 
