@@ -50,6 +50,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     salesPerson: initialReqObj?.salesPerson?._id || initialReqObj?.salesPerson || '',
     quotationDate: new Date().toISOString().split('T')[0],
     validTill: '',
+    deadline: '',
     currency: 'INR',
     pfAmount: 0,
     freightAmount: 0,
@@ -302,6 +303,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 salesPerson: q.salesPerson?._id || q.salesPerson || '',
                 quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
                 validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+                deadline: q.deadline ? new Date(q.deadline).toISOString().split('T')[0] : '',
                 currency: q.currency || 'INR',
                 pfAmount: q.pfAmount || 0,
                 freightAmount: q.freightAmount || 0,
@@ -325,6 +327,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 salesPerson: q.salesPerson?._id || q.salesPerson || '',
                 quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
                 validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+                deadline: q.deadline ? new Date(q.deadline).toISOString().split('T')[0] : '',
                 currency: q.currency || 'INR',
                 pfAmount: q.pfAmount || 0,
                 freightAmount: q.freightAmount || 0,
@@ -636,6 +639,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         salesPerson: formData.salesPerson || null,
         quotationDate: formData.quotationDate,
         validTill: formData.validTill || null,
+        deadline: formData.deadline || null,
         currency: formData.currency,
         pfAmount: Number(formData.pfAmount) || 0,
         freightAmount: Number(formData.freightAmount) || 0,
@@ -808,6 +812,17 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                   type="date"
                   value={formData.validTill}
                   onChange={(e) => setFormData({ ...formData, validTill: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" title="Operational date by which quotation requires internal decision or attention">
+                  Attention Deadline
+                </label>
+                <Input
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                 />
               </div>
             </div>

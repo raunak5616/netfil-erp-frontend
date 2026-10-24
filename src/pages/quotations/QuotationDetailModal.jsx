@@ -392,6 +392,27 @@ const QuotationDetailModal = ({
     }
   };
 
+  const getDeadlineBadge = (dateStr) => {
+    if (!dateStr) return null;
+    const target = new Date(dateStr);
+    if (isNaN(target.getTime())) return null;
+    const now = new Date();
+    const diffDays = Math.round((new Date(target.toDateString()) - new Date(now.toDateString())) / (24 * 60 * 60 * 1000));
+    if (diffDays < 0) {
+      return { text: `Overdue by ${Math.abs(diffDays)}d`, color: 'bg-rose-50 text-rose-700 border-rose-200' };
+    }
+    if (diffDays === 0) {
+      return { text: 'Due Today', color: 'bg-amber-50 text-amber-800 border-amber-200' };
+    }
+    if (diffDays === 1) {
+      return { text: 'Due Tomorrow', color: 'bg-amber-50 text-amber-800 border-amber-200' };
+    }
+    if (diffDays <= 4) {
+      return { text: `Due in ${diffDays}d`, color: 'bg-blue-50 text-blue-700 border-blue-200' };
+    }
+    return { text: `Upcoming (${diffDays}d)`, color: 'bg-slate-50 text-slate-700 border-slate-200' };
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -551,6 +572,17 @@ const QuotationDetailModal = ({
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
                 Valid Till: {formatDate(quotation.validTill)}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Attention Deadline: <strong>{formatDate(quotation.deadline)}</strong></span>
+                {quotation.deadline && (() => {
+                  const badge = getDeadlineBadge(quotation.deadline);
+                  return badge ? (
+                    <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-semibold border ${badge.color}`}>
+                      {badge.text}
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
                 Currency: {quotation.currency || 'INR'}
@@ -803,10 +835,22 @@ const QuotationDetailModal = ({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11.5px', color: 'var(--gray-600)' }}>
-                      <span>Next Follow-up: <strong style={{ color: 'var(--primary-700)' }}>{formatDate(fu.followUpDate)}</strong></span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Follow-up: <strong style={{ color: 'var(--primary-700)' }}>{formatDate(fu.followUpDate)}</strong> {fu.followUpTime ? `@ ${fu.followUpTime}` : ''}</span>
+                        {fu.outcome && (
+                          <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'var(--primary-50)', color: 'var(--primary-700)', fontWeight: 600 }}>
+                            {fu.outcome}
+                          </span>
+                        )}
+                      </span>
                       <span>Recorded on {formatDate(fu.createdAt)} {fu.followUpBy?.username ? `by ${fu.followUpBy.username}` : ''}</span>
                     </div>
                     <div style={{ color: 'var(--gray-900)' }}>{fu.remarks}</div>
+                    {fu.outcomeNotes && (
+                      <div style={{ color: 'var(--neutral-500)', fontSize: '11px', marginTop: '2px', fontStyle: 'italic' }}>
+                        Next action: {fu.outcomeNotes}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

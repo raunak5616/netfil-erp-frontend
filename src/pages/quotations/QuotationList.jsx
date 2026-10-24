@@ -4,6 +4,9 @@ import {
   updateQuotationStatus,
   releaseQuotation,
   printQuotationPdf,
+  getQuotationRemindersSummary,
+  dismissQuotationReminder,
+  syncQuotationReminders,
 } from '../../services/quotationService';
 import { getClients } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +30,7 @@ import {
   Edit,
   RefreshCw,
   Calendar,
+  Clock,
   Building2,
   Calculator,
   CheckCircle2,
@@ -38,6 +42,13 @@ import {
   Printer,
   ArrowUpDown,
   RotateCcw,
+  AlertTriangle,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Bell,
+  Check,
+  X,
 } from 'lucide-react';
 
 const QuotationList = () => {
@@ -49,10 +60,23 @@ const QuotationList = () => {
   const canAmend = hasPermission('QUOTATION_AMEND');
 
   const [quotations, setQuotations] = useState([]);
-  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+
+  // In-Page Reminders & Summary State
+  const [remindersSummary, setRemindersSummary] = useState({
+    overdueCount: 0,
+    dueTodayCount: 0,
+    dueNext4DaysCount: 0,
+    upcomingFollowUpsCount: 0,
+  });
+  const [deadlineAlerts, setDeadlineAlerts] = useState([]);
+  const [followUpReminders, setFollowUpReminders] = useState([]);
+  const [activeAlertTab, setActiveAlertTab] = useState('deadlines');
+  const [isActionCenterExpanded, setIsActionCenterExpanded] = useState(true);
+  const [dismissingId, setDismissingId] = useState(null);
+  const [syncingReminders, setSyncingReminders] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +88,10 @@ const QuotationList = () => {
   const [toDate, setToDate] = useState('');
   const [followUpFrom, setFollowUpFrom] = useState('');
   const [followUpTo, setFollowUpTo] = useState('');
+  const [deadlineFrom, setDeadlineFrom] = useState('');
+  const [deadlineTo, setDeadlineTo] = useState('');
+  const [deadlineStatus, setDeadlineStatus] = useState('all');
+  const [hasPendingFollowUp, setHasPendingFollowUp] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
 
   // Modals
@@ -78,6 +106,24 @@ const QuotationList = () => {
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUpTargetQuotation, setFollowUpTargetQuotation] = useState(null);
 
+  const fetchRemindersSummary = async () => {
+    try {
+      const res = await getQuotationRemindersSummary();
+      if (res.success) {
+        setRemindersSummary(res.summary || {
+          overdueCount: 0,
+          dueTodayCount: 0,
+          dueNext4DaysCount: 0,
+          upcomingFollowUpsCount: 0,
+        });
+        setDeadlineAlerts(res.alerts?.deadlineAlerts || []);
+        setFollowUpReminders(res.alerts?.followUpReminders || []);
+      }
+    } catch (err) {
+      console.error('Failed to load quotation reminders:', err);
+    }
+  };
+
   const fetchQuotationsData = async (overrides = {}) => {
     setLoading(true);
     setError('');
@@ -91,6 +137,10 @@ const QuotationList = () => {
       const activeTo = overrides.to !== undefined ? overrides.to : toDate;
       const activeFuFrom = overrides.followUpFrom !== undefined ? overrides.followUpFrom : followUpFrom;
       const activeFuTo = overrides.followUpTo !== undefined ? overrides.followUpTo : followUpTo;
+      const activeDlFrom = overrides.deadlineFrom !== undefined ? overrides.deadlineFrom : deadlineFrom;
+      const activeDlTo = overrides.deadlineTo !== undefined ? overrides.deadlineTo : deadlineTo;
+      const activeDlStatus = overrides.deadlineStatus !== undefined ? overrides.deadlineStatus : deadlineStatus;
+      const activeHasPendingFu = overrides.hasPendingFollowUp !== undefined ? overrides.hasPendingFollowUp : hasPendingFollowUp;
       const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
 
       const params = {};
@@ -103,6 +153,10 @@ const QuotationList = () => {
       if (activeTo) params.to = activeTo;
       if (activeFuFrom) params.followUpFrom = activeFuFrom;
       if (activeFuTo) params.followUpTo = activeFuTo;
+      if (activeDlFrom) params.deadlineFrom = activeDlFrom;
+      if (activeDlTo) params.deadlineTo = activeDlTo;
+      if (activeDlStatus !== 'all') params.deadlineStatus = activeDlStatus;
+      if (activeHasPendingFu !== 'all') params.hasPendingFollowUp = activeHasPendingFu;
       if (activeSortBy) params.sortBy = activeSortBy;
 
       const qRes = await getQuotations(params);
@@ -122,18 +176,27 @@ const QuotationList = () => {
 
   useEffect(() => {
     fetchQuotationsData();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, sortBy]);
+    fetchRemindersSummary();
+  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deadlineStatus, hasPendingFollowUp, sortBy]);
 
   const handleClearDateFilters = () => {
     setFollowUpFrom('');
     setFollowUpTo('');
     setFromDate('');
     setToDate('');
+    setDeadlineFrom('');
+    setDeadlineTo('');
+    setDeadlineStatus('all');
+    setHasPendingFollowUp('all');
     fetchQuotationsData({
       from: '',
       to: '',
       followUpFrom: '',
       followUpTo: '',
+      deadlineFrom: '',
+      deadlineTo: '',
+      deadlineStatus: 'all',
+      hasPendingFollowUp: 'all',
     });
   };
 
@@ -158,6 +221,57 @@ const QuotationList = () => {
     fetchQuotationsData();
   };
 
+  const handleKpiCardClick = (type) => {
+    if (type === 'overdue') {
+      const nextVal = deadlineStatus === 'overdue' ? 'all' : 'overdue';
+      setDeadlineStatus(nextVal);
+      fetchQuotationsData({ deadlineStatus: nextVal });
+    } else if (type === 'due_today') {
+      const nextVal = deadlineStatus === 'due_today' ? 'all' : 'due_today';
+      setDeadlineStatus(nextVal);
+      fetchQuotationsData({ deadlineStatus: nextVal });
+    } else if (type === 'due_next_4_days') {
+      const nextVal = deadlineStatus === 'due_next_4_days' ? 'all' : 'due_next_4_days';
+      setDeadlineStatus(nextVal);
+      fetchQuotationsData({ deadlineStatus: nextVal });
+    } else if (type === 'upcoming_followups') {
+      const nextVal = hasPendingFollowUp === 'true' ? 'all' : 'true';
+      setHasPendingFollowUp(nextVal);
+      fetchQuotationsData({ hasPendingFollowUp: nextVal });
+    }
+  };
+
+  const handleDismissReminder = async (reminderId) => {
+    setDismissingId(reminderId);
+    try {
+      const res = await dismissQuotationReminder(reminderId);
+      if (res.success) {
+        setDeadlineAlerts((prev) => prev.filter((a) => a._id !== reminderId));
+        setFollowUpReminders((prev) => prev.filter((r) => r._id !== reminderId));
+      }
+    } catch (err) {
+      console.error('Failed to dismiss reminder:', err);
+    } finally {
+      setDismissingId(null);
+    }
+  };
+
+  const handleSyncReminders = async () => {
+    setSyncingReminders(true);
+    try {
+      const res = await syncQuotationReminders();
+      if (res.success) {
+        setRemindersSummary(res.summary || {});
+        setDeadlineAlerts(res.alerts?.deadlineAlerts || []);
+        setFollowUpReminders(res.alerts?.followUpReminders || []);
+      }
+    } catch (err) {
+      console.error('Failed to sync reminders:', err);
+    } finally {
+      setSyncingReminders(false);
+    }
+  };
+
   const handleStatusChange = async (quotation, newStatus) => {
     if (quotation.status === newStatus) return;
 
@@ -171,6 +285,7 @@ const QuotationList = () => {
         setQuotations((prev) =>
           prev.map((q) => (q._id === quotation._id ? { ...q, status: newStatus } : q))
         );
+        fetchRemindersSummary();
       }
     } catch (err) {
       console.error('Failed to update quotation status:', err);
@@ -198,6 +313,53 @@ const QuotationList = () => {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const getDeadlineBadgeInfo = (deadlineDate) => {
+    if (!deadlineDate) {
+      return {
+        label: 'No Deadline',
+        className: 'bg-slate-100 text-slate-500 border-slate-200',
+      };
+    }
+
+    const target = new Date(deadlineDate);
+    if (isNaN(target.getTime())) {
+      return { label: 'No Deadline', className: 'bg-slate-100 text-slate-500 border-slate-200' };
+    }
+
+    const now = new Date();
+    const diffDays = Math.round((new Date(target.toDateString()) - new Date(now.toDateString())) / (24 * 60 * 60 * 1000));
+
+    if (diffDays < 0) {
+      const absDays = Math.abs(diffDays);
+      return {
+        label: absDays === 1 ? 'Overdue (1d)' : `Overdue (${absDays}d)`,
+        className: 'bg-rose-50 text-rose-700 border-rose-200 font-bold',
+      };
+    }
+    if (diffDays === 0) {
+      return {
+        label: 'Due Today',
+        className: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
+      };
+    }
+    if (diffDays === 1) {
+      return {
+        label: 'Due Tomorrow',
+        className: 'bg-amber-50 text-amber-800 border-amber-200 font-semibold',
+      };
+    }
+    if (diffDays <= 4) {
+      return {
+        label: `In ${diffDays} Days`,
+        className: 'bg-blue-50 text-blue-700 border-blue-200 font-semibold',
+      };
+    }
+    return {
+      label: `Upcoming (${diffDays}d)`,
+      className: 'bg-slate-50 text-slate-600 border-slate-200 font-medium',
+    };
   };
 
   const columns = useMemo(
@@ -233,27 +395,8 @@ const QuotationList = () => {
         key: 'quotationDate',
         header: 'Date',
         sortable: true,
-        render: (val, row) => (
-          <div>
-            <div>{val ? new Date(val).toLocaleDateString('en-GB') : '-'}</div>
-            {row.nextFollowUpDate && (
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: 'var(--primary-700)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  marginTop: '2px',
-                  whiteSpace: 'nowrap',
-                }}
-                title="Next Scheduled Follow-up"
-              >
-                <Calendar size={11} color="var(--primary-600)" />
-                <span>Next: <strong>{new Date(row.nextFollowUpDate).toLocaleDateString('en-GB')}</strong></span>
-              </div>
-            )}
-          </div>
+        render: (val) => (
+          <div>{val ? new Date(val).toLocaleDateString('en-GB') : '-'}</div>
         ),
       },
       {
@@ -272,6 +415,55 @@ const QuotationList = () => {
             )}
           </div>
         ),
+      },
+      {
+        key: 'deadline',
+        header: 'Attention Deadline',
+        sortable: true,
+        render: (val) => {
+          const badge = getDeadlineBadgeInfo(val);
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <div style={{ fontSize: '12.5px', fontWeight: val ? 600 : 400, color: val ? 'var(--neutral-900)' : 'var(--neutral-400)' }}>
+                {val ? new Date(val).toLocaleDateString('en-GB') : '—'}
+              </div>
+              <div>
+                <span className={`inline-flex items-center text-[10.5px] px-1.5 py-0.5 rounded border ${badge.className}`}>
+                  {badge.label}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: 'nextFollowUpDate',
+        header: 'Next Follow-up',
+        sortable: true,
+        render: (val, row) => {
+          if (!val) {
+            return <span style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>—</span>;
+          }
+          const latestFollowUp = row.followUps && row.followUps.length > 0 ? row.followUps[row.followUps.length - 1] : null;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={11} color="var(--primary-600)" />
+                <span>{new Date(val).toLocaleDateString('en-GB')}</span>
+                {latestFollowUp?.followUpTime && (
+                  <span style={{ fontSize: '10.5px', color: 'var(--neutral-500)' }}>@{latestFollowUp.followUpTime}</span>
+                )}
+              </div>
+              {latestFollowUp?.outcome && latestFollowUp.outcome !== 'PENDING' && (
+                <div>
+                  <span style={{ fontSize: '9.5px', padding: '1px 4px', borderRadius: '3px', background: 'var(--primary-50)', color: 'var(--primary-700)', border: '1px solid var(--primary-200)', fontWeight: 600 }}>
+                    {latestFollowUp.outcome}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: 'requirement',
@@ -458,7 +650,10 @@ const QuotationList = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchQuotationsData}
+              onClick={() => {
+                fetchQuotationsData();
+                fetchRemindersSummary();
+              }}
               disabled={loading}
             >
               <RefreshCw size={14} className={loading ? 'spin' : ''} style={{ marginRight: '6px' }} />
@@ -482,9 +677,300 @@ const QuotationList = () => {
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
+      {/* 1. KPI SUMMARY STRIP (Single-click quick filters) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Overdue Card */}
+        <div
+          onClick={() => handleKpiCardClick('overdue')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deadlineStatus === 'overdue'
+              ? 'ring-2 ring-rose-500 border-rose-400 bg-rose-50/30'
+              : 'border-slate-200 hover:border-rose-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+              <AlertTriangle size={14} className="text-rose-600" /> Overdue
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-rose-100 text-rose-800">
+              Needs Action
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {remindersSummary.overdueCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">quotations</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deadlineStatus === 'overdue' ? 'Active filter (click to reset)' : 'Click to filter overdue'}
+          </div>
+        </div>
+
+        {/* Due Today Card */}
+        <div
+          onClick={() => handleKpiCardClick('due_today')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deadlineStatus === 'due_today'
+              ? 'ring-2 ring-amber-500 border-amber-400 bg-amber-50/30'
+              : 'border-slate-200 hover:border-amber-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+              <Clock size={14} className="text-amber-600" /> Due Today
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-amber-100 text-amber-900">
+              Priority
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {remindersSummary.dueTodayCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">quotations</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deadlineStatus === 'due_today' ? 'Active filter (click to reset)' : 'Click to filter today’s deadlines'}
+          </div>
+        </div>
+
+        {/* Due Next 4 Days Card */}
+        <div
+          onClick={() => handleKpiCardClick('due_next_4_days')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deadlineStatus === 'due_next_4_days'
+              ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/30'
+              : 'border-slate-200 hover:border-blue-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+              <Calendar size={14} className="text-blue-600" /> Due in 2–4 Days
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-blue-100 text-blue-800">
+              Upcoming
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {remindersSummary.dueNext4DaysCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">quotations</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deadlineStatus === 'due_next_4_days' ? 'Active filter (click to reset)' : 'Click to filter next 4 days'}
+          </div>
+        </div>
+
+        {/* Upcoming Follow-ups Card */}
+        <div
+          onClick={() => handleKpiCardClick('upcoming_followups')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            hasPendingFollowUp === 'true'
+              ? 'ring-2 ring-emerald-500 border-emerald-400 bg-emerald-50/30'
+              : 'border-slate-200 hover:border-emerald-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+              <MessageSquare size={14} className="text-emerald-600" /> Scheduled Follow-ups
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-800">
+              Active Touchpoints
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {remindersSummary.upcomingFollowUpsCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">pending</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {hasPendingFollowUp === 'true' ? 'Active filter (click to reset)' : 'Click to filter active follow-ups'}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. IN-PAGE ACTION CENTER & REMINDERS DRAWER */}
+      {(deadlineAlerts.length > 0 || followUpReminders.length > 0) && (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+          {/* Header Bar */}
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Bell size={14} className="text-primary-600" /> Quotation Reminders & Action Center
+              </span>
+              <div className="flex items-center gap-1 bg-slate-200/80 p-0.5 rounded-md text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveAlertTab('deadlines')}
+                  className={`px-2.5 py-1 rounded font-medium transition-all ${
+                    activeAlertTab === 'deadlines'
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Deadline Alerts ({deadlineAlerts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveAlertTab('followups')}
+                  className={`px-2.5 py-1 rounded font-medium transition-all ${
+                    activeAlertTab === 'followups'
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Follow-up Reminders ({followUpReminders.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncReminders}
+                disabled={syncingReminders}
+                className="text-[11.5px] text-slate-600 hover:text-primary-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-200/60 transition-colors"
+                title="Synchronize reminder status"
+              >
+                <RefreshCw size={12} className={syncingReminders ? 'spin' : ''} />
+                <span>Sync</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsActionCenterExpanded(!isActionCenterExpanded)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
+              >
+                {isActionCenterExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Drawer Body */}
+          {isActionCenterExpanded && (
+            <div className="p-3 max-h-64 overflow-y-auto space-y-2">
+              {activeAlertTab === 'deadlines' ? (
+                deadlineAlerts.length === 0 ? (
+                  <div className="text-xs text-slate-500 py-3 text-center">No active deadline alerts.</div>
+                ) : (
+                  deadlineAlerts.map((alert) => (
+                    <div
+                      key={alert._id}
+                      className="p-2.5 bg-slate-50/80 hover:bg-slate-100/70 border border-slate-200 rounded-md flex flex-wrap items-center justify-between gap-2 text-xs transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-[280px]">
+                        <span className="font-mono font-bold text-primary-700">{alert.quotationNo}</span>
+                        <span className="font-medium text-slate-900">{alert.clientName || 'Customer'}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-600">
+                          Deadline: <strong>{new Date(alert.targetDate).toLocaleDateString('en-GB')}</strong>
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            alert.stage === 'OVERDUE'
+                              ? 'bg-rose-100 text-rose-800'
+                              : alert.stage === 'DUE_TODAY'
+                              ? 'bg-amber-100 text-amber-900'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {alert.stage.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11.5px] text-slate-500">
+                        <span>Owner: {alert.salesPersonName || 'Unassigned'}</span>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedQuotation(alert.quotation);
+                              setIsDetailOpen(true);
+                            }}
+                            className="px-2 py-0.5 rounded bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium"
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFollowUpTargetQuotation(alert.quotation);
+                              setIsFollowUpOpen(true);
+                            }}
+                            className="px-2 py-0.5 rounded bg-primary-50 border border-primary-200 text-primary-700 hover:bg-primary-100 font-medium"
+                          >
+                            Follow-up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDismissReminder(alert._id)}
+                            disabled={dismissingId === alert._id}
+                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+                            title="Dismiss reminder"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )
+              ) : (
+                followUpReminders.length === 0 ? (
+                  <div className="text-xs text-slate-500 py-3 text-center">No active follow-up reminders.</div>
+                ) : (
+                  followUpReminders.map((alert) => (
+                    <div
+                      key={alert._id}
+                      className="p-2.5 bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-200/80 rounded-md flex flex-wrap items-center justify-between gap-2 text-xs transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-[280px]">
+                        <span className="font-mono font-bold text-emerald-800">{alert.quotationNo}</span>
+                        <span className="font-medium text-slate-900">{alert.clientName || 'Customer'}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-600">
+                          Follow-up Scheduled: <strong>{new Date(alert.targetDate).toLocaleDateString('en-GB')}</strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11.5px] text-slate-500">
+                        <span>Owner: {alert.salesPersonName || 'Unassigned'}</span>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFollowUpTargetQuotation(alert.quotation);
+                              setIsFollowUpOpen(true);
+                            }}
+                            className="px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
+                          >
+                            Record Outcome
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDismissReminder(alert._id)}
+                            disabled={dismissingId === alert._id}
+                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+                            title="Dismiss reminder"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. TOOLBAR CONTROLS & MAIN REGISTER */}
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
-        {/* Toolbar Controls */}
-        <div className="flex flex-col gap-3 mb-4" style={{ padding: '16px' }}>
+        <div className="flex flex-col gap-3 mb-4">
           <form onSubmit={handleApplySearch} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
             {/* Row 1: Search & Categorical Dropdowns */}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -527,9 +1013,23 @@ const QuotationList = () => {
               </Select>
 
               <Select
+                value={deadlineStatus}
+                onChange={(e) => setDeadlineStatus(e.target.value)}
+                style={{ width: '170px' }}
+                title="Filter by Attention Deadline Status"
+              >
+                <option value="all">All Deadlines</option>
+                <option value="overdue">Overdue Deadlines</option>
+                <option value="due_today">Due Today</option>
+                <option value="due_next_4_days">Due Within 4 Days</option>
+                <option value="upcoming">Upcoming (&gt; 4 days)</option>
+                <option value="no_deadline">No Deadline</option>
+              </Select>
+
+              <Select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                style={{ width: '130px' }}
+                style={{ width: '120px' }}
               >
                 <option value="all">All Types</option>
                 <option value="domestic">Domestic</option>
@@ -539,7 +1039,7 @@ const QuotationList = () => {
               <Select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                style={{ width: '130px' }}
+                style={{ width: '120px' }}
               >
                 <option value="all">All Categories</option>
                 <option value="product">Product</option>
@@ -560,65 +1060,90 @@ const QuotationList = () => {
                 borderTop: '1px solid var(--neutral-200)',
               }}
             >
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {/* Quotation Date Group */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-600)', whiteSpace: 'nowrap' }}>
-                    Quotation Date:
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--neutral-600)', whiteSpace: 'nowrap' }}>
+                    Quote Date:
                   </span>
                   <Input
                     type="date"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    style={{ width: '135px' }}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
                     title="Quotation From Date"
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>to</span>
+                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>-</span>
                   <Input
                     type="date"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
-                    style={{ width: '135px' }}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
                     title="Quotation To Date"
                   />
                 </div>
 
+                {/* Deadline Date Range */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--primary-800)', whiteSpace: 'nowrap' }}>
+                    Deadline:
+                  </span>
+                  <Input
+                    type="date"
+                    value={deadlineFrom}
+                    onChange={(e) => setDeadlineFrom(e.target.value)}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
+                    title="Deadline From Date"
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>-</span>
+                  <Input
+                    type="date"
+                    value={deadlineTo}
+                    onChange={(e) => setDeadlineTo(e.target.value)}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
+                    title="Deadline To Date"
+                  />
+                </div>
+
                 {/* Follow-up Date Group */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                    <Calendar size={13} color="var(--primary-600)" />
-                    Follow-up Date:
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--emerald-800)', whiteSpace: 'nowrap' }}>
+                    Follow-up:
                   </span>
                   <Input
                     type="date"
                     value={followUpFrom}
                     onChange={(e) => setFollowUpFrom(e.target.value)}
-                    style={{ width: '135px' }}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
                     title="Follow-up From Date"
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>to</span>
+                  <span style={{ fontSize: '11px', color: 'var(--neutral-400)' }}>-</span>
                   <Input
                     type="date"
                     value={followUpTo}
                     onChange={(e) => setFollowUpTo(e.target.value)}
-                    style={{ width: '135px' }}
+                    style={{ width: '125px', padding: '4px 6px', fontSize: '12px' }}
                     title="Follow-up To Date"
                   />
                 </div>
 
                 {/* Sorting Dropdown */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-600)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--neutral-700)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                     <ArrowUpDown size={13} />
-                    Sort By:
+                    Sort:
                   </span>
                   <Select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    style={{ width: '225px' }}
+                    style={{ width: '235px', padding: '4px 8px', fontSize: '12px' }}
                   >
                     <option value="newest">Newest Quotation First</option>
                     <option value="oldest">Oldest Quotation First</option>
+                    <option value="overdue_first">Overdue First</option>
+                    <option value="due_today_tomorrow_first">Due Today & Tomorrow First</option>
+                    <option value="deadline_earliest">Deadline: Earliest First</option>
+                    <option value="deadline_latest">Deadline: Latest First</option>
                     <option value="follow_up_earliest">Follow-up Date: Earliest First</option>
                     <option value="follow_up_latest">Follow-up Date: Latest First</option>
                   </Select>
@@ -628,19 +1153,19 @@ const QuotationList = () => {
               {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <Button type="submit" variant="primary" size="sm">
-                  <Filter size={14} style={{ marginRight: '4px' }} /> Apply Filters
+                  <Filter size={14} style={{ marginRight: '4px' }} /> Apply
                 </Button>
 
-                {(fromDate || toDate || followUpFrom || followUpTo) && (
+                {(fromDate || toDate || followUpFrom || followUpTo || deadlineFrom || deadlineTo || deadlineStatus !== 'all' || hasPendingFollowUp !== 'all') && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={handleClearDateFilters}
-                    title="Reset Date Filters"
+                    title="Reset All Filters"
                     style={{ color: 'var(--neutral-600)' }}
                   >
-                    <RotateCcw size={13} style={{ marginRight: '4px' }} /> Clear Filters
+                    <RotateCcw size={13} style={{ marginRight: '4px' }} /> Reset
                   </Button>
                 )}
               </div>
@@ -671,6 +1196,7 @@ const QuotationList = () => {
             setIsFormOpen(false);
             setEditingQuotation(null);
             fetchQuotationsData();
+            fetchRemindersSummary();
           }}
         />
       )}
@@ -689,7 +1215,10 @@ const QuotationList = () => {
             setEditingQuotation(q);
             setIsFormOpen(true);
           }}
-          onRelease={fetchQuotationsData}
+          onRelease={() => {
+            fetchQuotationsData();
+            fetchRemindersSummary();
+          }}
           canEdit={canEdit}
           canRelease={canRelease}
           canAmend={canAmend}
@@ -709,6 +1238,7 @@ const QuotationList = () => {
             setIsAmendmentOpen(false);
             setAmendmentTargetQuotation(null);
             fetchQuotationsData();
+            fetchRemindersSummary();
           }}
         />
       )}
@@ -726,6 +1256,7 @@ const QuotationList = () => {
             setIsLostOpen(false);
             setLostTargetQuotation(null);
             fetchQuotationsData();
+            fetchRemindersSummary();
           }}
         />
       )}
@@ -743,6 +1274,7 @@ const QuotationList = () => {
             setIsFollowUpOpen(false);
             setFollowUpTargetQuotation(null);
             fetchQuotationsData();
+            fetchRemindersSummary();
           }}
         />
       )}

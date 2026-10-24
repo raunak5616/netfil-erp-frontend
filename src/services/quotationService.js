@@ -117,3 +117,20 @@ export const printQuotationPdf = async (quotationId) => {
   const url = window.URL.createObjectURL(blob);
   window.open(url, '_blank');
 };
+
+// In-Page Quotation Reminders & Alerts Endpoints
+export const getQuotationRemindersSummary = async () => {
+  const response = await api.get('/quotations/reminders/summary');
+  return response.data;
+};
+
+export const dismissQuotationReminder = async (reminderId) => {
+  const response = await api.patch(`/quotations/reminders/${reminderId}/dismiss`);
+  return response.data;
+};
+
+export const syncQuotationReminders = async () => {
+  const response = await api.post('/quotations/reminders/sync');
+  return response.data;
+};
+
