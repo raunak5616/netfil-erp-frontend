@@ -112,7 +112,7 @@ const PurchaseOrderForm = () => {
         getPurchaseEnquiries({ limit: 100 }).catch(() => ({ success: false, purchaseEnquiries: [] })),
         getSuppliers({ status: 'active', limit: 100, approvalStatus: 'APPROVED' }).catch(() => getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' })),
         getDepartments().catch(() => ({ success: false, departments: [] })),
-        getItems().catch(() => ({ success: false, items: [] })),
+        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))
       ]);
 

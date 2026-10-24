@@ -96,7 +96,7 @@ const PurchaseOrderDetail = () => {
     try {
       const [poRes, itemRes, uomRes] = await Promise.all([
         getPurchaseOrderById(id),
-        getItems().catch(() => ({ success: false, items: [] })),
+        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))
       ]);
 

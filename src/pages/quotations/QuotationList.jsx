@@ -78,8 +78,15 @@ const QuotationList = () => {
   const [dismissingId, setDismissingId] = useState(null);
   const [syncingReminders, setSyncingReminders] = useState(false);
 
+  // Pagination States (Fixed at 25 records per page)
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -93,6 +100,14 @@ const QuotationList = () => {
   const [deadlineStatus, setDeadlineStatus] = useState('all');
   const [hasPendingFollowUp, setHasPendingFollowUp] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -128,7 +143,7 @@ const QuotationList = () => {
     setLoading(true);
     setError('');
     try {
-      const activeSearch = overrides.search !== undefined ? overrides.search : searchTerm;
+      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
       const activeClient = overrides.client !== undefined ? overrides.client : clientFilter;
       const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
       const activeType = overrides.quotationType !== undefined ? overrides.quotationType : typeFilter;
@@ -142,9 +157,14 @@ const QuotationList = () => {
       const activeDlStatus = overrides.deadlineStatus !== undefined ? overrides.deadlineStatus : deadlineStatus;
       const activeHasPendingFu = overrides.hasPendingFollowUp !== undefined ? overrides.hasPendingFollowUp : hasPendingFollowUp;
       const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
+      const activePage = overrides.page !== undefined ? overrides.page : page;
 
-      const params = {};
-      if (activeSearch.trim()) params.search = activeSearch.trim();
+      const params = {
+        page: activePage,
+        limit: pageSize,
+      };
+
+      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
       if (activeClient !== 'all') params.client = activeClient;
       if (activeStatus !== 'all') params.status = activeStatus;
       if (activeType !== 'all') params.quotationType = activeType;
@@ -163,6 +183,10 @@ const QuotationList = () => {
 
       if (qRes.success && Array.isArray(qRes.quotations)) {
         setQuotations(qRes.quotations);
+        const total = typeof qRes.total === 'number' ? qRes.total : (qRes.count || 0);
+        setTotalRecords(total);
+        setTotalPages(qRes.totalPages || Math.ceil(total / pageSize) || 1);
+        if (qRes.page) setPage(qRes.page);
       } else {
         setError('Unexpected API response format');
       }
@@ -174,10 +198,22 @@ const QuotationList = () => {
     }
   };
 
+  // Load reminders summary once on mount
   useEffect(() => {
-    fetchQuotationsData();
     fetchRemindersSummary();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deadlineStatus, hasPendingFollowUp, sortBy]);
+  }, []);
+
+  // Fetch quotations and reset to page 1 whenever filters, search, or sorting change
+  useEffect(() => {
+    setPage(1);
+    fetchQuotationsData({ page: 1, search: debouncedSearch });
+  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deadlineStatus, hasPendingFollowUp, sortBy, debouncedSearch]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return;
+    setPage(newPage);
+    fetchQuotationsData({ page: newPage });
+  };
 
   const handleClearDateFilters = () => {
     setFollowUpFrom('');
@@ -188,7 +224,9 @@ const QuotationList = () => {
     setDeadlineTo('');
     setDeadlineStatus('all');
     setHasPendingFollowUp('all');
+    setPage(1);
     fetchQuotationsData({
+      page: 1,
       from: '',
       to: '',
       followUpFrom: '',
@@ -218,26 +256,28 @@ const QuotationList = () => {
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
-    fetchQuotationsData();
+    setPage(1);
+    fetchQuotationsData({ page: 1, search: searchTerm });
   };
 
   const handleKpiCardClick = (type) => {
+    setPage(1);
     if (type === 'overdue') {
       const nextVal = deadlineStatus === 'overdue' ? 'all' : 'overdue';
       setDeadlineStatus(nextVal);
-      fetchQuotationsData({ deadlineStatus: nextVal });
+      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
     } else if (type === 'due_today') {
       const nextVal = deadlineStatus === 'due_today' ? 'all' : 'due_today';
       setDeadlineStatus(nextVal);
-      fetchQuotationsData({ deadlineStatus: nextVal });
+      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
     } else if (type === 'due_next_4_days') {
       const nextVal = deadlineStatus === 'due_next_4_days' ? 'all' : 'due_next_4_days';
       setDeadlineStatus(nextVal);
-      fetchQuotationsData({ deadlineStatus: nextVal });
+      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
     } else if (type === 'upcoming_followups') {
       const nextVal = hasPendingFollowUp === 'true' ? 'all' : 'true';
       setHasPendingFollowUp(nextVal);
-      fetchQuotationsData({ hasPendingFollowUp: nextVal });
+      fetchQuotationsData({ page: 1, hasPendingFollowUp: nextVal });
     }
   };
 
@@ -1180,6 +1220,14 @@ const QuotationList = () => {
           loading={loading}
           emptyTitle="No Quotation records found"
           emptyDescription="Click '+ New Quotation' to create a commercial quotation for a client requirement."
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            totalRecords: totalRecords,
+            pageSize: pageSize,
+            recordLabel: 'quotations',
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
 

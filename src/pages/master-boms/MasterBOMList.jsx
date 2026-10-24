@@ -68,7 +68,7 @@ const MasterBOMList = () => {
 
       const [bomRes, itemRes] = await Promise.all([
         getBOMs(params),
-        getItems().catch(() => ({ success: false, items: [] }))
+        getItems({ all: true }).catch(() => ({ success: false, items: [] }))
       ]);
 
       if (bomRes.success && Array.isArray(bomRes.boms)) {

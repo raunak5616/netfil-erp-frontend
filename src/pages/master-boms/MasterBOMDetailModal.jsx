@@ -75,7 +75,7 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
     try {
       const [res, masterItemsRes, masterUomsRes] = await Promise.all([
         getBOMById(bomId),
-        getItems().catch(() => ({ success: false, items: [] })),
+        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))
       ]);
 

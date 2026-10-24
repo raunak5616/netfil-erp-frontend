@@ -237,9 +237,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
         const [rRes, iRes, uRes, eRes] = await Promise.all([
           getRequirements().catch(() => ({ success: false, requirements: [] })),
-          getItems({ typeFilter: 'MASTER' }).catch(() => ({ success: false, items: [] })),
+          getItems({ typeFilter: 'MASTER', all: true }).catch(() => ({ success: false, items: [] })),
           getUOMs().catch(() => ({ success: false, uoms: [] })),
-          getEmployees().catch(() => ({ success: false, employees: [] })),
+          getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
         ]);
 
         const reqsList = (rRes.success && Array.isArray(rRes.requirements)) ? rRes.requirements : [];

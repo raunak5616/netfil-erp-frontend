@@ -89,13 +89,19 @@ const DataTable = ({
           </table>
 
           {/* Pagination Controls Footer */}
-          {pagination && (
-            <div className="flex items-center justify-between px-3 py-2.5 border-t border-slate-200 bg-slate-50 text-xs text-slate-600 flex-wrap gap-2.5">
-              <div>
-                Showing <strong className="font-semibold text-slate-900">{data.length}</strong> of <strong className="font-semibold text-slate-900">{pagination.totalRecords || data.length}</strong> records
-              </div>
+          {pagination && (() => {
+            const pageSize = pagination.pageSize || pagination.limit || (pagination.totalRecords && pagination.totalPages ? Math.ceil(pagination.totalRecords / pagination.totalPages) : (data.length || 25));
+            const startRecord = data.length > 0 ? (pagination.currentPage - 1) * pageSize + 1 : 0;
+            const endRecord = data.length > 0 ? Math.min(startRecord + data.length - 1, pagination.totalRecords !== undefined ? pagination.totalRecords : data.length) : 0;
+            const recordUnit = pagination.recordLabel || 'records';
+            const totalPages = Math.max(1, pagination.totalPages || 1);
 
-              {pagination.totalPages > 1 && (
+            return (
+              <div className="flex items-center justify-between px-3 py-2.5 border-t border-slate-200 bg-slate-50 text-xs text-slate-600 flex-wrap gap-2.5">
+                <div>
+                  Showing <strong className="font-semibold text-slate-900">{data.length > 0 ? `${startRecord}–${endRecord}` : 0}</strong> of <strong className="font-semibold text-slate-900">{pagination.totalRecords !== undefined ? pagination.totalRecords : data.length}</strong> {recordUnit}
+                </div>
+
                 <div className="flex items-center gap-1">
                   <Button
                     variant="secondary"
@@ -108,22 +114,22 @@ const DataTable = ({
                   </Button>
 
                   <span className="px-2 text-xs font-semibold text-slate-800">
-                    Page {pagination.currentPage} of {pagination.totalPages}
+                    Page {pagination.currentPage} of {totalPages}
                   </span>
 
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled={pagination.currentPage >= pagination.totalPages}
+                    disabled={pagination.currentPage >= totalPages}
                     onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
                   >
                     <span>Next</span>
                     <ChevronRight size={14} />
                   </Button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </>
       )}
     </div>

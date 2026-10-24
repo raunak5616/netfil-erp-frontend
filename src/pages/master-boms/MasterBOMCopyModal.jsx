@@ -24,7 +24,7 @@ const MasterBOMCopyModal = ({ isOpen, bom, onClose, onSuccess }) => {
       setLoadingItems(true);
       setError('');
       try {
-        const res = await getItems();
+        const res = await getItems({ all: true });
         if (res.success && Array.isArray(res.items)) {
           // Filter active items
           setItems(res.items.filter(i => i.status === 'active'));

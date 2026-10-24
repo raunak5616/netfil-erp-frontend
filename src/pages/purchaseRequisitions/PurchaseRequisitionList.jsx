@@ -98,7 +98,7 @@ const PurchaseRequisitionList = () => {
     try {
       const [deptRes, empRes] = await Promise.all([
         getDepartments().catch(() => ({ success: false, departments: [] })),
-        getEmployees().catch(() => ({ success: false, employees: [] }))
+        getEmployees({ all: true }).catch(() => ({ success: false, employees: [] }))
       ]);
 
       if (deptRes.success && Array.isArray(deptRes.departments)) {

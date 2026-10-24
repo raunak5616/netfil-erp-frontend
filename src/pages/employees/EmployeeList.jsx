@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getEmployees } from '../../services/employeeService';
+import React, { useState, useEffect } from 'react';
+import { getEmployees, getDepartments } from '../../services/employeeService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -15,7 +15,9 @@ import {
   Filter, 
   Eye, 
   Edit, 
-  RefreshCw 
+  RefreshCw,
+  ArrowUpDown,
+  RotateCcw
 } from 'lucide-react';
 
 const EmployeeList = () => {
@@ -28,9 +30,19 @@ const EmployeeList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filter states
+  // Pagination states (25 records per page)
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Filter and sort states
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [departments, setDepartments] = useState([]);
+  const [sortBy, setSortBy] = useState('name_asc');
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,13 +50,56 @@ const EmployeeList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const fetchEmployeeData = async () => {
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Load department list for filter dropdown
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const data = await getDepartments();
+        if (data.success && Array.isArray(data.departments)) {
+          setDepartments(data.departments);
+        }
+      } catch (err) {
+        console.warn('Could not load departments for filter dropdown:', err.message || err);
+      }
+    };
+    loadDepartments();
+  }, []);
+
+  const fetchEmployeeData = async (overrides = {}) => {
     setLoading(true);
     setError('');
     try {
-      const data = await getEmployees();
+      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
+      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
+      const activeDepartment = overrides.department !== undefined ? overrides.department : departmentFilter;
+      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
+      const activePage = overrides.page !== undefined ? overrides.page : page;
+
+      const params = {
+        page: activePage,
+        limit: pageSize,
+      };
+
+      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
+      if (activeStatus !== 'all') params.status = activeStatus;
+      if (activeDepartment !== 'all') params.department = activeDepartment;
+      if (activeSortBy) params.sortBy = activeSortBy;
+
+      const data = await getEmployees(params);
       if (data.success && Array.isArray(data.employees)) {
         setEmployees(data.employees);
+        const total = typeof data.total === 'number' ? data.total : (data.count || 0);
+        setTotalRecords(total);
+        setTotalPages(data.totalPages || Math.ceil(total / pageSize) || 1);
+        if (data.page) setPage(data.page);
       } else {
         setError('Unexpected API response format');
       }
@@ -56,31 +111,33 @@ const EmployeeList = () => {
     }
   };
 
+  // Re-fetch from page 1 whenever filters, search, or sorting change
   useEffect(() => {
-    fetchEmployeeData();
-  }, []);
+    setPage(1);
+    fetchEmployeeData({ page: 1, search: debouncedSearch });
+  }, [debouncedSearch, statusFilter, departmentFilter, sortBy]);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      if (statusFilter !== 'all' && emp.status !== statusFilter) return false;
-      if (!searchTerm.trim()) return true;
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return;
+    setPage(newPage);
+    fetchEmployeeData({ page: newPage });
+  };
 
-      const term = searchTerm.toLowerCase();
-      const code = (emp.employeeCode || '').toLowerCase();
-      const name = (emp.fullName || '').toLowerCase();
-      const designation = (emp.designation || '').toLowerCase();
-      const deptName = (emp.department?.departmentName || '').toLowerCase();
-      const email = (emp.email || '').toLowerCase();
-
-      return (
-        code.includes(term) ||
-        name.includes(term) ||
-        designation.includes(term) ||
-        deptName.includes(term) ||
-        email.includes(term)
-      );
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setStatusFilter('all');
+    setDepartmentFilter('all');
+    setSortBy('name_asc');
+    setPage(1);
+    fetchEmployeeData({
+      page: 1,
+      search: '',
+      status: 'all',
+      department: 'all',
+      sortBy: 'name_asc',
     });
-  }, [employees, searchTerm, statusFilter]);
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
@@ -174,6 +231,13 @@ const EmployeeList = () => {
     },
   ];
 
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+    statusFilter !== 'all' ||
+    departmentFilter !== 'all' ||
+    sortBy !== 'name_asc'
+  );
+
   return (
     <div>
       <PageHeader
@@ -186,7 +250,7 @@ const EmployeeList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchEmployeeData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={() => fetchEmployeeData()}>
               Refresh
             </Button>
             {canCreate && (
@@ -212,43 +276,99 @@ const EmployeeList = () => {
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-[220px]">
             <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
-              placeholder="Search by code, name, designation, department..."
+            <Input
+              className="pl-8"
+              placeholder="Search by code, name, designation, department, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={16} className="text-muted" />
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ width: '160px' }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-            </Select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={15} className="text-muted" />
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ width: '140px' }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </Select>
+            </div>
+
+            {departments.length > 0 && (
+              <Select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                style={{ width: '160px' }}
+              >
+                <option value="all">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.departmentName}
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowUpDown size={15} className="text-muted" />
+              <Select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ width: '170px' }}
+              >
+                <option value="name_asc">Name: A to Z</option>
+                <option value="name_desc">Name: Z to A</option>
+                <option value="code_asc">Code: Ascending</option>
+                <option value="code_desc">Code: Descending</option>
+                <option value="joining_newest">Joining: Newest</option>
+                <option value="joining_oldest">Joining: Oldest</option>
+                <option value="newest">Recently Added</option>
+                <option value="oldest">Oldest Added</option>
+              </Select>
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={RotateCcw}
+                onClick={handleClearFilters}
+                title="Reset Filters"
+                style={{ color: 'var(--neutral-600)' }}
+              >
+                Reset
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Data Table Component */}
         <DataTable
           columns={columns}
-          data={filteredEmployees}
+          data={employees}
           loading={loading}
           emptyTitle="No employee records found"
           emptyDescription={
-            searchTerm || statusFilter !== 'all'
-              ? 'Try adjusting your search query or status filter.'
+            hasActiveFilters
+              ? 'Try adjusting your search query or filters.'
               : 'Click "Add Employee" above to create your first employee record.'
           }
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            totalRecords: totalRecords,
+            pageSize: pageSize,
+            recordLabel: 'employees',
+            onPageChange: handlePageChange,
+          }}
         />
 
-        {/* Record Counter Summary Footer */}
+        {/* Access Level Indicator */}
         <div className="flex-between text-muted" style={{ marginTop: '12px', fontSize: '12px' }}>
-          <span>Showing {filteredEmployees.length} of {employees.length} total employees</span>
           <span>Access Level: {canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</span>
         </div>
       </div>
@@ -258,7 +378,7 @@ const EmployeeList = () => {
         employee={editingEmployee}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchEmployeeData}
+        onSuccess={() => fetchEmployeeData()}
       />
 
       <EmployeeDetailModal

@@ -79,9 +79,9 @@ const PurchaseRequisitionForm = () => {
   const loadMasterData = async () => {
     try {
       const [empRes, deptRes, itemRes, uomRes] = await Promise.all([
-        getEmployees().catch(() => ({ success: false, employees: [] })),
+        getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
         getDepartments().catch(() => ({ success: false, departments: [] })),
-        getItems().catch(() => ({ success: false, items: [] })),
+        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
         getUOMs().catch(() => ({ success: false, uoms: [] }))
       ]);
 

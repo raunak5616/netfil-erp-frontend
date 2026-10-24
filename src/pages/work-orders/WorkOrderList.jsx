@@ -100,7 +100,7 @@ const WorkOrderList = () => {
       const [woRes, soRes, itemRes, plantRes] = await Promise.all([
         getWorkOrders(params),
         getSalesOrders({ limit: 100 }).catch(() => ({ success: false, salesOrders: [] })),
-        getItems().catch(() => ({ success: false, items: [] })),
+        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
         getPlants({ status: 'active' }).catch(() => ({ success: false, plants: [] }))
       ]);
 

@@ -38,7 +38,7 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
       setError('');
       try {
         const [itemRes, uomRes] = await Promise.all([
-          getItems(),
+          getItems({ all: true }),
           getUOMs()
         ]);
 

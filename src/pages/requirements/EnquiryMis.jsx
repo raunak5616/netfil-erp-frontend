@@ -97,8 +97,8 @@ const EnquiryMis = () => {
 
         const [catRes, itemRes, empRes] = await Promise.all([
           getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: false, itemCategories: [] })),
-          getItems({ typeFilter: 'MASTER' }).catch(() => ({ success: false, items: [] })),
-          getEmployees().catch(() => ({ success: false, employees: [] })),
+          getItems({ typeFilter: 'MASTER', all: true }).catch(() => ({ success: false, items: [] })),
+          getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
         ]);
 
         if (catRes.success && Array.isArray(catRes.itemCategories)) {

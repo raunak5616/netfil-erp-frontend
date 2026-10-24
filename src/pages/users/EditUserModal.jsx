@@ -47,7 +47,7 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
       setErrorMessage('');
       try {
         const [empRes, roleRes] = await Promise.all([
-          getEmployees(),
+          getEmployees({ all: true }),
           getRoles(),
         ]);
 

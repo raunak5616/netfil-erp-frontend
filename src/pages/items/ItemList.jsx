@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Layers,
   Tag,
-  X
+  ArrowUpDown,
+  RotateCcw
 } from 'lucide-react';
 
 const ItemList = () => {
@@ -37,12 +38,20 @@ const ItemList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filter states
+  // Pagination states (25 records per page)
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Filter & sort states
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [productTypeFilter, setProductTypeFilter] = useState('all');
   const [groupFilter, setGroupFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('code_asc');
 
   // Modal states
   const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
@@ -52,10 +61,17 @@ const ItemList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const fetchItemData = async () => {
-    setLoading(true);
-    setError('');
-    try {
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Load groups & categories on mount for filter dropdowns
+  useEffect(() => {
+    const loadFilterOptions = async () => {
       const isSystemCode = (code) => {
         if (!code) return false;
         const u = String(code).toUpperCase();
@@ -65,32 +81,65 @@ const ItemList = () => {
           u === 'CAT-OBOM' ||
           u.startsWith('GP-WO-') ||
           u === 'GP-INV' ||
-          u === 'GP-OBOM' ||
-          u.startsWith('ITEM-WO-') ||
-          u.startsWith('ITEM-INV-') ||
-          u.startsWith('ITEM-OBOM-')
+          u === 'GP-OBOM'
         );
       };
 
-      const [itemRes, groupRes, catRes] = await Promise.all([
-        getItems({ typeFilter: 'MASTER' }),
-        getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemGroups: [] })),
-        getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemCategories: [] })),
-      ]);
+      try {
+        const [groupRes, catRes] = await Promise.all([
+          getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemGroups: [] })),
+          getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemCategories: [] })),
+        ]);
 
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setItems(itemRes.items.filter((i) => !isSystemCode(i.itemCode)));
+        const groupsArray = groupRes.itemGroups || groupRes.groups;
+        if (groupRes.success && Array.isArray(groupsArray)) {
+          setItemGroups(groupsArray.filter((g) => !isSystemCode(g.groupCode)));
+        }
+        const categoriesArray = catRes.itemCategories || catRes.categories;
+        if (catRes.success && Array.isArray(categoriesArray)) {
+          setItemCategories(categoriesArray.filter((cat) => !isSystemCode(cat.categoryCode)));
+        }
+      } catch (err) {
+        console.warn('Failed to load item groups/categories for filters:', err);
+      }
+    };
+    loadFilterOptions();
+  }, []);
+
+  const fetchItemData = async (overrides = {}) => {
+    setLoading(true);
+    setError('');
+    try {
+      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
+      const activeProductType = overrides.productType !== undefined ? overrides.productType : productTypeFilter;
+      const activeGroup = overrides.group !== undefined ? overrides.group : groupFilter;
+      const activeCategory = overrides.category !== undefined ? overrides.category : categoryFilter;
+      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
+      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
+      const activePage = overrides.page !== undefined ? overrides.page : page;
+
+      const params = {
+        typeFilter: 'MASTER',
+        page: activePage,
+        limit: pageSize,
+      };
+
+      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
+      if (activeProductType !== 'all') params.productType = activeProductType;
+      if (activeGroup !== 'all') params.itemGroup = activeGroup;
+      if (activeCategory !== 'all') params.itemCategory = activeCategory;
+      if (activeStatus !== 'all') params.status = activeStatus;
+      if (activeSortBy) params.sortBy = activeSortBy;
+
+      const res = await getItems(params);
+      if (res.success && Array.isArray(res.items)) {
+        setItems(res.items);
+        const total = typeof res.total === 'number' ? res.total : (res.count || 0);
+        setTotalRecords(total);
+        setTotalPages(res.totalPages || Math.ceil(total / pageSize) || 1);
+        if (res.page) setPage(res.page);
       } else {
         setError('Unexpected API response format');
-      }
-
-      const groupsArray = groupRes.itemGroups || groupRes.groups;
-      if (groupRes.success && Array.isArray(groupsArray)) {
-        setItemGroups(groupsArray.filter((g) => !isSystemCode(g.groupCode)));
-      }
-      const categoriesArray = catRes.itemCategories || catRes.categories;
-      if (catRes.success && Array.isArray(categoriesArray)) {
-        setItemCategories(categoriesArray.filter((cat) => !isSystemCode(cat.categoryCode)));
       }
     } catch (err) {
       console.error("Failed to fetch Items:", err);
@@ -100,58 +149,43 @@ const ItemList = () => {
     }
   };
 
+  // Re-fetch from page 1 whenever filters, search, or sorting change
   useEffect(() => {
-    fetchItemData();
-  }, []);
+    setPage(1);
+    fetchItemData({ page: 1, search: debouncedSearch });
+  }, [debouncedSearch, productTypeFilter, groupFilter, categoryFilter, statusFilter, sortBy]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return;
+    setPage(newPage);
+    fetchItemData({ page: newPage });
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setProductTypeFilter('all');
+    setGroupFilter('all');
+    setCategoryFilter('all');
+    setStatusFilter('all');
+    setSortBy('code_asc');
+    setPage(1);
+    fetchItemData({
+      page: 1,
+      search: '',
+      productType: 'all',
+      group: 'all',
+      category: 'all',
+      status: 'all',
+      sortBy: 'code_asc',
+    });
+  };
 
   // Categories available based on group filter
   const availableCategoryFilters = useMemo(() => {
     if (groupFilter === 'all') return itemCategories;
     return itemCategories.filter((c) => (c.itemGroup?._id || c.itemGroup) === groupFilter);
   }, [itemCategories, groupFilter]);
-
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      // Status filter
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-
-      // Product Type filter
-      if (productTypeFilter !== 'all') {
-        const itemPType = item.productType || (item.filterGrade ? 'FILTER' : 'RAW_ITEM');
-        if (itemPType !== productTypeFilter) return false;
-      }
-
-      // Group filter
-      if (groupFilter !== 'all') {
-        const groupId = item.itemGroup?._id || item.itemGroup;
-        if (groupId !== groupFilter) return false;
-      }
-
-      // Category filter
-      if (categoryFilter !== 'all') {
-        const catId = item.itemCategory?._id || item.itemCategory;
-        if (catId !== categoryFilter) return false;
-      }
-
-      // Search filter
-      if (!searchTerm.trim()) return true;
-
-      const term = searchTerm.toLowerCase();
-      const code = (item.itemCode || '').toLowerCase();
-      const name = (item.itemName || '').toLowerCase();
-      const groupName = (item.itemGroup?.groupName || '').toLowerCase();
-      const categoryName = (item.itemCategory?.categoryName || '').toLowerCase();
-      const hsn = (item.hsnCode || '').toLowerCase();
-
-      return (
-        code.includes(term) ||
-        name.includes(term) ||
-        groupName.includes(term) ||
-        categoryName.includes(term) ||
-        hsn.includes(term)
-      );
-    });
-  }, [items, searchTerm, statusFilter, productTypeFilter, groupFilter, categoryFilter]);
 
   const columns = [
     {
@@ -293,6 +327,15 @@ const ItemList = () => {
     },
   ];
 
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+    productTypeFilter !== 'all' ||
+    groupFilter !== 'all' ||
+    categoryFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    sortBy !== 'code_asc'
+  );
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -305,7 +348,7 @@ const ItemList = () => {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={fetchItemData} loading={loading}>
+            <Button variant="secondary" size="sm" onClick={() => fetchItemData()} loading={loading}>
               <RefreshCw size={14} />
               <span>Refresh</span>
             </Button>
@@ -329,112 +372,173 @@ const ItemList = () => {
 
       {/* Main Content Card Container */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3.5">
-        {/* Horizontal Toolbar Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200/70">
-          {/* Search Input */}
-          <div className="relative w-full md:w-96">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by item code, name, HSN, group, or category..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
-
-          {/* Inline Filter Dropdowns */}
-          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium shrink-0">
-              <Filter size={14} className="text-slate-400" />
-              <span>Filters:</span>
+        {/* Structured Filter & Search Toolbar */}
+        <div className="bg-slate-50/80 rounded-xl border border-slate-200/80 p-3.5 space-y-3">
+          {/* Row 1: Search & Primary Sorting Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search Input with Clear Button */}
+            <div className="relative flex-1 min-w-[260px] max-w-xl">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by item code, name, HSN, group, category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full transition-colors"
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
-            <select
-              value={productTypeFilter}
-              onChange={(e) => setProductTypeFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Product Types</option>
-              <option value="RAW_ITEM">Raw Item</option>
-              <option value="FILTER">Filter</option>
-              <option value="COIL">Coil</option>
-              <option value="AHU">AHU</option>
-            </select>
+            {/* Quick Actions, Sorting & Status Controls */}
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Sort Dropdown */}
+              <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <ArrowUpDown size={14} className="text-slate-500 shrink-0" />
+                <span className="text-[11.5px] text-slate-500 font-medium whitespace-nowrap">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="text-xs text-slate-800 bg-transparent font-semibold focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="code_asc">Code: A to Z</option>
+                  <option value="code_desc">Code: Z to A</option>
+                  <option value="name_asc">Name: A to Z</option>
+                  <option value="name_desc">Name: Z to A</option>
+                  <option value="newest">Recently Added</option>
+                  <option value="oldest">Oldest Added</option>
+                </select>
+              </div>
 
-            <select
-              value={groupFilter}
-              onChange={(e) => {
-                setGroupFilter(e.target.value);
-                setCategoryFilter('all');
-              }}
-              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Groups</option>
-              {itemGroups.map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.groupName}
-                </option>
-              ))}
-            </select>
+              {/* Status Filter */}
+              <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <span className="text-[11.5px] text-slate-500 font-medium mr-1.5">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="text-xs text-slate-800 bg-transparent font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active Only</option>
+                  <option value="inactive">Inactive Only</option>
+                </select>
+              </div>
 
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Categories</option>
-              {availableCategoryFilters.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.categoryName}
-                </option>
-              ))}
-            </select>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={RotateCcw}
+                  onClick={handleClearFilters}
+                  title="Reset All Filters"
+                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/60 h-[33px] px-2.5"
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+          </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-            </select>
+          {/* Row 2: Classification Filter Bar (Product Type, Group, Category) */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200/70">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold uppercase tracking-wider text-[11px] mr-1">
+                <Filter size={13} className="text-blue-600" />
+                <span>Filters:</span>
+              </div>
 
-            {(searchTerm || productTypeFilter !== 'all' || groupFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setProductTypeFilter('all');
-                  setGroupFilter('all');
-                  setCategoryFilter('all');
-                  setStatusFilter('all');
-                }}
-                className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded font-medium transition-colors whitespace-nowrap"
-              >
-                Clear Filters
-              </button>
-            )}
+              {/* Product Type Filter */}
+              <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <span className="text-[11.5px] text-slate-500 font-medium mr-1.5">Type:</span>
+                <select
+                  value={productTypeFilter}
+                  onChange={(e) => setProductTypeFilter(e.target.value)}
+                  className="text-xs text-slate-800 bg-transparent font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="all">All Types</option>
+                  <option value="RAW_ITEM">Raw Item</option>
+                  <option value="FILTER">Filter</option>
+                  <option value="COIL">Coil</option>
+                  <option value="AHU">AHU</option>
+                </select>
+              </div>
+
+              {/* Item Group Filter */}
+              <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <span className="text-[11.5px] text-slate-500 font-medium mr-1.5">Group:</span>
+                <select
+                  value={groupFilter}
+                  onChange={(e) => {
+                    setGroupFilter(e.target.value);
+                    setCategoryFilter('all');
+                  }}
+                  className="text-xs text-slate-800 bg-transparent font-medium focus:outline-none cursor-pointer max-w-[170px] truncate"
+                >
+                  <option value="all">All Groups</option>
+                  {itemGroups.map((g) => (
+                    <option key={g._id} value={g._id}>
+                      {g.groupName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Item Category Filter */}
+              <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <span className="text-[11.5px] text-slate-500 font-medium mr-1.5">Category:</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="text-xs text-slate-800 bg-transparent font-medium focus:outline-none cursor-pointer max-w-[180px] truncate"
+                >
+                  <option value="all">All Categories</option>
+                  {availableCategoryFilters.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.categoryName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Total Record Counter Indicator */}
+            <div className="text-[11.5px] text-slate-500">
+              <span>Total: <strong className="text-slate-900 font-semibold font-mono">{totalRecords}</strong> catalog items</span>
+            </div>
           </div>
         </div>
 
         {/* Data Table Component */}
         <DataTable
           columns={columns}
-          data={filteredItems}
+          data={items}
           loading={loading}
           emptyTitle="No Item records found"
           emptyDescription={
-            searchTerm || statusFilter !== 'all' || productTypeFilter !== 'all' || groupFilter !== 'all' || categoryFilter !== 'all'
+            hasActiveFilters
               ? 'Try adjusting your search query or status/group/type filters.'
               : 'Click "Add Item" above to create your first item master record.'
           }
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            totalRecords: totalRecords,
+            pageSize: pageSize,
+            recordLabel: 'items',
+            onPageChange: handlePageChange,
+          }}
         />
 
         {/* Footer Summary */}
         <div className="flex items-center justify-between text-slate-500 text-xs pt-1 border-t border-slate-100">
-          <span>Showing <strong>{filteredItems.length}</strong> of <strong>{items.length}</strong> total item catalog records</span>
           <span>Access Level: <strong>{canEdit ? 'Full Edit Access' : canCreate ? 'Create & View' : 'Read Only'}</strong></span>
         </div>
       </div>

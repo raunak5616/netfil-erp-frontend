@@ -72,7 +72,7 @@ const OrderBOMList = () => {
       const [obomRes, soRes, itemRes] = await Promise.all([
         getOrderBOMs(params),
         getSalesOrders({ limit: 100 }).catch(() => ({ success: false, salesOrders: [] })),
-        getItems().catch(() => ({ success: false, items: [] }))
+        getItems({ all: true }).catch(() => ({ success: false, items: [] }))
       ]);
 
       if (obomRes.success && Array.isArray(obomRes.orderBOMs)) {
