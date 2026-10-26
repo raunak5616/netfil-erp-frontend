@@ -17,17 +17,31 @@ import {
   Star,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Box,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
-const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
+const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null, defaultDrawingType = 'BOX' }) => {
   const isEdit = Boolean(initialData?._id);
+
+  const resolveInitialType = () => {
+    if (initialData?.drawingType) {
+      const dt = initialData.drawingType.toUpperCase();
+      return dt === 'STANDARD' ? 'BOX' : dt;
+    }
+    if (initialData?.designCode) return 'FLANGE';
+    const norm = (defaultDrawingType || 'BOX').toUpperCase();
+    return norm === 'STANDARD' ? 'BOX' : norm;
+  };
 
   const [formData, setFormData] = useState({
     drawingCode: '',
     drawingName: '',
-    drawingType: 'STANDARD', // 'STANDARD' | 'FLANGE'
+    drawingType: resolveInitialType(), // 'BOX' | 'FLANGE' | 'FINE' | 'HEPA'
     constructionType: 'FLANGE', // 'FLANGE' | 'BOX'
+    holes: '',
     filterGrades: [], // Array of FilterGrade _id strings
     defaultForGrades: [], // Array of FilterGrade _id strings where this drawing is default
     description: '',
@@ -104,11 +118,19 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
         ? initialData.defaultForGrades.map(g => String(g._id || g))
         : (initialData.isDefault ? [...initGrades] : []);
 
+      const rawType = initialData.drawingType ? initialData.drawingType.toUpperCase() : (initialData.designCode ? 'FLANGE' : 'BOX');
+      const resolvedType = rawType === 'STANDARD' ? 'BOX' : rawType;
+
       setFormData({
         drawingCode: initialData.drawingCode || initialData.designCode || '',
         drawingName: initialData.drawingName || initialData.designName || '',
-        drawingType: initialData.drawingType || (initialData.designCode ? 'FLANGE' : 'STANDARD'),
+        drawingType: resolvedType,
         constructionType: initialData.constructionType || (initialData.designCode?.startsWith('BOX') ? 'BOX' : 'FLANGE'),
+        holes: (initialData.holes !== undefined && initialData.holes !== null)
+          ? String(initialData.holes)
+          : (initialData.holeCount !== undefined && initialData.holeCount !== null)
+            ? String(initialData.holeCount)
+            : '',
         filterGrades: initGrades,
         defaultForGrades: initDefaults,
         description: initialData.description || '',
@@ -125,11 +147,14 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
         setFilePreview(null);
       }
     } else {
+      const resolvedDefault = (defaultDrawingType || 'BOX').toUpperCase();
+      const normDefault = resolvedDefault === 'STANDARD' ? 'BOX' : resolvedDefault;
       setFormData({
         drawingCode: '',
         drawingName: '',
-        drawingType: 'STANDARD',
-        constructionType: 'FLANGE',
+        drawingType: normDefault,
+        constructionType: normDefault === 'FLANGE' ? 'FLANGE' : '',
+        holes: '',
         filterGrades: [],
         defaultForGrades: [],
         description: '',
@@ -289,9 +314,17 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
       return;
     }
 
-    if (formData.drawingType === 'STANDARD' && (!formData.filterGrades || formData.filterGrades.length === 0)) {
-      setError('Please select at least one assigned Filter Grade for standard drawings.');
+    if (['STANDARD', 'BOX'].includes(formData.drawingType) && (!formData.filterGrades || formData.filterGrades.length === 0)) {
+      setError('Please select at least one assigned Filter Grade for box drawings.');
       return;
+    }
+
+    if (formData.drawingType === 'FLANGE' && formData.holes !== '' && formData.holes !== null && formData.holes !== undefined) {
+      const parsedHoles = Number(formData.holes);
+      if (!Number.isInteger(parsedHoles) || parsedHoles <= 0) {
+        setError('Holes must be a valid positive integer.');
+        return;
+      }
     }
 
     if (!isEdit && !selectedFile) {
@@ -308,6 +341,19 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
       data.append('drawingType', formData.drawingType);
       if (formData.drawingType === 'FLANGE') {
         data.append('constructionType', formData.constructionType || 'FLANGE');
+        if (formData.holes !== '' && formData.holes !== null && formData.holes !== undefined) {
+          const parsedHoles = Number(formData.holes);
+          data.append('holes', String(parsedHoles));
+          data.append('holeCount', String(parsedHoles));
+        } else {
+          data.append('holes', '');
+          data.append('holeCount', '');
+        }
+        data.append('handleQuantity', '2');
+      } else {
+        data.append('constructionType', '');
+        data.append('holes', '');
+        data.append('holeCount', '');
       }
       data.append('filterGrades', JSON.stringify(formData.filterGrades));
       data.append('defaultForGrades', JSON.stringify(formData.defaultForGrades));
@@ -364,70 +410,140 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
           <label className="form-label font-semibold text-slate-700 block mb-1">
             Drawing Type *
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* 1. Box */}
             <button
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, drawingType: 'STANDARD' }))}
-              className={`p-2.5 rounded-lg border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                formData.drawingType === 'STANDARD'
-                  ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 ring-1 ring-indigo-600'
+              onClick={() => setFormData(prev => ({ ...prev, drawingType: 'BOX', holes: '', constructionType: '' }))}
+              className={`p-2.5 rounded-lg border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                formData.drawingType === 'BOX' || formData.drawingType === 'STANDARD'
+                  ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-1 ring-blue-600 shadow-2xs'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
               }`}
             >
-              <FileText size={16} className={`mt-0.5 shrink-0 ${formData.drawingType === 'STANDARD' ? 'text-indigo-600' : 'text-slate-400'}`} />
-              <div>
-                <div className="font-semibold text-xs">Standard Drawing</div>
-                <div className="text-[10px] text-slate-500">Filter drawing mapped to specific Filter Grades</div>
+              <div className="flex items-center gap-1.5">
+                <Box size={16} className={`shrink-0 ${formData.drawingType === 'BOX' || formData.drawingType === 'STANDARD' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span className="font-semibold text-xs">Box</span>
               </div>
+              <span className="text-[10px] text-slate-500 leading-tight">Box casing filter drawing</span>
             </button>
 
+            {/* 2. Flange */}
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, drawingType: 'FLANGE', constructionType: prev.constructionType || 'FLANGE' }))}
-              className={`p-2.5 rounded-lg border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+              className={`p-2.5 rounded-lg border text-left flex flex-col gap-1 transition-all cursor-pointer ${
                 formData.drawingType === 'FLANGE'
-                  ? 'border-purple-600 bg-purple-50/50 text-purple-900 ring-1 ring-purple-600'
+                  ? 'border-purple-600 bg-purple-50/70 text-purple-900 ring-1 ring-purple-600 shadow-2xs'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
               }`}
             >
-              <Layers size={16} className={`mt-0.5 shrink-0 ${formData.drawingType === 'FLANGE' ? 'text-purple-600' : 'text-slate-400'}`} />
-              <div>
-                <div className="font-semibold text-xs">Flange Design / Profile</div>
-                <div className="text-[10px] text-slate-500">Flange or Box CAD construction template</div>
+              <div className="flex items-center gap-1.5">
+                <Layers size={16} className={`shrink-0 ${formData.drawingType === 'FLANGE' ? 'text-purple-600' : 'text-slate-400'}`} />
+                <span className="font-semibold text-xs">Flange</span>
               </div>
+              <span className="text-[10px] text-slate-500 leading-tight">Flange profile & bolt holes</span>
+            </button>
+
+            {/* 3. Fine */}
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, drawingType: 'FINE', holes: '', constructionType: '' }))}
+              className={`p-2.5 rounded-lg border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                formData.drawingType === 'FINE'
+                  ? 'border-emerald-600 bg-emerald-50/70 text-emerald-900 ring-1 ring-emerald-600 shadow-2xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={16} className={`shrink-0 ${formData.drawingType === 'FINE' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                <span className="font-semibold text-xs">Fine</span>
+              </div>
+              <span className="text-[10px] text-slate-500 leading-tight">Fine filter (F5–F9 / ePM)</span>
+            </button>
+
+            {/* 4. HEPA */}
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, drawingType: 'HEPA', holes: '', constructionType: '' }))}
+              className={`p-2.5 rounded-lg border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                formData.drawingType === 'HEPA'
+                  ? 'border-amber-600 bg-amber-50/70 text-amber-900 ring-1 ring-amber-600 shadow-2xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={16} className={`shrink-0 ${formData.drawingType === 'HEPA' ? 'text-amber-600' : 'text-slate-400'}`} />
+                <span className="font-semibold text-xs">HEPA</span>
+              </div>
+              <span className="text-[10px] text-slate-500 leading-tight">HEPA (H10–H14 / ISO)</span>
             </button>
           </div>
         </div>
 
-        {/* Construction Type (when Flange Design selected) */}
+        {/* Flange Drawing Configuration (Holes, Handles, Construction Type) */}
         {formData.drawingType === 'FLANGE' && (
-          <div className="p-3 bg-purple-50/40 border border-purple-200 rounded-lg space-y-2">
-            <label className="form-label font-semibold text-purple-900 block m-0">
-              Construction Type *
-            </label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
-                <input
-                  type="radio"
-                  name="constructionType"
-                  value="FLANGE"
-                  checked={formData.constructionType === 'FLANGE'}
-                  onChange={() => setFormData(prev => ({ ...prev, constructionType: 'FLANGE' }))}
-                  className="text-purple-600 focus:ring-purple-500"
+          <div className="p-3 bg-purple-50/40 border border-purple-200 rounded-lg space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="form-label font-semibold text-purple-900 block mb-1">
+                  Holes <span className="text-[11px] font-normal text-purple-600">(Optional)</span>
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 4, 8, 12 (leave empty if none)"
+                  value={formData.holes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, holes: e.target.value }))}
+                  className="text-xs font-mono"
                 />
-                <span>Flange Type (with outer flange mounting)</span>
+                <span className="text-[10px] text-purple-700/80 mt-0.5 block">
+                  Number of flange mounting holes (Optional - leave empty for solid flange / no holes)
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label font-semibold text-purple-900 block mb-1">
+                  Handles
+                </label>
+                <div className="flex items-center h-[38px] px-3 bg-purple-100/60 border border-purple-200 rounded-lg text-xs font-medium text-purple-900">
+                  <span>2 Handles (Fixed)</span>
+                </div>
+                <span className="text-[10px] text-purple-700/80 mt-0.5 block">
+                  Standard fixed handle quantity
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label font-semibold text-purple-900 block mb-1">
+                Construction Type *
               </label>
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
-                <input
-                  type="radio"
-                  name="constructionType"
-                  value="BOX"
-                  checked={formData.constructionType === 'BOX'}
-                  onChange={() => setFormData(prev => ({ ...prev, constructionType: 'BOX' }))}
-                  className="text-purple-600 focus:ring-purple-500"
-                />
-                <span>Box Type (standard box casing without flange)</span>
-              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
+                  <input
+                    type="radio"
+                    name="constructionType"
+                    value="FLANGE"
+                    checked={formData.constructionType === 'FLANGE'}
+                    onChange={() => setFormData(prev => ({ ...prev, constructionType: 'FLANGE' }))}
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>Flange Type (with outer flange mounting)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
+                  <input
+                    type="radio"
+                    name="constructionType"
+                    value="BOX"
+                    checked={formData.constructionType === 'BOX'}
+                    onChange={() => setFormData(prev => ({ ...prev, constructionType: 'BOX' }))}
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>Box Type (standard box casing without flange)</span>
+                </label>
+              </div>
             </div>
           </div>
         )}
@@ -440,7 +556,15 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
             </label>
             <Input
               type="text"
-              placeholder={formData.drawingType === 'FLANGE' ? "e.g. FLG-004 or BOX-002" : "e.g. DRW-H14-FLG-01"}
+              placeholder={
+                formData.drawingType === 'FLANGE'
+                  ? "e.g. FLG-004 or BOX-002"
+                  : formData.drawingType === 'FINE'
+                    ? "e.g. DRW-FINE-F8-01"
+                    : formData.drawingType === 'HEPA'
+                      ? "e.g. DRW-HEPA-H14-01"
+                      : "e.g. DRW-BOX-STD-01"
+              }
               value={formData.drawingCode}
               onChange={(e) => setFormData({ ...formData, drawingCode: e.target.value.toUpperCase() })}
               required
@@ -455,7 +579,15 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
             </label>
             <Input
               type="text"
-              placeholder={formData.drawingType === 'FLANGE' ? "e.g. Flange Profile 4 (Double Gasket)" : "e.g. HEPA Filter H14 Standard Drawing"}
+              placeholder={
+                formData.drawingType === 'FLANGE'
+                  ? "e.g. Flange Profile 4 (Double Gasket)"
+                  : formData.drawingType === 'FINE'
+                    ? "e.g. Fine Filter F8 Compact Drawing"
+                    : formData.drawingType === 'HEPA'
+                      ? "e.g. HEPA Filter H14 Standard Drawing"
+                      : "e.g. Box Filter Standard Drawing"
+              }
               value={formData.drawingName}
               onChange={(e) => setFormData({ ...formData, drawingName: e.target.value })}
               required
@@ -468,9 +600,9 @@ const DrawingMasterFormModal = ({ isOpen, onClose, onSuccess, initialData = null
         <div className="space-y-2" ref={dropdownRef}>
           <div className="flex items-center justify-between">
             <label className="form-label font-semibold text-slate-700 m-0">
-              {formData.drawingType === 'FLANGE'
-                ? `Assigned Filter Grades (Optional - ${formData.filterGrades.length} selected, leave empty for Universal)`
-                : `Assigned Filter Grades * (${formData.filterGrades.length} selected)`}
+              {['STANDARD', 'BOX'].includes(formData.drawingType)
+                ? `Assigned Filter Grades * (${formData.filterGrades.length} selected)`
+                : `Assigned Filter Grades (Optional - ${formData.filterGrades.length} selected, leave empty for Universal)`}
             </label>
             <div className="flex items-center gap-2">
               <button

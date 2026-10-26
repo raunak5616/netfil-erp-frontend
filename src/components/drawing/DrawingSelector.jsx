@@ -203,7 +203,16 @@ const DrawingSelector = ({
                   const isDef = (Array.isArray(d.defaultForGrades) ? d.defaultForGrades : [])
                     .map(g => String(g?._id || g))
                     .includes(String(gradeId)) || d.isDefault;
-                  const typeLabel = d.drawingType === 'FLANGE' ? '[Flange] ' : '';
+                  const dt = (d.drawingType || '').toUpperCase();
+                  const typeLabel = dt === 'FLANGE'
+                    ? '[Flange] '
+                    : dt === 'FINE'
+                      ? '[Fine] '
+                      : dt === 'HEPA'
+                        ? '[HEPA] '
+                        : dt === 'BOX'
+                          ? '[Box] '
+                          : '';
                   return (
                     <option key={d._id} value={d._id}>
                       {typeLabel}{d.drawingCode} — {d.drawingName} {isDef ? '★ (Default)' : ''}
@@ -252,6 +261,11 @@ const DrawingSelector = ({
                     <span className="font-mono font-bold text-slate-900 text-xs">
                       {currentDrawing.drawingCode}
                     </span>
+                    {currentDrawing.drawingType === 'FLANGE' && (currentDrawing.holes !== undefined && currentDrawing.holes !== null) && (
+                      <span className="text-[10px] text-purple-700 bg-purple-100/70 px-1.5 py-0.2 rounded font-medium">
+                        {currentDrawing.holes} {currentDrawing.holes === 1 ? 'Hole' : 'Holes'}
+                      </span>
+                    )}
                     {currentDrawing.isDefault && (
                       <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded font-semibold">
                         <Star size={9} className="mr-0.5 fill-emerald-600 text-emerald-600" /> Default

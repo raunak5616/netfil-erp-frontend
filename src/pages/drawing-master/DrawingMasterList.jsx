@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getDrawings,
   updateDrawingStatus,
@@ -31,7 +32,11 @@ import {
   ExternalLink,
   Ban,
   RefreshCw,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Box,
+  Sparkles,
+  ShieldCheck,
+  LayoutGrid
 } from 'lucide-react';
 
 const DrawingMasterList = () => {
@@ -39,6 +44,33 @@ const DrawingMasterList = () => {
 
   // Admin permissions check: Admin role or explicit DRAWING_MANAGE permission
   const canManageDrawings = isAdmin || hasPermission('DRAWING_MANAGE') || hasPermission('ITEM_CREATE');
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read initial tab from URL param ?tab= or localStorage, default to 'box'
+  const getInitialTab = () => {
+    const urlTab = (searchParams.get('tab') || searchParams.get('type') || '').toLowerCase();
+    if (['box', 'flange', 'fine', 'hepa', 'all'].includes(urlTab)) {
+      return urlTab;
+    }
+    const savedTab = (localStorage.getItem('netfil_drawing_master_tab') || '').toLowerCase();
+    if (['box', 'flange', 'fine', 'hepa', 'all'].includes(savedTab)) {
+      return savedTab;
+    }
+    return 'box';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    localStorage.setItem('netfil_drawing_master_tab', newTab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', newTab);
+      return next;
+    }, { replace: true });
+  };
 
   const [drawings, setDrawings] = useState([]);
   const [filterGrades, setFilterGrades] = useState([]);
@@ -48,7 +80,6 @@ const DrawingMasterList = () => {
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -133,10 +164,72 @@ const DrawingMasterList = () => {
     }
   };
 
+  // Tab Definitions
+  const tabs = useMemo(
+    () => [
+      {
+        id: 'box',
+        label: 'Box',
+        description: 'Box casing filter drawings',
+        icon: Box,
+        badgeColor: 'bg-blue-100 text-blue-800'
+      },
+      {
+        id: 'flange',
+        label: 'Flange',
+        description: 'Flange profile & mounting hole drawings',
+        icon: Layers,
+        badgeColor: 'bg-purple-100 text-purple-800'
+      },
+      {
+        id: 'fine',
+        label: 'Fine',
+        description: 'Fine filtration grade drawings',
+        icon: Sparkles,
+        badgeColor: 'bg-emerald-100 text-emerald-800'
+      },
+      {
+        id: 'hepa',
+        label: 'HEPA',
+        description: 'High-efficiency particulate air drawings',
+        icon: ShieldCheck,
+        badgeColor: 'bg-amber-100 text-amber-800'
+      },
+      {
+        id: 'all',
+        label: 'All Drawings',
+        description: 'All engineering drawings registry',
+        icon: LayoutGrid,
+        badgeColor: 'bg-slate-200 text-slate-800'
+      }
+    ],
+    []
+  );
+
+  // Dynamic counts per drawing category
+  const counts = useMemo(() => {
+    const res = { box: 0, flange: 0, fine: 0, hepa: 0, all: drawings.length };
+    for (const d of drawings) {
+      const dt = (d.drawingType || '').toUpperCase();
+      if (dt === 'BOX' || dt === 'STANDARD') res.box++;
+      else if (dt === 'FLANGE') res.flange++;
+      else if (dt === 'FINE') res.fine++;
+      else if (dt === 'HEPA') res.hepa++;
+    }
+    return res;
+  }, [drawings]);
+
   // Filtered drawings
   const filteredDrawings = useMemo(() => {
     return drawings.filter((drw) => {
-      // 1. Search filter
+      // 1. Tab filter
+      const dt = (drw.drawingType || '').toUpperCase();
+      if (activeTab === 'box' && dt !== 'BOX' && dt !== 'STANDARD') return false;
+      if (activeTab === 'flange' && dt !== 'FLANGE') return false;
+      if (activeTab === 'fine' && dt !== 'FINE') return false;
+      if (activeTab === 'hepa' && dt !== 'HEPA') return false;
+
+      // 2. Search filter
       const term = searchTerm.toLowerCase().trim();
       const matchSearch =
         !term ||
@@ -144,29 +237,22 @@ const DrawingMasterList = () => {
         drw.drawingName?.toLowerCase().includes(term) ||
         drw.description?.toLowerCase().includes(term);
 
-      // 2. Filter Grade filter (supports multi-grade array and legacy single field)
+      // 3. Filter Grade filter (supports multi-grade array and legacy single field)
       const assignedIds = Array.isArray(drw.filterGrades) && drw.filterGrades.length > 0
         ? drw.filterGrades.map(g => String(g?._id || g))
         : (drw.filterGrade ? [String(drw.filterGrade?._id || drw.filterGrade)] : []);
 
       const matchGrade = !gradeFilter || assignedIds.includes(String(gradeFilter));
 
-      // 3. Status filter
+      // 4. Status filter
       const matchStatus =
         statusFilter === 'all' ||
         (statusFilter === 'active' && drw.status === 'active') ||
         (statusFilter === 'inactive' && drw.status === 'inactive');
 
-      // 4. Drawing Type filter
-      const isFlange = drw.drawingType === 'FLANGE';
-      const matchType =
-        typeFilter === 'all' ||
-        (typeFilter === 'standard' && !isFlange) ||
-        (typeFilter === 'flange' && isFlange);
-
-      return matchSearch && matchGrade && matchStatus && matchType;
+      return matchSearch && matchGrade && matchStatus;
     });
-  }, [drawings, searchTerm, typeFilter, gradeFilter, statusFilter]);
+  }, [drawings, activeTab, searchTerm, gradeFilter, statusFilter]);
 
   // Table Columns
   const columns = useMemo(
@@ -225,21 +311,44 @@ const DrawingMasterList = () => {
         key: 'drawingType',
         header: 'Type',
         align: 'center',
-        width: '105px',
+        width: '115px',
         render: (_, row) => {
-          const isFlange = row.drawingType === 'FLANGE';
+          const dt = (row.drawingType || '').toUpperCase();
+          const isBox = dt === 'BOX' || dt === 'STANDARD';
+          const isFlange = dt === 'FLANGE';
+          const isFine = dt === 'FINE';
+          const isHepa = dt === 'HEPA';
+
+          let badgeColor = 'bg-slate-100 text-slate-700 border-slate-200';
+          let label = dt || 'Standard';
+
+          if (isBox) {
+            badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+            label = 'Box';
+          } else if (isFlange) {
+            badgeColor = 'bg-purple-50 text-purple-700 border-purple-200';
+            label = 'Flange';
+          } else if (isFine) {
+            badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            label = 'Fine';
+          } else if (isHepa) {
+            badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+            label = 'HEPA';
+          }
+
           return (
             <div className="flex flex-col items-center gap-0.5">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                isFlange 
-                  ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-              }`}>
-                {isFlange ? 'Flange' : 'Standard'}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeColor}`}>
+                {label}
               </span>
               {isFlange && row.constructionType && (
                 <span className="text-[10px] text-slate-500 font-mono font-medium">
                   {row.constructionType}
+                </span>
+              )}
+              {isFlange && (row.holes !== undefined && row.holes !== null) && (
+                <span className="text-[10px] text-purple-700 bg-purple-100/60 px-1.5 py-0.2 rounded border border-purple-200 font-medium" title="Configured flange holes">
+                  {row.holes} {row.holes === 1 ? 'Hole' : 'Holes'}
                 </span>
               )}
             </div>
@@ -265,7 +374,7 @@ const DrawingMasterList = () => {
             : (row.filterGrade ? [row.filterGrade] : []);
 
           if (assigned.length === 0) {
-            if (row.drawingType === 'FLANGE') {
+            if (['FLANGE', 'FINE', 'HEPA'].includes(row.drawingType)) {
               return (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
                   Universal (All Grades)
@@ -419,6 +528,40 @@ const DrawingMasterList = () => {
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
       {successMsg && <Alert type="success" message={successMsg} onClose={() => setSuccessMsg('')} />}
 
+      {/* Drawing Category Tabs Bar */}
+      <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-2 overflow-x-auto">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          const count = counts[tab.id] || 0;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200/80'
+              }`}
+            >
+              <Icon size={15} className={isActive ? 'text-white' : 'text-slate-400'} />
+              <span>{tab.label}</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-1 flex-wrap gap-3 items-center min-w-[280px]">
@@ -432,19 +575,6 @@ const DrawingMasterList = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 text-xs"
             />
-          </div>
-
-          {/* Drawing Type Filter */}
-          <div className="w-40">
-            <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="text-xs"
-            >
-              <option value="all">All Drawing Types</option>
-              <option value="standard">Standard Drawings</option>
-              <option value="flange">Flange Designs</option>
-            </Select>
           </div>
 
           {/* Filter Grade Dropdown Filter */}
@@ -488,8 +618,8 @@ const DrawingMasterList = () => {
           columns={columns}
           data={filteredDrawings}
           loading={loading}
-          emptyTitle="No engineering drawings found"
-          emptyDescription="Click 'Add Drawing' to create one, or adjust your search filters."
+          emptyTitle={`No ${activeTab === 'all' ? '' : tabs.find(t => t.id === activeTab)?.label || ''} engineering drawings found`}
+          emptyDescription="Click 'Add Drawing' to create one for this category, or adjust your search filters."
         />
       </div>
 
@@ -500,6 +630,7 @@ const DrawingMasterList = () => {
           onClose={() => setIsFormOpen(false)}
           onSuccess={fetchDrawings}
           initialData={editingDrawing}
+          defaultDrawingType={activeTab === 'all' ? 'BOX' : activeTab.toUpperCase()}
         />
       )}
 

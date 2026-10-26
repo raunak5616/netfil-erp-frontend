@@ -51,6 +51,29 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
           </div>
 
           <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-0.5 rounded-full font-semibold border ${
+              (drawing.drawingType === 'BOX' || drawing.drawingType === 'STANDARD')
+                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                : drawing.drawingType === 'FLANGE'
+                  ? 'bg-purple-50 text-purple-800 border-purple-200'
+                  : drawing.drawingType === 'FINE'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : drawing.drawingType === 'HEPA'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-slate-50 text-slate-800 border-slate-200'
+            }`}>
+              Type: {drawing.drawingType === 'STANDARD' ? 'Box' : (drawing.drawingType ? drawing.drawingType.charAt(0).toUpperCase() + drawing.drawingType.slice(1).toLowerCase() : 'Box')}
+            </span>
+            {drawing.drawingType === 'FLANGE' && (drawing.holes !== undefined && drawing.holes !== null) && (
+              <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-semibold">
+                Holes: {drawing.holes}
+              </span>
+            )}
+            {drawing.drawingType === 'FLANGE' && (
+              <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-medium">
+                Handles: 2 (Fixed)
+              </span>
+            )}
             <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full font-medium">
               Filter Grade: {gradeName}
             </span>
