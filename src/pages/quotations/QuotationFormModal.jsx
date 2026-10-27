@@ -212,6 +212,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         drawing: reqItem.drawing?._id || reqItem.drawing || itemObj?.drawing?._id || itemObj?.drawing || null,
         drawingSnapshot: reqItem.drawingSnapshot || itemObj?.drawingSnapshot || null,
         constructionType: constructionTypeVal,
+        holeCount: isFlange ? (reqItem.holeCount || selectedReq.holeCount || null) : null,
+        flangeHoleConfig: isFlange ? (reqItem.flangeHoleConfig || selectedReq.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : null)) : null,
         flangeDesign: flangeDesignId,
         flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq.flangeDesignSnapshot || null,
         dimensions: cleanDims,

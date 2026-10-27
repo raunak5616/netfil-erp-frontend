@@ -8,6 +8,7 @@ import { getUOMs } from '../../services/uomService';
 import { getEmployees } from '../../services/employeeService';
 import { getFlangeDesigns } from '../../services/flangeDesignService';
 import { getFilterGrades } from '../../services/filterGradeService';
+import { getHoleConfigurations } from '../../services/drawingMasterService';
 import DrawingSelector from '../../components/drawing/DrawingSelector';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -114,6 +115,8 @@ const createNewItemObj = (idIndex = 0, defaultFlangeId = '') => ({
   uom: '',
   constructionType: 'FLANGE',
   flangeDesign: defaultFlangeId || '',
+  holeCount: null,
+  flangeHoleConfig: '',
   dimensions: {
     bodyWidth: '',
     bodyHeight: '',
@@ -180,6 +183,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const [employees, setEmployees] = useState([]);
   const [flangeDesigns, setFlangeDesigns] = useState([]);
   const [filterGrades, setFilterGrades] = useState([]);
+  const [holeOptions, setHoleOptions] = useState(['4 Holes', '8 Holes', '12 Holes']);
   const [loadingMasters, setLoadingMasters] = useState(false);
 
   // Default active FLANGE construction design ID
@@ -249,14 +253,15 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           );
         };
 
-        const [cRes, iRes, catRes, uRes, eRes, fRes, fgRes] = await Promise.all([
+        const [cRes, iRes, catRes, uRes, eRes, fRes, fgRes, hRes] = await Promise.all([
           getClients({ typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' }),
           getItems({ typeFilter: 'MASTER', all: true }),
           getItemCategories({ typeFilter: 'MASTER' }),
           getUOMs(),
           getEmployees({ all: true }),
           getFlangeDesigns({ status: 'active' }),
-          getFilterGrades().catch(() => ({ success: false, filterGrades: [] }))
+          getFilterGrades().catch(() => ({ success: false, filterGrades: [] })),
+          getHoleConfigurations().catch(() => ({ success: false, options: ['4 Holes', '8 Holes', '12 Holes'] }))
         ]);
 
         if (cRes.success && Array.isArray(cRes.clients)) {
@@ -280,6 +285,9 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         }
         if (fgRes && fgRes.success && Array.isArray(fgRes.filterGrades)) {
           setFilterGrades(fgRes.filterGrades.filter((g) => g.status === 'active'));
+        }
+        if (hRes && hRes.success && Array.isArray(hRes.options) && hRes.options.length > 0) {
+          setHoleOptions(hRes.options);
         }
       } catch (err) {
         console.error('Failed to load master references:', err);
@@ -369,6 +377,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             uom: reqItem.uom?._id || reqItem.uom || '',
             constructionType: constType,
             flangeDesign: constType === 'FLANGE' ? (flangeId || defaultFlangeId) : '',
+            holeCount: constType === 'FLANGE' ? (reqItem.holeCount || null) : null,
+            flangeHoleConfig: constType === 'FLANGE' ? (reqItem.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : '')) : '',
             dimensions: dims,
             specifications: specs,
             remarks: reqItem.remarks || '',
@@ -435,6 +445,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           uom: requirement.uom?._id || requirement.uom || '',
           constructionType: constType,
           flangeDesign: constType === 'FLANGE' ? (flangeId || defaultFlangeId) : '',
+          holeCount: constType === 'FLANGE' ? (requirement.holeCount || null) : null,
+          flangeHoleConfig: constType === 'FLANGE' ? (requirement.flangeHoleConfig || (requirement.holeCount ? `${requirement.holeCount} Holes` : '')) : '',
           dimensions: dims,
           specifications: specs,
           remarks: '',
@@ -560,6 +572,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           newFlangeDesign = '';
           newDims.overallFlangeWidth = '';
           newDims.overallFlangeHeight = '';
+          curItem.holeCount = null;
+          curItem.flangeHoleConfig = '';
         } else if (ct === 'FLANGE') {
           if (!newFlangeDesign) {
             newFlangeDesign = defaultFlangeId;
@@ -695,6 +709,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         nextFlangeDesign = '';
         nextDims.overallFlangeWidth = '';
         nextDims.overallFlangeHeight = '';
+        curItem.holeCount = null;
+        curItem.flangeHoleConfig = '';
       }
 
       // Recalculate CFM strictly from BOX dimensions
@@ -922,6 +938,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         uom: itemObj.uom || null,
         constructionType: itemObj.constructionType || 'FLANGE',
         flangeDesign: isFlange ? itemObj.flangeDesign : null,
+        holeCount: isFlange && itemObj.holeCount ? Number(itemObj.holeCount) : null,
+        flangeHoleConfig: isFlange && itemObj.flangeHoleConfig ? itemObj.flangeHoleConfig : null,
         dimensions: {
           constructionType: itemObj.constructionType,
           bodyWidth: bw,
@@ -964,6 +982,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       uom: firstItem.uom || null,
       constructionType: firstItem.constructionType || 'FLANGE',
       flangeDesign: firstItem.flangeDesign || null,
+      holeCount: firstItem.holeCount || null,
+      flangeHoleConfig: firstItem.flangeHoleConfig || null,
       dimensions: firstItem.dimensions || {},
       specifications: firstItem.specifications || [],
       remarks: formData.remarks,
@@ -2021,6 +2041,37 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         value={itemObj.dimensions.depth || ''}
                                         disabled={true}
                                       />
+                                    </FormField>
+                                  </div>
+
+                                  {/* Flange Hole Configuration (Optional - Flange Only) */}
+                                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #bfdbfe' }}>
+                                    <FormField
+                                      label="Flange Hole Configuration"
+                                      helperText="Optional flange hole configuration for mounting specification"
+                                    >
+                                      <Select
+                                        value={itemObj.flangeHoleConfig || (itemObj.holeCount ? `${itemObj.holeCount} Holes` : '')}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          let count = null;
+                                          if (val) {
+                                            const m = val.match(/^(\d+)/);
+                                            if (m) count = Number(m[1]);
+                                          }
+                                          handleItemFieldChange(itemIndex, 'flangeHoleConfig', val);
+                                          handleItemFieldChange(itemIndex, 'holeCount', count);
+                                        }}
+                                        disabled={submitting}
+                                      >
+                                        <option value="">No Selection</option>
+                                        {holeOptions.map((opt) => (
+                                          <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                        {itemObj.flangeHoleConfig && !holeOptions.includes(itemObj.flangeHoleConfig) && (
+                                          <option value={itemObj.flangeHoleConfig}>{itemObj.flangeHoleConfig}</option>
+                                        )}
+                                      </Select>
                                     </FormField>
                                   </div>
                                 </div>

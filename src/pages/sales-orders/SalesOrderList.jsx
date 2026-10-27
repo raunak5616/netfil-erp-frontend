@@ -13,6 +13,7 @@ import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import SalesOrderCreateModal from './SalesOrderCreateModal';
 import SalesOrderDetailModal from './SalesOrderDetailModal';
 import SalesOrderEditModal from './SalesOrderEditModal';
+import SalesOrderDrawingWorkspaceModal from './SalesOrderDrawingWorkspaceModal';
 
 import {
   Plus,
@@ -25,7 +26,8 @@ import {
   Clock,
   Ban,
   RotateCcw,
-  Paperclip
+  Paperclip,
+  Printer
 } from 'lucide-react';
 
 const SalesOrderList = () => {
@@ -61,6 +63,8 @@ const SalesOrderList = () => {
   const [detailInitialTab, setDetailInitialTab] = useState('details');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingSO, setEditingSO] = useState(null);
+  const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
+  const [drawingWorkspaceSOId, setDrawingWorkspaceSOId] = useState(null);
 
   const fetchSalesOrdersData = async () => {
     setLoading(true);
@@ -296,6 +300,15 @@ const SalesOrderList = () => {
               }
             },
             {
+              label: 'Drawing Print',
+              icon: Printer,
+              color: 'var(--primary-600)',
+              onClick: () => {
+                setDrawingWorkspaceSOId(row._id);
+                setIsDrawingWorkspaceOpen(true);
+              }
+            },
+            {
               label: 'Edit Order',
               icon: Edit,
               show: canEdit && !['cancelled', 'completed'].includes(row.status),
@@ -348,6 +361,18 @@ const SalesOrderList = () => {
                 title="View Details"
               >
                 <Eye size={13} className="mr-1" /> View
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setDrawingWorkspaceSOId(row._id);
+                  setIsDrawingWorkspaceOpen(true);
+                }}
+                title="Engineering Drawing Workspace & Printing"
+                className="text-blue-700 hover:text-blue-900 hover:bg-blue-50 font-medium"
+              >
+                <Printer size={13} className="mr-1 text-blue-600" /> Drawing
               </Button>
               <ActionDropdown items={actionItems} />
             </div>
@@ -568,6 +593,18 @@ const SalesOrderList = () => {
             setIsEditOpen(false);
             setEditingSO(null);
             fetchSalesOrdersData();
+          }}
+        />
+      )}
+
+      {/* Engineering Drawing Workspace Modal */}
+      {isDrawingWorkspaceOpen && drawingWorkspaceSOId && (
+        <SalesOrderDrawingWorkspaceModal
+          isOpen={isDrawingWorkspaceOpen}
+          salesOrderId={drawingWorkspaceSOId}
+          onClose={() => {
+            setIsDrawingWorkspaceOpen(false);
+            setDrawingWorkspaceSOId(null);
           }}
         />
       )}

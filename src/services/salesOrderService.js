@@ -58,15 +58,27 @@ export const deleteSalesOrderItem = async (salesOrderId, itemId) => {
 };
 
 // Drawing Endpoints
-export const getSalesOrderItemDrawing = async (salesOrderId, itemId) => {
+export const getSalesOrderDrawingsConfig = async (salesOrderId) => {
+  const response = await api.get(`/sales-orders/${salesOrderId}/drawings/config`);
+  return response.data;
+};
+
+export const updateSalesOrderItemDrawingConfig = async (salesOrderId, itemId, configData) => {
+  const response = await api.put(`/sales-orders/${salesOrderId}/items/${itemId}/drawing-config`, configData);
+  return response.data;
+};
+
+export const getSalesOrderItemDrawing = async (salesOrderId, itemId, download = false) => {
   const response = await api.get(`/sales-orders/${salesOrderId}/items/${itemId}/drawing`, {
+    params: download ? { download: 'true' } : {},
     responseType: 'blob'
   });
   return response.data;
 };
 
-export const getSalesOrderDrawings = async (salesOrderId) => {
+export const getSalesOrderDrawings = async (salesOrderId, download = false) => {
   const response = await api.get(`/sales-orders/${salesOrderId}/drawings`, {
+    params: download ? { download: 'true' } : {},
     responseType: 'blob'
   });
   return response.data;

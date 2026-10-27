@@ -176,6 +176,9 @@ const getItemTechnicalSpecs = (it) => {
     if (flangeCode || flangeName) {
       specs.push({ label: 'Flange Design', value: flangeCode ? `${flangeCode}${flangeName ? ` (${flangeName})` : ''}` : flangeName });
     }
+
+    const holeVal = it.flangeHoleConfig || (it.holeCount ? `${it.holeCount} Holes` : null) || 'Not Specified';
+    specs.push({ label: 'Flange Hole Configuration', value: holeVal });
   }
 
   const drwSnap = it.drawingSnapshot || (typeof it.drawing === 'object' ? it.drawing : null) || (typeof itemDoc?.drawing === 'object' ? itemDoc.drawing : null);

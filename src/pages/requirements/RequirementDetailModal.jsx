@@ -386,13 +386,20 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
                           </div>
                         ) : null}
 
-                        {/* Flange Design & Reference Preview */}
+                        {/* Flange Design & Flange Hole Configuration */}
                         {constTypeStr === 'FLANGE' && (
                           <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--neutral-200)' }}>
-                            <div style={{ fontSize: '11.5px', color: 'var(--neutral-700)', marginBottom: '4px' }}>
-                              Flange Design Master: <strong style={{ color: 'var(--neutral-900)' }}>
-                                {reqItem.flangeDesignSnapshot?.designCode || flangeObj?.designCode || 'FLG-001'} — {reqItem.flangeDesignSnapshot?.designName || flangeObj?.designName || 'Flange Design'}
-                              </strong>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '11.5px', color: 'var(--neutral-700)', marginBottom: '4px' }}>
+                              <div>
+                                Flange Design Master: <strong style={{ color: 'var(--neutral-900)' }}>
+                                  {reqItem.flangeDesignSnapshot?.designCode || flangeObj?.designCode || 'FLG-001'} — {reqItem.flangeDesignSnapshot?.designName || flangeObj?.designName || 'Flange Design'}
+                                </strong>
+                              </div>
+                              <div>
+                                Flange Hole Configuration: <strong style={{ color: reqItem.flangeHoleConfig || reqItem.holeCount ? '#7c3aed' : 'var(--neutral-600)' }}>
+                                  {reqItem.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : 'Not Specified')}
+                                </strong>
+                              </div>
                             </div>
                             {(reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage) && (
                               <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>

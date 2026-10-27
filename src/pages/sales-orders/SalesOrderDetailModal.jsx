@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 
 import TechnicalDrawingModal from './TechnicalDrawingModal';
+import SalesOrderDrawingWorkspaceModal from './SalesOrderDrawingWorkspaceModal';
 import SalesOrderAttachmentsSection from './components/SalesOrderAttachmentsSection';
 
 const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated, initialTab = 'details' }) => {
@@ -49,6 +50,8 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
 
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   const [drawingTargetItem, setDrawingTargetItem] = useState(null);
+  const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
+  const [drawingWorkspaceInitialItemId, setDrawingWorkspaceInitialItemId] = useState(null);
 
   const [statusLoading, setStatusLoading] = useState(false);
   const [error, setError] = useState('');
@@ -294,10 +297,14 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={handleGenerateOrderDrawings}
-                    title="Generate Engineering Drawings for all eligible items"
+                    onClick={() => {
+                      setDrawingWorkspaceInitialItemId(null);
+                      setIsDrawingWorkspaceOpen(true);
+                    }}
+                    title="Open Engineering Drawing Printing Workspace"
+                    className="border-blue-300 text-blue-700 bg-blue-50/70 hover:bg-blue-100"
                   >
-                    <Printer size={14} style={{ marginRight: '6px' }} /> Order Drawings
+                    <Printer size={14} style={{ marginRight: '6px' }} /> Drawing Print
                   </Button>
                 )}
               </div>
@@ -475,14 +482,14 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                             {checkDrawingEligible(it) ? (
                               <button 
                                 onClick={() => {
-                                  setDrawingTargetItem(it);
-                                  setIsDrawingModalOpen(true);
+                                  setDrawingWorkspaceInitialItemId(it._id);
+                                  setIsDrawingWorkspaceOpen(true);
                                 }}
-                                title="Configure & Generate Technical Drawing"
+                                title="Open Engineering Drawing Workspace & Confirm Hole Details"
                                 className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
                               >
-                                <ImageIcon size={14} className="text-blue-600" />
-                                <span>{it.drawingSnapshot?.drawingCode || it.drawing?.drawingCode || it.flangeDesignSnapshot?.designCode || (it.constructionType === 'BOX' ? 'BOX' : 'Drawing')}</span>
+                                <Printer size={13} className="text-blue-600" />
+                                <span>{it.drawingSnapshot?.drawingCode || it.drawing?.drawingCode || 'Drawing Print'}</span>
                               </button>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
@@ -637,6 +644,20 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
               onClose={() => {
                 setIsDrawingModalOpen(false);
                 setDrawingTargetItem(null);
+                fetchDetails();
+              }}
+            />
+          )}
+
+          {/* Dedicated Engineering Drawing Printing Workspace */}
+          {isDrawingWorkspaceOpen && (
+            <SalesOrderDrawingWorkspaceModal
+              isOpen={isDrawingWorkspaceOpen}
+              salesOrderId={salesOrderId}
+              initialItemId={drawingWorkspaceInitialItemId}
+              onClose={() => {
+                setIsDrawingWorkspaceOpen(false);
+                setDrawingWorkspaceInitialItemId(null);
                 fetchDetails();
               }}
             />

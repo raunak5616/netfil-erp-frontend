@@ -40,3 +40,35 @@ export const deleteDrawing = async (id) => {
   const response = await api.delete(`/drawings/${id}`);
   return response.data;
 };
+
+export const getHoleConfigurations = async (params = {}) => {
+  const response = await api.get('/drawings/hole-configurations', { params });
+  return response.data;
+};
+
+export const getHoleImages = async (params = {}) => {
+  const response = await api.get('/drawings/hole-images', { params });
+  return response.data;
+};
+
+export const saveHoleImage = async (data) => {
+  const isFormData = data instanceof FormData;
+  const response = await api.post('/drawings/hole-images', data, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
+  });
+  return response.data;
+};
+
+export const deleteHoleImage = async (id) => {
+  const response = await api.delete(`/drawings/hole-images/${id}`);
+  return response.data;
+};
+
+export const generateDrawing = async (id, params = {}) => {
+  const response = await api.get(`/drawings/${id}/generate`, {
+    params,
+    responseType: 'blob'
+  });
+  return response.data;
+};
+

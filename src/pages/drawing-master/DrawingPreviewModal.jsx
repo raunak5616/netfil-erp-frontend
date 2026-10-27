@@ -1,19 +1,34 @@
 import React from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
-import { Download, ExternalLink, FileText, CheckCircle2 } from 'lucide-react';
+import { Download, ExternalLink, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
   if (!isOpen || !drawing) return null;
 
   const isPdf = drawing.format === 'pdf' || drawing.fileUrl?.toLowerCase().endsWith('.pdf') || drawing.mimeType === 'application/pdf';
-  const gradeName = typeof drawing.filterGrade === 'object' ? drawing.filterGrade?.filterGrade : drawing.filterGradeName || '—';
+  const gradeName = typeof drawing.filterGrade === 'object' ? drawing.filterGrade?.filterGrade : drawing.filterGradeName || 'Universal';
+
+  const isFinePre = drawing.filterCategory === 'FINE_PRE' || drawing.drawingType === 'FINE';
+  const isHepa = drawing.filterCategory === 'HEPA' || drawing.drawingType === 'HEPA';
+  const isFlange = drawing.drawingType === 'FLANGE';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Drawing Preview — ${drawing.drawingCode}`}
+      title={
+        <div className="flex items-center gap-2">
+          <span>Drawing Preview — {drawing.drawingCode}</span>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+            isFinePre
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : 'bg-amber-100 text-amber-800 border border-amber-300'
+          }`}>
+            {isFinePre ? 'Fine / Pre' : 'HEPA'}
+          </span>
+        </div>
+      }
       size="xl"
       zIndex={1200}
       footer={
@@ -22,13 +37,15 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
             {drawing.drawingName} • Grade: <strong className="text-slate-800">{gradeName}</strong>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => window.open(drawing.fileUrl, '_blank')}
-            >
-              <ExternalLink size={14} className="mr-1.5" /> Open Full Asset
-            </Button>
+            {drawing.fileUrl && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.open(drawing.fileUrl, '_blank')}
+              >
+                <ExternalLink size={14} className="mr-1.5" /> View Asset
+              </Button>
+            )}
             <Button
               variant="primary"
               size="sm"
@@ -41,7 +58,7 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
       }
     >
       <div className="space-y-4">
-        {/* Header Summary */}
+        {/* Header Summary Badges */}
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-mono font-bold text-slate-900 bg-white px-2.5 py-1 rounded border border-slate-300">
@@ -50,36 +67,42 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
             <span className="text-slate-700 font-semibold">{drawing.drawingName}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 py-0.5 rounded-full font-semibold border ${
-              (drawing.drawingType === 'BOX' || drawing.drawingType === 'STANDARD')
-                ? 'bg-blue-50 text-blue-800 border-blue-200'
-                : drawing.drawingType === 'FLANGE'
-                  ? 'bg-purple-50 text-purple-800 border-purple-200'
-                  : drawing.drawingType === 'FINE'
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : drawing.drawingType === 'HEPA'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-slate-50 text-slate-800 border-slate-200'
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Category Badge */}
+            <span className={`px-2 py-0.5 rounded-full font-bold border text-[11px] ${
+              isFinePre
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
             }`}>
-              Type: {drawing.drawingType === 'STANDARD' ? 'Box' : (drawing.drawingType ? drawing.drawingType.charAt(0).toUpperCase() + drawing.drawingType.slice(1).toLowerCase() : 'Box')}
+              {isFinePre ? 'Fine/Pre' : 'HEPA'}
             </span>
-            {drawing.drawingType === 'FLANGE' && (drawing.holes !== undefined && drawing.holes !== null) && (
-              <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-semibold">
-                Holes: {drawing.holes}
-              </span>
-            )}
-            {drawing.drawingType === 'FLANGE' && (
-              <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2.5 py-0.5 rounded-full font-medium">
-                Handles: 2 (Fixed)
-              </span>
-            )}
-            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full font-medium">
-              Filter Grade: {gradeName}
+
+            {/* Drawing Type Badge */}
+            <span className={`px-2 py-0.5 rounded-full font-semibold border text-[11px] ${
+              isFlange
+                ? 'bg-purple-50 text-purple-800 border-purple-200'
+                : 'bg-blue-50 text-blue-800 border-blue-200'
+            }`}>
+              {isFlange ? 'Flange' : 'Box'}
             </span>
+
+
+            {/* Flange Hole Config & Handles */}
+            {isFlange && (
+              <>
+                <span className="bg-purple-100 text-purple-900 border border-purple-300 px-2 py-0.5 rounded-full font-semibold text-[11px]">
+                  {(drawing.holeConfig && drawing.holeConfig.toLowerCase() !== 'ing1') ? drawing.holeConfig : (drawing.holes ? `${drawing.holes} Holes` : 'Normal Flange')}
+                </span>
+                <span className="bg-purple-50 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full font-medium text-[11px]">
+                  2 Handles (Fixed)
+                </span>
+              </>
+            )}
+
+            {/* Default Status */}
             {drawing.isDefault && (
-              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                <CheckCircle2 size={12} className="text-emerald-600" /> Default Drawing
+              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold text-[11px] flex items-center gap-1">
+                <CheckCircle2 size={12} className="text-emerald-600" /> Default
               </span>
             )}
           </div>
@@ -114,7 +137,7 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
             </div>
           ) : (
             <img
-              src={drawing.fileUrl}
+              src={drawing.holeImageUrl || drawing.fileUrl}
               alt={drawing.drawingName}
               className="max-h-[500px] max-w-full object-contain rounded shadow-xs bg-white"
             />
