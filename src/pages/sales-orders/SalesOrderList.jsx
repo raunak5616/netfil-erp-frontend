@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getSalesOrders, updateSalesOrderStatus } from '../../services/salesOrderService';
 import { getClients } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +33,8 @@ import {
 
 const SalesOrderList = () => {
   const { hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
+  const urlStatus = searchParams.get('status')?.toLowerCase();
 
   const canCreate = hasPermission('SALES_ORDER_CREATE');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
@@ -45,7 +48,7 @@ const SalesOrderList = () => {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(urlStatus || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');

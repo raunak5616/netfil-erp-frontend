@@ -2,6 +2,7 @@ import React from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { Download, ExternalLink, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { getVersionedImageUrl } from '../../services/drawingMasterService';
 
 const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
   if (!isOpen || !drawing) return null;
@@ -137,7 +138,7 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
             </div>
           ) : (
             <img
-              src={drawing.holeImageUrl || drawing.fileUrl}
+              src={getVersionedImageUrl(drawing.holeImageUrl || drawing.fileUrl, drawing.updatedAt)}
               alt={drawing.drawingName}
               className="max-h-[500px] max-w-full object-contain rounded shadow-xs bg-white"
             />

@@ -116,14 +116,14 @@ const Dashboard = () => {
             label="Pending Quotations" 
             value={data.summary?.qtPending} 
             subtext="Needs follow-up" 
-            link="/quotations?status=DRAFT" 
+            link="/quotations?status=draft" 
             hasPermission={hasPermission('QUOTATION_VIEW')} 
           />
           <OpsDashboardMetric 
             label="Pending Sales Orders" 
             value={data.summary?.soPending} 
             subtext="Awaiting fulfillment" 
-            link="/sales-orders?status=DRAFT" 
+            link="/sales-orders?status=draft" 
             hasPermission={hasPermission('SALES_ORDER_VIEW')} 
           />
           <OpsDashboardMetric 

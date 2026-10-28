@@ -41,6 +41,8 @@ const WorkOrderList = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const urlStatus = queryParams.get('status')?.toUpperCase();
 
   const [workOrders, setWorkOrders] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
@@ -52,7 +54,7 @@ const WorkOrderList = () => {
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(urlStatus || 'all');
   const [salesOrderFilter, setSalesOrderFilter] = useState('all');
   const [parentItemFilter, setParentItemFilter] = useState('all');
   const [plantFilter, setPlantFilter] = useState('all');

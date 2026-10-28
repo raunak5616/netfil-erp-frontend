@@ -7,7 +7,8 @@ import { getFilterGrades } from '../../services/filterGradeService';
 import {
   createDrawing,
   updateDrawing,
-  getHoleConfigurations
+  getHoleConfigurations,
+  getVersionedImageUrl
 } from '../../services/drawingMasterService';
 import {
   UploadCloud,
@@ -788,7 +789,7 @@ const DrawingMasterFormModal = ({
                   </div>
                 ) : (
                   <img
-                    src={filePreview}
+                    src={selectedFile ? filePreview : getVersionedImageUrl(filePreview, initialData?.updatedAt)}
                     alt="Drawing / Hole Preview"
                     className="max-h-[200px] object-contain rounded"
                   />

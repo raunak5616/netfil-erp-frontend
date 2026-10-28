@@ -72,3 +72,15 @@ export const generateDrawing = async (id, params = {}) => {
   return response.data;
 };
 
+/**
+ * Produces a cache-busted image delivery URL based on the asset's last updated timestamp.
+ * Avoids random query parameters on every render while ensuring instant refresh when an image is updated.
+ */
+export const getVersionedImageUrl = (url, updatedAt) => {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  const v = updatedAt ? new Date(updatedAt).getTime() : '';
+  if (!v || isNaN(v)) return url;
+  return url.includes('?') ? `${url}&v=${v}` : `${url}?v=${v}`;
+};
+

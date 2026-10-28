@@ -6,8 +6,8 @@ import { getItems } from './itemService';
 
 export const getOpsDashboardSummary = async () => {
   const [soRes, qtRes, woRes, clientRes, itemRes] = await Promise.allSettled([
-    getSalesOrders({ limit: 1, status: 'DRAFT' }),
-    getQuotations({ limit: 1, status: 'DRAFT' }),
+    getSalesOrders({ limit: 1, status: 'draft' }),
+    getQuotations({ limit: 1, status: 'draft' }),
     getWorkOrders({ limit: 1, status: 'IN_PROGRESS' }),
     getClients({ limit: 1, status: 'active' }),
     getItems({ limit: 1, status: 'active' })

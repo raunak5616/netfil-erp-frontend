@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getQuotations,
   updateQuotationStatus,
@@ -53,6 +54,8 @@ import {
 
 const QuotationList = () => {
   const { hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
+  const urlStatus = searchParams.get('status')?.toLowerCase();
 
   const canCreate = hasPermission('QUOTATION_CREATE');
   const canEdit = hasPermission('QUOTATION_EDIT');
@@ -88,7 +91,7 @@ const QuotationList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(urlStatus || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');

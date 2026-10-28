@@ -9,6 +9,7 @@ import {
   getSalesOrderItemDrawing,
   getSalesOrderDrawings
 } from '../../services/salesOrderService';
+import { getVersionedImageUrl } from '../../services/drawingMasterService';
 import {
   Printer,
   Download,
@@ -25,180 +26,129 @@ import {
   ChevronRight,
   Info,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 /**
- * Helper to render dynamic SVG Flange Diagram with mounting holes
+ * Displays the actual uploaded technical CAD drawing from Drawing Master / Hole Image Management.
+ * Preserves true proportions and aspect ratio without stretching, distortion, or cropping.
+ * Displays clear error if missing or cannot be loaded.
  */
-const DynamicFlangeDiagram = ({ holeCount = 12, L = 100, M = 100, dia = 12, A = 610, B = 610 }) => {
-  const count = Number(holeCount) || 12;
-  const size = 260;
-  const pad = 35;
-  const outerW = size - pad * 2;
-  const outerH = size - pad * 2;
-  const flangeThick = 24;
-  const innerW = outerW - flangeThick * 2;
-  const innerH = outerH - flangeThick * 2;
+const UploadedFlangeDrawingViewer = ({
+  drawingUrl,
+  drawingCode,
+  drawingName,
+  holeCount,
+  L,
+  M,
+  dia,
+  A,
+  B,
+  X,
+  Y,
+  onInspectFull
+}) => {
+  const [imageError, setImageError] = useState(false);
 
-  // Calculate hole positions along the flange
-  const holes = [];
-  const radius = 4;
+  useEffect(() => {
+    setImageError(false);
+  }, [drawingUrl]);
 
-  const left = pad;
-  const top = pad;
-  const right = pad + outerW;
-  const bottom = pad + outerH;
-  const midX = pad + flangeThick / 2;
-  const midRightX = right - flangeThick / 2;
-  const midY = top + flangeThick / 2;
-  const midBottomY = bottom - flangeThick / 2;
-
-  if (count === 4) {
-    holes.push({ x: midX, y: midY });
-    holes.push({ x: midRightX, y: midY });
-    holes.push({ x: midX, y: midBottomY });
-    holes.push({ x: midRightX, y: midBottomY });
-  } else if (count === 8) {
-    // 3 per side, sharing corners or 2 per side
-    // Top
-    holes.push({ x: midX + 15, y: midY });
-    holes.push({ x: left + outerW / 2, y: midY });
-    holes.push({ x: midRightX - 15, y: midY });
-    // Bottom
-    holes.push({ x: midX + 15, y: midBottomY });
-    holes.push({ x: left + outerW / 2, y: midBottomY });
-    holes.push({ x: midRightX - 15, y: midBottomY });
-    // Left & Right mid
-    holes.push({ x: midX, y: top + outerH / 2 });
-    holes.push({ x: midRightX, y: top + outerH / 2 });
-  } else {
-    // 12 holes or dynamic
-    const perHoriz = Math.max(3, Math.ceil(count / 3));
-    const perVert = Math.max(2, Math.floor((count - perHoriz * 2) / 2));
-
-    // Top edge holes
-    for (let i = 0; i < perHoriz; i++) {
-      const frac = perHoriz === 1 ? 0.5 : i / (perHoriz - 1);
-      const x = (midX + 10) + frac * (outerW - flangeThick - 20);
-      holes.push({ x, y: midY });
-    }
-    // Bottom edge holes
-    for (let i = 0; i < perHoriz; i++) {
-      const frac = perHoriz === 1 ? 0.5 : i / (perHoriz - 1);
-      const x = (midX + 10) + frac * (outerW - flangeThick - 20);
-      holes.push({ x, y: midBottomY });
-    }
-    // Left & Right side middle holes
-    for (let i = 1; i <= perVert; i++) {
-      const frac = i / (perVert + 1);
-      const y = (midY) + frac * (outerH - flangeThick);
-      holes.push({ x: midX, y });
-      holes.push({ x: midRightX, y });
-    }
-  }
+  const hasValidFile = Boolean(drawingUrl) && !imageError;
+  const isPdf = Boolean(drawingUrl) && (drawingUrl.toLowerCase().endsWith('.pdf') || drawingUrl.includes('application/pdf'));
 
   return (
-    <div className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-xl p-4">
-      <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <Sparkles size={14} className="text-blue-600" />
-        Flange Dynamic Hole Geometry
+    <div className="flex flex-col bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+      {/* Title & Inspection Control */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <FileText size={15} className="text-blue-700" />
+          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            Uploaded Flange Drawing
+          </span>
+          {drawingCode && (
+            <span className="font-mono text-[11px] font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200">
+              {drawingCode}
+            </span>
+          )}
+        </div>
+        {hasValidFile && (
+          <button
+            type="button"
+            onClick={() => onInspectFull?.(drawingUrl, drawingCode, drawingName)}
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs transition-colors"
+            title="Inspect full-resolution technical drawing"
+          >
+            <Maximize2 size={12} /> Full View
+          </button>
+        )}
       </div>
 
-      <svg width={size} height={size + 20} className="overflow-visible">
-        {/* Outer flange border */}
-        <rect
-          x={left}
-          y={top}
-          width={outerW}
-          height={outerH}
-          fill="#f8fafc"
-          stroke="#0f172a"
-          strokeWidth="1.8"
-        />
+      {/* Main Drawing Viewport: Preserves aspect ratio without stretching or distortion */}
+      {hasValidFile ? (
+        <div className="relative w-full h-[320px] bg-white border border-slate-200 rounded-xl flex items-center justify-center p-3 overflow-hidden shadow-inner group">
+          {isPdf ? (
+            <iframe
+              src={drawingUrl}
+              title={drawingName || drawingCode}
+              className="w-full h-full border-0 rounded"
+            />
+          ) : (
+            <img
+              src={drawingUrl}
+              alt={drawingName || drawingCode || "Filter Flange Technical Drawing"}
+              onError={() => setImageError(true)}
+              className="max-w-full max-h-full object-contain transition-transform group-hover:scale-[1.02] duration-200"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="w-full h-[320px] bg-amber-50/60 border border-amber-300 rounded-xl flex flex-col items-center justify-center p-6 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shadow-xs">
+            <AlertTriangle size={24} />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+              Uploaded Technical Drawing Missing
+            </h4>
+            <p className="text-xs text-amber-800 max-w-sm">
+              No uploaded technical drawing file was found in Drawing Master for pattern <strong className="font-mono">{drawingCode || 'configuration'}</strong>.
+            </p>
+            <p className="text-[11px] text-amber-700 max-w-sm">
+              Please upload the filter flange drawing file in <strong>Drawing Master &rarr; Hole Image Management</strong> to display it here and embed it into the production PDF.
+            </p>
+          </div>
+          <a
+            href="/drawing-master?tab=hole_images"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-sm transition-colors mt-2"
+          >
+            <ExternalLink size={13} /> Open Hole Image Management
+          </a>
+        </div>
+      )}
 
-        {/* Inner casing opening */}
-        <rect
-          x={left + flangeThick}
-          y={top + flangeThick}
-          width={innerW}
-          height={innerH}
-          fill="#ffffff"
-          stroke="#334155"
-          strokeWidth="1.2"
-          strokeDasharray="4 2"
-        />
-
-        {/* Dimension B (bottom width) */}
-        <line x1={left} y1={bottom + 12} x2={right} y2={bottom + 12} stroke="#64748b" strokeWidth="1" />
-        <line x1={left} y1={bottom + 7} x2={left} y2={bottom + 17} stroke="#64748b" strokeWidth="1" />
-        <line x1={right} y1={bottom + 7} x2={right} y2={bottom + 17} stroke="#64748b" strokeWidth="1" />
-        <text x={left + outerW / 2} y={bottom + 22} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#334155">
-          B = {B} mm
-        </text>
-
-        {/* Dimension A (right height) */}
-        <line x1={right + 12} y1={top} x2={right + 12} y2={bottom} stroke="#64748b" strokeWidth="1" />
-        <line x1={right + 7} y1={top} x2={right + 17} y2={top} stroke="#64748b" strokeWidth="1" />
-        <line x1={right + 7} y1={bottom} x2={right + 17} y2={bottom} stroke="#64748b" strokeWidth="1" />
-        <text x={right + 22} y={top + outerH / 2 + 3} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#334155" transform={`rotate(90 ${right + 22} ${top + outerH / 2 + 3})`}>
-          A = {A} mm
-        </text>
-
-        {/* Dimension markers: M TYP (top) */}
-        {holes.length >= 2 && (
-          <g>
-            <line x1={holes[0].x} y1={top - 6} x2={holes[1].x} y2={top - 6} stroke="#2563eb" strokeWidth="1" />
-            <line x1={holes[0].x} y1={top - 10} x2={holes[0].x} y2={top - 2} stroke="#2563eb" strokeWidth="1" />
-            <line x1={holes[1].x} y1={top - 10} x2={holes[1].x} y2={top - 2} stroke="#2563eb" strokeWidth="1" />
-            <text x={(holes[0].x + holes[1].x) / 2} y={top - 11} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#2563eb">
-              M = {M} TYP
-            </text>
-          </g>
-        )}
-
-        {/* Dimension markers: L TYP (left) */}
-        {holes.length >= 2 && (
-          <g>
-            <line x1={left - 6} y1={midY} x2={left - 6} y2={midY + 30} stroke="#2563eb" strokeWidth="1" />
-            <line x1={left - 10} y1={midY} x2={left - 2} y2={midY} stroke="#2563eb" strokeWidth="1" />
-            <line x1={left - 10} y1={midY + 30} x2={left - 2} y2={midY + 30} stroke="#2563eb" strokeWidth="1" />
-            <text x={left - 12} y={midY + 18} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#2563eb" transform={`rotate(-90 ${left - 12} ${midY + 18})`}>
-              L = {L} TYP
-            </text>
-          </g>
-        )}
-
-        {/* Render Holes */}
-        {holes.map((h, i) => (
-          <circle
-            key={i}
-            cx={h.x}
-            cy={h.y}
-            r={radius}
-            fill="#ffffff"
-            stroke="#0f172a"
-            strokeWidth="1.5"
-          />
-        ))}
-
-        {/* Center crosshairs for holes */}
-        {holes.map((h, i) => (
-          <g key={`cross-${i}`}>
-            <line x1={h.x - 6} y1={h.y} x2={h.x + 6} y2={h.y} stroke="#64748b" strokeWidth="0.7" />
-            <line x1={h.x} y1={h.y - 6} x2={h.x} y2={h.y + 6} stroke="#64748b" strokeWidth="0.7" />
-          </g>
-        ))}
-      </svg>
-
-      {/* Hole count badge */}
-      <div className="mt-2 flex items-center justify-between w-full px-2 text-xs">
-        <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[11px] shadow-sm">
-          No.Of Holes = {count}
-        </span>
-        <span className="text-[11px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-          Ø = {dia} mm
-        </span>
+      {/* Confirmed Engineering Dimension Badges */}
+      <div className="grid grid-cols-4 gap-2 pt-2 text-center text-xs">
+        <div className="bg-white p-2 rounded-lg border border-slate-200">
+          <span className="text-[10px] text-slate-500 block uppercase font-medium">Flange (A × B)</span>
+          <strong className="text-xs font-bold text-slate-800">{A || 610} × {B || 610} mm</strong>
+        </div>
+        <div className="bg-purple-50 p-2 rounded-lg border border-purple-200">
+          <span className="text-[10px] text-purple-700 block uppercase font-semibold">Hole Pattern</span>
+          <strong className="text-xs font-bold text-purple-900">{holeCount || 0} Holes</strong>
+        </div>
+        <div className="bg-blue-50 p-2 rounded-lg border border-blue-200">
+          <span className="text-[10px] text-blue-700 block uppercase font-semibold">Pitch / Spacing</span>
+          <strong className="text-xs font-bold text-blue-900">L={L} | M={M} mm</strong>
+        </div>
+        <div className="bg-white p-2 rounded-lg border border-slate-200">
+          <span className="text-[10px] text-slate-500 block uppercase font-medium">Hole Size (Ø)</span>
+          <strong className="text-xs font-bold text-slate-800">Ø{dia} mm {X && X !== '-' ? `(${X})` : ''}</strong>
+        </div>
       </div>
     </div>
   );
@@ -233,6 +183,7 @@ const SalesOrderDrawingWorkspaceModal = ({
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [inspectDrawingModal, setInspectDrawingModal] = useState(null); // { url, code, name }
 
   // Load configuration
   const loadWorkspaceConfig = async (preferredItemId = null) => {
@@ -279,14 +230,20 @@ const SalesOrderDrawingWorkspaceModal = ({
   const populateHoleForm = (item) => {
     if (!item) return;
     const confirmed = item.confirmedHoleDetails || {};
+    const count = (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount)))
+      ? Number(item.holeCount)
+      : (item.flangeHoleConfig ? parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10) : 12) || 12;
+
+    const identifier = item.flangeHoleConfig || `HOLE-${count}H`;
+
     setHoleForm({
-      L: confirmed.L !== undefined ? confirmed.L : 100,
-      M: confirmed.M !== undefined ? confirmed.M : 100,
-      dia: confirmed.dia !== undefined ? confirmed.dia : 12,
-      X: confirmed.X !== undefined ? confirmed.X : '-',
-      Y: confirmed.Y !== undefined ? confirmed.Y : '-',
-      holeCount: item.holeCount || 12,
-      flangeHoleConfig: item.flangeHoleConfig || `HOLE-${item.holeCount || 12}H`
+      L: confirmed.L !== undefined && confirmed.L !== null ? confirmed.L : 100,
+      M: confirmed.M !== undefined && confirmed.M !== null ? confirmed.M : 100,
+      dia: confirmed.dia !== undefined && confirmed.dia !== null ? confirmed.dia : 12,
+      X: confirmed.X !== undefined && confirmed.X !== null ? confirmed.X : '-',
+      Y: confirmed.Y !== undefined && confirmed.Y !== null ? confirmed.Y : '-',
+      holeCount: count,
+      flangeHoleConfig: identifier
     });
   };
 
@@ -350,11 +307,17 @@ const SalesOrderDrawingWorkspaceModal = ({
 
       const res = await updateSalesOrderItemDrawingConfig(salesOrderId, activeItem._id, payload);
       if (res.success) {
-        setSuccessMsg(`Hole details confirmed for Item ${activeItem.itemNumber}!`);
+        setSuccessMsg(`Hole details confirmed for Item #${activeItem.lineNumber || activeItem.itemNumber || 1}!`);
         // Refresh workspace data to update statuses
         await loadWorkspaceConfig(activeItem._id);
         // Switch to preview tab to see updated drawing
         setActiveTab('preview');
+        // Reload preview with saved values
+        if (pdfBlobUrl) {
+          window.URL.revokeObjectURL(pdfBlobUrl);
+          setPdfBlobUrl(null);
+        }
+        loadItemPreview({ ...activeItem, ...payload });
       } else {
         setError(res.message || 'Failed to save hole details');
       }
@@ -636,7 +599,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                         <div className="flex justify-between text-slate-600">
                           <span>Holes:</span>
                           <strong className="font-mono text-blue-700">
-                            {it.holeCount || 12} Holes (L: {it.confirmedHoleDetails?.L || 100}, M: {it.confirmedHoleDetails?.M || 100}, Ø: {it.confirmedHoleDetails?.dia || 12})
+                            {it.holeCount ?? 12} Holes (L: {it.confirmedHoleDetails?.L ?? 100}, M: {it.confirmedHoleDetails?.M ?? 100}, Ø: {it.confirmedHoleDetails?.dia ?? 12})
                           </strong>
                         </div>
                       </div>
@@ -804,24 +767,28 @@ const SalesOrderDrawingWorkspaceModal = ({
                             Hole Count
                           </label>
                           <div className="grid grid-cols-4 gap-2">
-                            {[4, 8, 12, 16].map((cnt) => (
-                              <button
-                                key={cnt}
-                                type="button"
-                                onClick={() => setHoleForm(prev => ({
-                                  ...prev,
-                                  holeCount: cnt,
-                                  flangeHoleConfig: `HOLE-${cnt}H`
-                                }))}
-                                className={`py-1.5 px-3 rounded-lg text-xs font-bold border transition-all ${
-                                  Number(holeForm.holeCount) === cnt
-                                    ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                }`}
-                              >
-                                {cnt} Holes
-                              </button>
-                            ))}
+                            {[4, 8, 12, 16].map((cnt) => {
+                              const matchingPattern = (configData?.availableHoleConfigurations || []).find(p => p.holes === cnt);
+                              const targetCode = matchingPattern?.drawingCode || `HOLE-${cnt}H`;
+                              return (
+                                <button
+                                  key={cnt}
+                                  type="button"
+                                  onClick={() => setHoleForm(prev => ({
+                                    ...prev,
+                                    holeCount: cnt,
+                                    flangeHoleConfig: targetCode
+                                  }))}
+                                  className={`py-1.5 px-3 rounded-lg text-xs font-bold border transition-all ${
+                                    Number(holeForm.holeCount) === cnt
+                                      ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {cnt} Holes
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -940,16 +907,56 @@ const SalesOrderDrawingWorkspaceModal = ({
                         </div>
                       </form>
 
-                      {/* Right Side: Live Flange Dynamic Diagram Preview */}
+                      {/* Right Side: Actual Uploaded Flange Drawing Preview */}
                       <div>
-                        <DynamicFlangeDiagram
-                          holeCount={holeForm.holeCount}
-                          L={holeForm.L}
-                          M={holeForm.M}
-                          dia={holeForm.dia}
-                          A={activeItem.dimensions?.A || 610}
-                          B={activeItem.dimensions?.B || 610}
-                        />
+                        {(() => {
+                          const matchingHolePattern = (configData?.availableHoleConfigurations || []).find(
+                            p => p.drawingCode === holeForm.flangeHoleConfig || Number(p.holes) === Number(holeForm.holeCount)
+                          ) || activeItem?.holePattern;
+
+                          const rawDrawingUrl = matchingHolePattern?.fileUrl 
+                            || matchingHolePattern?.holeImageUrl 
+                            || activeItem?.drawingFileUrl
+                            || activeItem?.selectedDrawing?.fileUrl 
+                            || activeItem?.selectedDrawing?.holeImageUrl
+                            || activeItem?.drawingSnapshot?.fileUrl 
+                            || '';
+
+                          const currentDrawingUrl = getVersionedImageUrl(
+                            rawDrawingUrl,
+                            matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt
+                          );
+
+                          const currentDrawingCode = matchingHolePattern?.drawingCode 
+                            || activeItem?.drawingCode 
+                            || activeItem?.selectedDrawing?.drawingCode 
+                            || activeItem?.drawingSnapshot?.drawingCode 
+                            || holeForm.flangeHoleConfig 
+                            || 'DRAWING';
+
+                          const currentDrawingName = matchingHolePattern?.drawingName 
+                            || activeItem?.drawingName 
+                            || activeItem?.selectedDrawing?.drawingName 
+                            || activeItem?.drawingSnapshot?.drawingName 
+                            || 'Filter Flange Technical Drawing';
+
+                          return (
+                            <UploadedFlangeDrawingViewer
+                              drawingUrl={currentDrawingUrl}
+                              drawingCode={currentDrawingCode}
+                              drawingName={currentDrawingName}
+                              holeCount={holeForm.holeCount}
+                              L={holeForm.L}
+                              M={holeForm.M}
+                              dia={holeForm.dia}
+                              A={activeItem.dimensions?.A || 610}
+                              B={activeItem.dimensions?.B || 610}
+                              X={holeForm.X}
+                              Y={holeForm.Y}
+                              onInspectFull={(url, code, name) => setInspectDrawingModal({ url, code, name })}
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1087,6 +1094,38 @@ const SalesOrderDrawingWorkspaceModal = ({
           )}
         </div>
       </div>
+
+      {/* Full Resolution Inspection Modal */}
+      {inspectDrawingModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                  {inspectDrawingModal.code}
+                </span>
+                <span className="text-xs font-bold text-slate-800">
+                  {inspectDrawingModal.name || 'Technical Flange Drawing'} — Full Resolution Inspection
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectDrawingModal(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-100/60 min-h-[400px]">
+              <img
+                src={inspectDrawingModal.url}
+                alt={inspectDrawingModal.name || 'Full Drawing'}
+                className="max-w-full max-h-[75vh] object-contain shadow-md rounded border border-slate-200 bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };

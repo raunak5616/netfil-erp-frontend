@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import {
   getDrawings,
   updateDrawingStatus,
-  deleteDrawing
+  deleteDrawing,
+  getVersionedImageUrl
 } from '../../services/drawingMasterService';
 import { getFilterGrades } from '../../services/filterGradeService';
 import { useAuth } from '../../context/AuthContext';
@@ -207,16 +208,27 @@ const DrawingMasterList = () => {
     []
   );
 
+  // Helper to distinguish flange hole pattern drawings from filter product drawings
+  const isHoleDrawing = (d) => Boolean(
+    d?.isHolePattern ||
+    (d?.drawingCode && d.drawingCode.toUpperCase().startsWith('HOLE-'))
+  );
+
   // Dynamic counts per category
   const counts = useMemo(() => {
-    const res = { fine_pre: 0, hepa: 0, all: drawings.length, hole_images: 6 };
+    const res = { fine_pre: 0, hepa: 0, all: 0, hole_images: 0 };
     for (const d of drawings) {
-      const cat = (d.filterCategory || '').toUpperCase();
-      const dt = (d.drawingType || '').toUpperCase();
-      if (cat === 'HEPA' || dt === 'HEPA') {
-        res.hepa++;
+      if (isHoleDrawing(d)) {
+        res.hole_images++;
       } else {
-        res.fine_pre++;
+        res.all++;
+        const cat = (d.filterCategory || '').toUpperCase();
+        const dt = (d.drawingType || '').toUpperCase();
+        if (cat === 'HEPA' || dt === 'HEPA') {
+          res.hepa++;
+        } else {
+          res.fine_pre++;
+        }
       }
     }
     return res;
@@ -235,6 +247,12 @@ const DrawingMasterList = () => {
   // Filtered drawings
   const filteredDrawings = useMemo(() => {
     return drawings.filter((drw) => {
+      // Hole drawings are hole pattern configurations, NOT filter product drawings.
+      // They belong exclusively in the Hole Image Management tab.
+      if (isHoleDrawing(drw)) {
+        return false;
+      }
+
       // 1. Category Tab filter
       const cat = (drw.filterCategory || '').toUpperCase();
       const dt = (drw.drawingType || '').toUpperCase();
@@ -298,7 +316,8 @@ const DrawingMasterList = () => {
         width: '64px',
         render: (_, row) => {
           const isPdf = row.format === 'pdf' || row.fileUrl?.toLowerCase().endsWith('.pdf');
-          const previewSrc = row.holeImageUrl || row.fileUrl;
+          const rawSrc = row.holeImageUrl || row.fileUrl;
+          const previewSrc = getVersionedImageUrl(rawSrc, row.updatedAt);
           return (
             <div
               onClick={() => handlePreview(row)}
@@ -349,6 +368,13 @@ const DrawingMasterList = () => {
         align: 'center',
         width: '95px',
         render: (_, row) => {
+          if (isHoleDrawing(row)) {
+            return (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border bg-purple-50 text-purple-800 border-purple-200">
+                Hole Pattern
+              </span>
+            );
+          }
           const isHepa = (row.filterCategory === 'HEPA') || (row.drawingType === 'HEPA');
           return (
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${
