@@ -158,6 +158,25 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
         {/* TAB 1: GENERAL */}
         {activeTab === 'general' && (
           <div className="flex flex-col gap-3">
+            {item.imageUrl && (
+              <div className="flex items-center gap-4 bg-slate-900/90 border border-slate-800 p-3 rounded-lg text-white">
+                <div className="w-20 h-20 rounded-md overflow-hidden bg-black/40 shrink-0 border border-slate-700">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.itemName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">
+                    Product Image
+                  </span>
+                  <h4 className="text-sm font-semibold mt-1 text-white">{item.itemName}</h4>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">{item.itemCode}</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-md border border-slate-200">
               <div>
                 <div className="text-[11px] text-slate-500 uppercase font-semibold">
@@ -183,6 +202,17 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                 </div>
                 <StatusBadge status={item.status} />
               </div>
+
+              {item.filterType && (
+                <div>
+                  <div className="text-[11px] text-slate-500 uppercase font-semibold">
+                    Filter Type
+                  </div>
+                  <div className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded inline-block mt-0.5">
+                    {item.filterType}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div className="text-[11px] text-slate-500 uppercase font-semibold">

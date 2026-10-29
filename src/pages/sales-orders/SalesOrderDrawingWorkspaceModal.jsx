@@ -38,6 +38,9 @@ import {
  */
 const UploadedFlangeDrawingViewer = ({
   drawingUrl,
+  frontViewUrl,
+  sideViewUrl,
+  pictorialViewUrl,
   drawingCode,
   drawingName,
   holeCount,
@@ -48,16 +51,19 @@ const UploadedFlangeDrawingViewer = ({
   B,
   X,
   Y,
+  tolerance = '± 2 mm',
   onInspectFull
 }) => {
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     setImageError(false);
-  }, [drawingUrl]);
+  }, [drawingUrl, frontViewUrl, sideViewUrl, pictorialViewUrl]);
 
-  const hasValidFile = Boolean(drawingUrl) && !imageError;
-  const isPdf = Boolean(drawingUrl) && (drawingUrl.toLowerCase().endsWith('.pdf') || drawingUrl.includes('application/pdf'));
+  const effectiveFront = frontViewUrl || drawingUrl;
+  const hasThreeViews = Boolean(sideViewUrl || pictorialViewUrl);
+  const hasValidFile = Boolean(effectiveFront || sideViewUrl || pictorialViewUrl) && !imageError;
+  const isPdf = Boolean(effectiveFront) && (effectiveFront.toLowerCase().endsWith('.pdf') || effectiveFront.includes('application/pdf'));
 
   return (
     <div className="flex flex-col bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
@@ -66,7 +72,7 @@ const UploadedFlangeDrawingViewer = ({
         <div className="flex items-center gap-2">
           <FileText size={15} className="text-blue-700" />
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Uploaded Flange Drawing
+            {hasThreeViews ? 'Three-View Filter Drawings' : 'Uploaded Technical Drawing'}
           </span>
           {drawingCode && (
             <span className="font-mono text-[11px] font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200">
@@ -74,10 +80,10 @@ const UploadedFlangeDrawingViewer = ({
             </span>
           )}
         </div>
-        {hasValidFile && (
+        {hasValidFile && !hasThreeViews && (
           <button
             type="button"
-            onClick={() => onInspectFull?.(drawingUrl, drawingCode, drawingName)}
+            onClick={() => onInspectFull?.(effectiveFront, drawingCode, drawingName)}
             className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs transition-colors"
             title="Inspect full-resolution technical drawing"
           >
@@ -86,24 +92,116 @@ const UploadedFlangeDrawingViewer = ({
         )}
       </div>
 
-      {/* Main Drawing Viewport: Preserves aspect ratio without stretching or distortion */}
+      {/* Main Drawing Viewport: Three-View horizontal layout or single view */}
       {hasValidFile ? (
-        <div className="relative w-full h-[320px] bg-white border border-slate-200 rounded-xl flex items-center justify-center p-3 overflow-hidden shadow-inner group">
-          {isPdf ? (
-            <iframe
-              src={drawingUrl}
-              title={drawingName || drawingCode}
-              className="w-full h-full border-0 rounded"
-            />
-          ) : (
-            <img
-              src={drawingUrl}
-              alt={drawingName || drawingCode || "Filter Flange Technical Drawing"}
-              onError={() => setImageError(true)}
-              className="max-w-full max-h-full object-contain transition-transform group-hover:scale-[1.02] duration-200"
-            />
-          )}
-        </div>
+        hasThreeViews ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Front View */}
+            <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="text-[11px] font-bold text-slate-800">1. Front View</span>
+                <button
+                  type="button"
+                  onClick={() => onInspectFull?.(effectiveFront, drawingCode, `${drawingName} - Front View`)}
+                  className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                >
+                  <Maximize2 size={10} /> Full
+                </button>
+              </div>
+              <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
+                <img
+                  src={effectiveFront}
+                  alt="Front View Drawing"
+                  onError={() => setImageError(true)}
+                  className="max-w-full max-h-full object-contain"
+                />
+                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 py-0.2 rounded font-mono">
+                  Left
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 text-center font-medium">Front Elevation</span>
+            </div>
+
+            {/* Side View */}
+            <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="text-[11px] font-bold text-slate-800">2. Side View</span>
+                {sideViewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => onInspectFull?.(sideViewUrl, drawingCode, `${drawingName} - Side View`)}
+                    className="text-[10px] text-teal-600 hover:underline flex items-center gap-0.5"
+                  >
+                    <Maximize2 size={10} /> Full
+                  </button>
+                )}
+              </div>
+              <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
+                {sideViewUrl ? (
+                  <img
+                    src={sideViewUrl}
+                    alt="Side View Drawing"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400 italic">No side view</span>
+                )}
+                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 py-0.2 rounded font-mono">
+                  Centre
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 text-center font-medium">Side Elevation</span>
+            </div>
+
+            {/* 3D / Pictorial View */}
+            <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="text-[11px] font-bold text-slate-800">3. 3D / Pictorial</span>
+                {pictorialViewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => onInspectFull?.(pictorialViewUrl, drawingCode, `${drawingName} - 3D View`)}
+                    className="text-[10px] text-purple-600 hover:underline flex items-center gap-0.5"
+                  >
+                    <Maximize2 size={10} /> Full
+                  </button>
+                )}
+              </div>
+              <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
+                {pictorialViewUrl ? (
+                  <img
+                    src={pictorialViewUrl}
+                    alt="3D View Drawing"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400 italic">No 3D view</span>
+                )}
+                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 py-0.2 rounded font-mono">
+                  Right
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 text-center font-medium">Isometric / 3D</span>
+            </div>
+          </div>
+        ) : (
+          <div className="relative w-full h-[320px] bg-white border border-slate-200 rounded-xl flex items-center justify-center p-3 overflow-hidden shadow-inner group">
+            {isPdf ? (
+              <iframe
+                src={effectiveFront}
+                title={drawingName || drawingCode}
+                className="w-full h-full border-0 rounded"
+              />
+            ) : (
+              <img
+                src={effectiveFront}
+                alt={drawingName || drawingCode || "Filter Technical Drawing"}
+                onError={() => setImageError(true)}
+                className="max-w-full max-h-full object-contain transition-transform group-hover:scale-[1.02] duration-200"
+              />
+            )}
+          </div>
+        )
       ) : (
         <div className="w-full h-[320px] bg-amber-50/60 border border-amber-300 rounded-xl flex flex-col items-center justify-center p-6 text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shadow-xs">
@@ -132,7 +230,7 @@ const UploadedFlangeDrawingViewer = ({
       )}
 
       {/* Confirmed Engineering Dimension Badges */}
-      <div className="grid grid-cols-4 gap-2 pt-2 text-center text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 text-center text-xs">
         <div className="bg-white p-2 rounded-lg border border-slate-200">
           <span className="text-[10px] text-slate-500 block uppercase font-medium">Flange (A × B)</span>
           <strong className="text-xs font-bold text-slate-800">{A || 610} × {B || 610} mm</strong>
@@ -148,6 +246,10 @@ const UploadedFlangeDrawingViewer = ({
         <div className="bg-white p-2 rounded-lg border border-slate-200">
           <span className="text-[10px] text-slate-500 block uppercase font-medium">Hole Size (Ø)</span>
           <strong className="text-xs font-bold text-slate-800">Ø{dia} mm {X && X !== '-' ? `(${X})` : ''}</strong>
+        </div>
+        <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200 col-span-2 sm:col-span-1">
+          <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Tolerance</span>
+          <strong className="text-xs font-bold text-emerald-900 font-mono">{tolerance || '± 2 mm'}</strong>
         </div>
       </div>
     </div>
@@ -175,7 +277,8 @@ const SalesOrderDrawingWorkspaceModal = ({
     X: '-',
     Y: '-',
     holeCount: 12,
-    flangeHoleConfig: 'HOLE-12H'
+    flangeHoleConfig: 'HOLE-12H',
+    tolerance: '± 2 mm'
   });
   const [savingHoles, setSavingHoles] = useState(false);
 
@@ -243,7 +346,8 @@ const SalesOrderDrawingWorkspaceModal = ({
       X: confirmed.X !== undefined && confirmed.X !== null ? confirmed.X : '-',
       Y: confirmed.Y !== undefined && confirmed.Y !== null ? confirmed.Y : '-',
       holeCount: count,
-      flangeHoleConfig: identifier
+      flangeHoleConfig: identifier,
+      tolerance: item.tolerance || '± 2 mm'
     });
   };
 
@@ -302,6 +406,7 @@ const SalesOrderDrawingWorkspaceModal = ({
         },
         holeCount: Number(holeForm.holeCount),
         flangeHoleConfig: holeForm.flangeHoleConfig,
+        tolerance: holeForm.tolerance || '± 2 mm',
         drawingStatus: 'READY_FOR_PREVIEW'
       };
 
@@ -869,18 +974,35 @@ const SalesOrderDrawingWorkspaceModal = ({
                           </div>
                         </div>
 
-                        {/* Flange Hole Config Code */}
-                        <div>
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                            Configuration Identifier
-                          </label>
-                          <input
-                            type="text"
-                            value={holeForm.flangeHoleConfig}
-                            onChange={(e) => setHoleForm({ ...holeForm, flangeHoleConfig: e.target.value })}
-                            className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="HOLE-12H"
-                          />
+                        {/* Flange Hole Config Code and Tolerance */}
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Configuration Identifier
+                            </label>
+                            <input
+                              type="text"
+                              value={holeForm.flangeHoleConfig}
+                              onChange={(e) => setHoleForm({ ...holeForm, flangeHoleConfig: e.target.value })}
+                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="HOLE-12H"
+                            />
+                            <span className="text-[10px] text-slate-400 mt-0.5 block">Hole pattern ID</span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Tolerance (mm)
+                            </label>
+                            <input
+                              type="text"
+                              value={holeForm.tolerance}
+                              onChange={(e) => setHoleForm({ ...holeForm, tolerance: e.target.value })}
+                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="± 2 mm"
+                            />
+                            <span className="text-[10px] text-slate-400 mt-0.5 block">Shown on Drawing PDF</span>
+                          </div>
                         </div>
 
                         {/* Action buttons */}
@@ -940,9 +1062,27 @@ const SalesOrderDrawingWorkspaceModal = ({
                             || activeItem?.drawingSnapshot?.drawingName 
                             || 'Filter Flange Technical Drawing';
 
+                          const frontUrl = matchingHolePattern?.frontViewImage?.url 
+                            || activeItem?.drawingSnapshot?.frontViewImage?.url 
+                            || activeItem?.selectedDrawing?.frontViewImage?.url 
+                            || currentDrawingUrl;
+
+                          const sideUrl = matchingHolePattern?.sideViewImage?.url 
+                            || activeItem?.drawingSnapshot?.sideViewImage?.url 
+                            || activeItem?.selectedDrawing?.sideViewImage?.url 
+                            || '';
+
+                          const picUrl = matchingHolePattern?.pictorialViewImage?.url 
+                            || activeItem?.drawingSnapshot?.pictorialViewImage?.url 
+                            || activeItem?.selectedDrawing?.pictorialViewImage?.url 
+                            || '';
+
                           return (
                             <UploadedFlangeDrawingViewer
                               drawingUrl={currentDrawingUrl}
+                              frontViewUrl={frontUrl}
+                              sideViewUrl={sideUrl}
+                              pictorialViewUrl={picUrl}
                               drawingCode={currentDrawingCode}
                               drawingName={currentDrawingName}
                               holeCount={holeForm.holeCount}
@@ -953,6 +1093,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                               B={activeItem.dimensions?.B || 610}
                               X={holeForm.X}
                               Y={holeForm.Y}
+                              tolerance={holeForm.tolerance || activeItem.tolerance || '± 2 mm'}
                               onInspectFull={(url, code, name) => setInspectDrawingModal({ url, code, name })}
                             />
                           );
@@ -1030,45 +1171,72 @@ const SalesOrderDrawingWorkspaceModal = ({
 
                     {/* Filter Specifications Table */}
                     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-                        Filter Specifications (Printed on Engineering Drawing)
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Filter Specifications (Printed on Engineering Drawing)
+                        </h4>
+                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          {activeItem?.grade || 'Grade 11'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                        <div className="flex justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-medium">Grade:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.grade || 'Grade 11'}</strong>
+                        </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Efficiency:</span>
-                          <strong className="text-slate-900 font-semibold">85 % Down to 0.3 µ</strong>
+                          <strong className="text-slate-900 font-semibold">
+                            {activeItem?.efficiency || '99.97% @ 0.3 µm'}
+                          </strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">IPD:</span>
-                          <strong className="text-slate-900 font-semibold">12-15 ±10% mm of WC</strong>
+                          <span className="text-slate-500 font-medium">Micron Rating:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.micronRating || '0.3 µm'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">FPD:</span>
-                          <strong className="text-slate-900 font-semibold">45 mm of WC</strong>
+                          <span className="text-slate-500 font-medium">Initial Pressure Drop:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.initialPressureDrop || '20 mm of WC'}</strong>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-medium">Final Pressure Drop:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.finalPressureDrop || '70 mm of WC'}</strong>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-medium">Separator:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.separator || 'Corrugated Aluminium Separator'}</strong>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-medium">No. of Folds:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.noOfFolds || '72 - 76 Folds'}</strong>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-medium">Max Operating Temperature:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.maxOperatingTemperature || 'Up To 120 ° C'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Material of Casing:</span>
-                          <strong className="text-slate-900 font-semibold">Aluminum Anodized</strong>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.casingMaterial || activeItem?.dimensions?.moc || 'Aluminum Anodized'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Media:</span>
-                          <strong className="text-slate-900 font-semibold">Imported Submicronic Glass Fiber</strong>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.media || 'Imported Submicronic Glass Fiber'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">No. of Pleats:</span>
-                          <strong className="text-slate-900 font-semibold">15-18 / FT</strong>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">Temperature:</span>
-                          <strong className="text-slate-900 font-semibold">Up To 150 ° C</strong>
+                          <span className="text-slate-500 font-medium">Bonding:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.bonding || 'PU Bonding'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Gasket MOC:</span>
-                          <strong className="text-slate-900 font-semibold">EPDM</strong>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.gasketMoc || 'EPDM'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">Protection guard MOC:</span>
-                          <strong className="text-slate-900 font-semibold">NO Protection Grid</strong>
+                          <span className="text-slate-500 font-medium">Protection Guard (MOC):</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.protectionGuardMoc || 'NO Protection Grid'}</strong>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-100 bg-emerald-50/50 px-2 rounded">
+                          <span className="text-emerald-800 font-medium">Dimensional Tolerance:</span>
+                          <strong className="text-emerald-950 font-bold font-mono">{holeForm.tolerance || activeItem?.tolerance || '± 2 mm'}</strong>
                         </div>
                       </div>
                     </div>
@@ -1081,6 +1249,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                       <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1 font-mono">
                         <li>PLEASE DO NOT MAKE HOLES ON THE CORNER JOINTS OF THE EXTRUDED FLANGES</li>
                         <li>TEST CERTIFICATES WILL BE AS PER APPROVED DRAWINGS ONLY</li>
+                        <li>GENERAL DIMENSIONAL TOLERANCE: {holeForm.tolerance || activeItem?.tolerance || '± 2 mm'}</li>
                       </ol>
                     </div>
                   </div>

@@ -49,3 +49,20 @@ export const deleteItem = async (itemId) => {
   const response = await api.delete(`/items/${itemId}`);
   return response.data;
 };
+
+export const uploadItemImage = async (formData, itemId = null) => {
+  const url = itemId ? `/items/${itemId}/image` : '/items/upload-image';
+  const method = itemId ? 'patch' : 'post';
+  const response = await api[method](url, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
+export const removeItemImage = async (itemId) => {
+  const response = await api.delete(`/items/${itemId}/image`);
+  return response.data;
+};
+

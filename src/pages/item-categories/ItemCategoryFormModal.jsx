@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createItemCategory, updateItemCategory } from '../../services/itemCategoryService';
 import { getItemGroups } from '../../services/itemGroupService';
 import Modal from '../../components/ui/Modal';
@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
 
-const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
+const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialItemGroups = [] }) => {
   const isEditMode = !!category;
 
   const [formData, setFormData] = useState({
@@ -17,38 +17,86 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
     status: 'active',
   });
 
-  const [itemGroups, setItemGroups] = useState([]);
+  const [itemGroups, setItemGroups] = useState(initialItemGroups || []);
   const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Fetch available Item Groups for the dropdown
+  // Synchronize initial item groups from parent if available
   useEffect(() => {
-    if (isOpen) {
-      const fetchGroups = async () => {
+    if (initialItemGroups && initialItemGroups.length > 0) {
+      setItemGroups(initialItemGroups);
+    }
+  }, [initialItemGroups]);
+
+  // Fetch available Item Groups for the dropdown when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    const fetchGroups = async () => {
+      // Only show loading spinner if we don't already have cached/initial groups
+      if (!itemGroups || itemGroups.length === 0) {
         setGroupsLoading(true);
-        try {
-          const res = await getItemGroups();
-          if (res.success && Array.isArray(res.itemGroups)) {
-            setItemGroups(res.itemGroups);
-          }
-        } catch (err) {
+      }
+      setGroupsError('');
+      try {
+        const res = await getItemGroups({ typeFilter: 'MASTER' });
+        if (isMounted && res?.success && Array.isArray(res.itemGroups)) {
+          setItemGroups(res.itemGroups);
+        }
+      } catch (err) {
+        if (isMounted) {
           console.error("Failed to fetch item groups:", err);
-        } finally {
+          if (!itemGroups || itemGroups.length === 0) {
+            setGroupsError(err.response?.data?.message || 'Failed to fetch item groups from server.');
+          }
+        }
+      } finally {
+        if (isMounted) {
           setGroupsLoading(false);
         }
-      };
-      fetchGroups();
-    }
+      }
+    };
+
+    fetchGroups();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen]);
+
+  // Filter out system internal groups and guarantee currently edited category's item group is included
+  const displayGroups = useMemo(() => {
+    const list = [...(itemGroups || [])];
+
+    // If editing a category and its group is an object not currently in list, inject it
+    if (category?.itemGroup && typeof category.itemGroup === 'object' && category.itemGroup._id) {
+      const exists = list.some((g) => String(g._id) === String(category.itemGroup._id));
+      if (!exists) {
+        list.push(category.itemGroup);
+      }
+    }
+
+    return list.filter((g) => {
+      if (g.groupType === 'SYSTEM') return false;
+      const code = String(g.groupCode || '').toUpperCase();
+      return !code.startsWith('GP-WO-') && code !== 'GP-INV' && code !== 'GP-OBOM';
+    });
+  }, [itemGroups, category]);
 
   useEffect(() => {
     if (category) {
       setFormData({
         categoryCode: category.categoryCode || '',
         categoryName: category.categoryName || '',
-        itemGroup: category.itemGroup?._id || category.itemGroup || '',
+        itemGroup: category.itemGroup?._id
+          ? String(category.itemGroup._id)
+          : category.itemGroup
+          ? String(category.itemGroup)
+          : '',
         description: category.description || '',
         status: category.status || 'active',
       });
@@ -155,6 +203,12 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
           </div>
         )}
 
+        {groupsError && (
+          <div style={{ gridColumn: 'span 2' }}>
+            <Alert type="warning" message={groupsError} onClose={() => setGroupsError('')} />
+          </div>
+        )}
+
         {successMessage && (
           <div style={{ gridColumn: 'span 2' }}>
             <Alert type="success" message={successMessage} />
@@ -162,7 +216,13 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
         )}
 
         {/* Parent Item Group Select */}
-        <FormField label="Parent Item Group" required fullWidth helperText="Master group classification this category belongs to">
+        <FormField
+          label="Parent Item Group"
+          required
+          fullWidth
+          error={groupsError}
+          helperText="Master group classification this category belongs to"
+        >
           <Select
             name="itemGroup"
             value={formData.itemGroup}
@@ -170,11 +230,17 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
             disabled={submitting || groupsLoading}
           >
             <option value="">-- Select Item Group --</option>
-            {itemGroups.map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.groupCode} — {g.groupName} {g.status === 'inactive' ? '(Inactive)' : ''}
-              </option>
-            ))}
+            {groupsLoading && displayGroups.length === 0 ? (
+              <option value="" disabled>Loading item groups...</option>
+            ) : displayGroups.length === 0 ? (
+              <option value="" disabled>No item groups available</option>
+            ) : (
+              displayGroups.map((g) => (
+                <option key={g._id} value={g._id}>
+                  {`${g.groupCode} — ${g.groupName}${g.status === 'inactive' ? ' (Inactive)' : ''}`}
+                </option>
+              ))
+            )}
           </Select>
         </FormField>
 

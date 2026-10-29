@@ -51,7 +51,12 @@ const DrawingSelector = ({
       filterGradeName: matchedGradeName,
       fileUrl: doc.fileUrl,
       format: doc.format || (doc.fileUrl?.split('.').pop() || '').toLowerCase(),
-      mimeType: doc.mimeType
+      mimeType: doc.mimeType,
+      filterCategory: doc.filterCategory,
+      constructionType: doc.constructionType,
+      frontViewImage: doc.frontViewImage,
+      sideViewImage: doc.sideViewImage,
+      pictorialViewImage: doc.pictorialViewImage
     };
   };
 

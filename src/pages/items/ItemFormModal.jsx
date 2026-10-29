@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { createItem, updateItem, getItemSpecifications, assignItemSpecification, updateItemSpecification, removeItemSpecification } from '../../services/itemService';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+  createItem, 
+  updateItem, 
+  getItemSpecifications, 
+  assignItemSpecification, 
+  updateItemSpecification, 
+  removeItemSpecification,
+  uploadItemImage,
+  removeItemImage
+} from '../../services/itemService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { getItemCategories, getCategorySpecifications } from '../../services/itemCategoryService';
 import { getFilterGrades } from '../../services/filterGradeService';
@@ -10,6 +19,15 @@ import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
 import DrawingSelector from '../../components/drawing/DrawingSelector';
+import { 
+  Image as ImageIcon, 
+  UploadCloud, 
+  Trash2, 
+  Eye, 
+  RefreshCw,
+  Camera,
+  X
+} from 'lucide-react';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
   RAW_ITEM: 'raw_material',
@@ -50,7 +68,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const isEditMode = !!item;
 
   const [activeTab, setActiveTab] = useState('basic'); // 'basic' | 'uom' | 'inventory' | 'specifications'
-  const [filterConstructionType, setFilterConstructionType] = useState(''); // 'BOX' | 'FLANGE' | ''
+  const [filterType, setFilterType] = useState(item?.filterType || ''); // 'HEPA' | 'PRE/FINE' | ''
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [previewImageModalOpen, setPreviewImageModalOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     itemCode: 'AUTO',
@@ -78,6 +100,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     drawingSnapshot: null,
     status: 'active',
     // Technical Filter Fields
+    filterType: item?.filterType || '',
+    imageUrl: item?.imageUrl || '',
+    imagePublicId: item?.imagePublicId || '',
     constructionType: '',
     moc: '',
     customMoc: '',
@@ -187,7 +212,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           }
         }
       }
-      setFilterConstructionType(initialConstruction);
 
       let initialMoc = item.moc || '';
       let initialCustomMoc = '';
@@ -221,6 +245,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         drawing: item.drawing?._id || item.drawing || '',
         drawingSnapshot: item.drawingSnapshot || null,
         status: item.status || 'active',
+        filterType: item.filterType || '',
+        imageUrl: item.imageUrl || '',
+        imagePublicId: item.imagePublicId || '',
         constructionType: item.constructionType || initialConstruction,
         moc: initialMoc,
         customMoc: initialCustomMoc,
@@ -232,6 +259,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         temperatureRating: item.temperatureRating !== null && item.temperatureRating !== undefined ? item.temperatureRating : (item.grade_items?.filterTemp ?? ''),
         bonding: item.bonding || '',
       });
+      setFilterType(item.filterType || '');
+      setImageError('');
 
       // Load existing item specification values
       getItemSpecifications(item._id).then((specRes) => {
@@ -269,7 +298,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
     } else {
       const pType = initialProductType || 'RAW_ITEM';
-      setFilterConstructionType('');
       setFormData({
         itemCode: 'AUTO',
         itemName: '',
@@ -295,6 +323,9 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         drawing: '',
         drawingSnapshot: null,
         status: 'active',
+        filterType: '',
+        imageUrl: '',
+        imagePublicId: '',
         constructionType: '',
         moc: '',
         customMoc: '',
@@ -306,6 +337,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         temperatureRating: '',
         bonding: '',
       });
+      setFilterType('');
+      setImageError('');
       setSpecsData({});
     }
 
@@ -346,27 +379,40 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       });
   }, [formData.itemCategory]);
 
-  // For edit mode: derive construction from filterGrades master data if not yet derived
+  // For edit mode: derive filterType if not set on item
   useEffect(() => {
-    if (!isEditMode || !item || filterConstructionType || (item.productType !== 'FILTER' && !item.filterGrade)) return;
-    if (!filterGrades.length || !item.filterGrade || !item.filterGradeVariant) return;
-
-    const fgId = item.filterGrade?._id || item.filterGrade;
-    const fg = filterGrades.find((f) => String(f._id) === String(fgId));
-    if (fg && Array.isArray(fg.variants)) {
-      const matched = fg.variants.find((v) => {
-        const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
-        const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||');
-        return item.filterGradeVariant === k1 || item.filterGradeVariant === k2;
-      });
-      if (matched) {
-        const c = getVariantConstruction(matched);
-        if (c === 'BOX' || c === 'FLANGE') {
-          setFilterConstructionType(c);
-        }
+    if (!isEditMode || !item || filterType) return;
+    if (item.filterType) {
+      setFilterType(item.filterType);
+    } else if (item.productType === 'FILTER' || item.filterGrade) {
+      const catName = (item.itemCategory?.categoryName || '').toUpperCase();
+      const catCode = (item.itemCategory?.categoryCode || '').toUpperCase();
+      if (catName.includes('HEPA') || catCode.includes('HEPA')) {
+        setFilterType('HEPA');
+      } else if (catName.includes('PRE') || catName.includes('FINE') || catCode.includes('PRE') || catCode.includes('FINE')) {
+        setFilterType('PRE/FINE');
       }
     }
-  }, [isEditMode, item, filterGrades, filterConstructionType]);
+  }, [isEditMode, item, filterType]);
+
+  // Auto-select Item Group as "Filter" when Product Type is FILTER
+  useEffect(() => {
+    if (formData.productType === 'FILTER' && itemGroups.length > 0) {
+      const filterGroup = itemGroups.find(
+        (g) =>
+          (g.name || g.groupName || '').toLowerCase() === 'filter' ||
+          g.groupCode === 'FILTER BOX' ||
+          g.groupCode === 'FILTER' ||
+          ((g.applicableProductTypes || []).includes('FILTER') && (g.name || '').toLowerCase().includes('filter'))
+      );
+      if (filterGroup && (!formData.itemGroup || (formData.itemGroup !== filterGroup._id && !isEditMode))) {
+        setFormData((prev) => ({
+          ...prev,
+          itemGroup: filterGroup._id,
+        }));
+      }
+    }
+  }, [formData.productType, itemGroups, isEditMode]);
 
   // Filtered groups: exclude system-generated groups and filter by applicable product types
   const availableGroups = itemGroups.filter((group) => {
@@ -381,34 +427,40 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     return true;
   });
 
-  // Filtered categories: by construction type when FILTER, or by applicableProductTypes for others
+  // Filtered categories: strictly by Filter Type (HEPA or PRE/FINE) when FILTER, or by applicableProductTypes for others
   const availableCategories = itemCategories.filter((cat) => {
-    // If productType is FILTER, strictly filter by construction type
+    // If productType is FILTER, strictly filter by selected Filter Type (HEPA or PRE/FINE)
     if (formData.productType === 'FILTER') {
-      if (!filterConstructionType) {
-        // Must select construction type first
+      if (!filterType) {
+        // Must select Filter Type first
         return false;
       }
-      const catCode = (cat.categoryCode || '').trim().toUpperCase();
-      if (filterConstructionType === 'BOX') {
-        if (!VERIFIED_BOX_CATEGORY_CODES.includes(catCode)) return false;
-      } else if (filterConstructionType === 'FLANGE') {
-        if (!VERIFIED_FLANGE_CATEGORY_CODES.includes(catCode)) return false;
-      } else {
-        return false;
+      const catName = (cat.categoryName || '').toUpperCase();
+      const catCode = (cat.categoryCode || '').toUpperCase();
+
+      if (filterType === 'HEPA') {
+        return catName.includes('HEPA') || catCode.includes('HEPA');
+      } else if (filterType === 'PRE/FINE' || filterType === 'PRE_FINE') {
+        return (
+          catName.includes('PRE') || 
+          catName.includes('FINE') || 
+          catCode.includes('PRE') || 
+          catCode.includes('FINE')
+        );
       }
+      return false;
     } else {
       // Non-Filter Product Types: Preserve existing group-level applicableProductTypes logic
       const parentGroup = typeof cat.itemGroup === 'object' ? cat.itemGroup : itemGroups.find((g) => String(g._id) === String(cat.itemGroup));
       if (parentGroup && parentGroup.applicableProductTypes && parentGroup.applicableProductTypes.length > 0) {
         if (!parentGroup.applicableProductTypes.includes(formData.productType)) return false;
       }
-    }
 
-    // If a group is already chosen, only show categories that belong to it
-    if (formData.itemGroup) {
-      const catGroupId = cat.itemGroup?._id || cat.itemGroup;
-      if (String(catGroupId) !== String(formData.itemGroup)) return false;
+      // If a group is already chosen, only show categories that belong to it
+      if (formData.itemGroup) {
+        const catGroupId = cat.itemGroup?._id || cat.itemGroup;
+        if (String(catGroupId) !== String(formData.itemGroup)) return false;
+      }
     }
 
     return true;
@@ -435,8 +487,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     const l = Number(formData.filterLength);
     const w = Number(formData.filterWidth);
     const d = Number(formData.filterDepth);
-    const isFlange = filterConstructionType === 'FLANGE';
-    const isBox = filterConstructionType === 'BOX';
+    const isFlange = formData.constructionType === 'FLANGE' || (formData.itemCategory && itemCategories.find(c => c._id === formData.itemCategory)?.categoryName?.toUpperCase().includes('FLANGE'));
+    const isBox = !isFlange;
 
     if (isFlange) {
       return {
@@ -459,7 +511,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     }
 
     return null;
-  }, [filterConstructionType, formData.filterLength, formData.filterWidth, formData.filterDepth]);
+  }, [formData.constructionType, formData.itemCategory, itemCategories, formData.filterLength, formData.filterWidth, formData.filterDepth]);
 
   // Non-blocking warning if temperature rating is outside the selected bonding range
   const temperatureWarning = useMemo(() => {
@@ -474,61 +526,106 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     return null;
   }, [formData.temperatureRating, formData.bonding]);
 
-  const handleConstructionChange = (e) => {
-    const newConstruction = e.target.value; // 'BOX' | 'FLANGE' | ''
-    setFilterConstructionType(newConstruction);
+  const handleFilterTypeChange = (e) => {
+    const newFilterType = e.target.value; // 'HEPA' | 'PRE/FINE' | ''
+    setFilterType(newFilterType);
 
     setFormData((prev) => {
       const next = {
         ...prev,
-        constructionType: newConstruction,
-        flangeType: newConstruction === 'FLANGE' ? prev.flangeType : ''
+        filterType: newFilterType,
       };
 
-      // Clear itemCategory if not compatible with newConstruction
+      // Clear itemCategory if not compatible with newFilterType
       if (prev.itemCategory) {
         const currentCat = itemCategories.find((c) => String(c._id) === String(prev.itemCategory));
-        const currentCatCode = (currentCat?.categoryCode || '').trim().toUpperCase();
-        const isCompatible =
-          (newConstruction === 'BOX' && VERIFIED_BOX_CATEGORY_CODES.includes(currentCatCode)) ||
-          (newConstruction === 'FLANGE' && VERIFIED_FLANGE_CATEGORY_CODES.includes(currentCatCode));
-
+        const catName = (currentCat?.categoryName || '').toUpperCase();
+        const catCode = (currentCat?.categoryCode || '').toUpperCase();
+        let isCompatible = false;
+        if (newFilterType === 'HEPA') {
+          isCompatible = catName.includes('HEPA') || catCode.includes('HEPA');
+        } else if (newFilterType === 'PRE/FINE') {
+          isCompatible = catName.includes('PRE') || catName.includes('FINE') || catCode.includes('PRE') || catCode.includes('FINE');
+        }
         if (!isCompatible) {
           next.itemCategory = '';
         }
       }
 
-      // Clear filterGradeVariant if not compatible with newConstruction
-      if (prev.filterGrade && prev.filterGradeVariant) {
-        const currentFg = filterGrades.find((fg) => String(fg._id) === String(prev.filterGrade));
-        const currentVariantObj = currentFg?.variants?.find((v) => {
-          const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
-          const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||');
-          return prev.filterGradeVariant === k1 || prev.filterGradeVariant === k2;
-        });
-
-        if (currentVariantObj) {
-          const vConstruction = getVariantConstruction(currentVariantObj);
-          if (vConstruction !== newConstruction) {
-            next.filterGradeVariant = '';
-          }
-        } else {
-          next.filterGradeVariant = '';
-        }
-      }
-
-      // Check if current filterGrade has any variants matching newConstruction
-      if (prev.filterGrade && newConstruction) {
-        const currentFg = filterGrades.find((fg) => String(fg._id) === String(prev.filterGrade));
-        const hasMatchingVariant = currentFg?.variants?.some((v) => getVariantConstruction(v) === newConstruction);
-        if (!hasMatchingVariant) {
-          next.filterGrade = '';
-          next.filterGradeVariant = '';
-        }
+      // Auto-select filter group if not set
+      if (!next.itemGroup && itemGroups.length > 0) {
+        const filterGroup = itemGroups.find(
+          (g) =>
+            (g.name || g.groupName || '').toLowerCase() === 'filter' ||
+            g.groupCode === 'FILTER BOX' ||
+            g.groupCode === 'FILTER'
+        );
+        if (filterGroup) next.itemGroup = filterGroup._id;
       }
 
       return next;
     });
+  };
+
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+    const originalNameLower = (file.name || '').toLowerCase();
+    const hasAllowedExt = ['.png', '.jpg', '.jpeg', '.webp', '.svg'].some((ext) => originalNameLower.endsWith(ext));
+
+    if (!allowedTypes.includes(file.type) && !hasAllowedExt) {
+      setImageError('Only PNG, JPG, JPEG, WEBP, or SVG images are allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image file size must not exceed 5 MB.');
+      return;
+    }
+
+    setImageError('');
+    setUploadingImage(true);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append('image', file);
+
+      const res = await uploadItemImage(uploadData, item?._id || null);
+      if (res.success && res.imageUrl) {
+        setFormData((prev) => ({
+          ...prev,
+          imageUrl: res.imageUrl,
+          imagePublicId: res.imagePublicId || '',
+        }));
+      } else {
+        setImageError(res.message || 'Failed to upload image.');
+      }
+    } catch (err) {
+      console.error('Item image upload error:', err);
+      setImageError(err.response?.data?.message || err.message || 'Image upload failed.');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (isEditMode && item?._id && formData.imagePublicId) {
+      try {
+        await removeItemImage(item._id);
+      } catch (err) {
+        console.warn('Could not remove remote image asset:', err);
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      imageUrl: '',
+      imagePublicId: '',
+    }));
+    setImageError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleChange = (e) => {
@@ -543,8 +640,20 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
         if (PRODUCT_TYPE_TO_ITEM_TYPE[value]) {
           next.itemType = PRODUCT_TYPE_TO_ITEM_TYPE[value];
         }
-        if (value !== 'FILTER') {
-          setFilterConstructionType('');
+        if (value === 'FILTER') {
+          // Auto-select Filter group
+          const filterGroup = itemGroups.find(
+            (g) =>
+              (g.name || g.groupName || '').toLowerCase() === 'filter' ||
+              g.groupCode === 'FILTER BOX' ||
+              g.groupCode === 'FILTER'
+          );
+          if (filterGroup) {
+            next.itemGroup = filterGroup._id;
+          }
+        } else {
+          setFilterType('');
+          next.filterType = '';
           next.constructionType = '';
           next.flangeType = '';
           next.filterGrade = '';
@@ -653,8 +762,8 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     
     // Filter validation
     if (formData.productType === 'FILTER') {
-      if (!filterConstructionType) {
-        return 'Filter Construction Type (BOX or FLANGE) is required for Filter items.';
+      if (!filterType) {
+        return 'Filter Type (HEPA or PRE/FINE) is required for Filter items.';
       }
       if (formData.filterGrade && !formData.filterGradeVariant) {
         return 'Filter Grade Variant is required when a Filter Grade is selected.';
@@ -727,15 +836,18 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
       const submitPayload = {
         ...formData,
+        filterType: formData.productType === 'FILTER' ? filterType : '',
+        imageUrl: formData.imageUrl || '',
+        imagePublicId: formData.imagePublicId || '',
         moc: finalMoc,
-        constructionType: formData.productType === 'FILTER' ? filterConstructionType : '',
-        flangeType: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' ? (formData.flangeType || null) : null,
+        constructionType: formData.productType === 'FILTER' ? (formData.constructionType || '') : '',
+        flangeType: formData.productType === 'FILTER' && formData.constructionType === 'FLANGE' ? (formData.flangeType || null) : null,
         filterLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
         filterWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
         filterDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
-        overallFlangeLength: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterLength !== '' ? Number(formData.filterLength) + 60 : null,
-        overallFlangeWidth: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterWidth !== '' ? Number(formData.filterWidth) + 60 : null,
-        overallFlangeDepth: formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+        overallFlangeLength: formData.productType === 'FILTER' && formData.constructionType === 'FLANGE' && formData.filterLength !== '' ? Number(formData.filterLength) + 60 : null,
+        overallFlangeWidth: formData.productType === 'FILTER' && formData.constructionType === 'FLANGE' && formData.filterWidth !== '' ? Number(formData.filterWidth) + 60 : null,
+        overallFlangeDepth: formData.productType === 'FILTER' && formData.constructionType === 'FLANGE' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
         faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
         temperatureRating: formData.productType === 'FILTER' && formData.temperatureRating !== '' ? Number(formData.temperatureRating) : null,
         bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
@@ -918,19 +1030,19 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
             {formData.productType === 'FILTER' ? (
               <FormField
-                label="Filter Construction Type"
+                label="Filter Type"
                 required
-                helperText="Select filter construction style (BOX or FLANGE)."
+                helperText="Select Filter Type (HEPA or PRE/FINE) to view matching item categories."
               >
                 <Select
-                  name="filterConstructionType"
-                  value={filterConstructionType}
-                  onChange={handleConstructionChange}
+                  name="filterType"
+                  value={filterType}
+                  onChange={handleFilterTypeChange}
                   disabled={submitting}
                 >
-                  <option value="">-- Select Construction --</option>
-                  <option value="BOX">BOX</option>
-                  <option value="FLANGE">FLANGE</option>
+                  <option value="">-- Select Filter Type --</option>
+                  <option value="HEPA">HEPA</option>
+                  <option value="PRE/FINE">PRE/FINE</option>
                 </Select>
               </FormField>
             ) : (
@@ -969,31 +1081,31 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               />
             </FormField>
 
-            {/* Item Category first — Item Group auto-derives from selection */}
+            {/* Item Category first — filtered strictly according to Filter Type for Filter items */}
             <FormField
               label="Item Category"
               required
               helperText={
-                formData.productType === 'FILTER' && !filterConstructionType
-                  ? '⚠️ Please select Filter Construction Type above first.'
-                  : formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && availableCategories.length === 0
-                  ? '⚠️ No categories found for FLANGE construction in master data. Please create a FLANGE category in Item Categories or select BOX.'
+                formData.productType === 'FILTER' && !filterType
+                  ? '⚠️ Please select Filter Type above first.'
+                  : formData.productType === 'FILTER' && availableCategories.length === 0
+                  ? `⚠️ No categories found for ${filterType} filter type. Please create a ${filterType} category in Item Categories.`
                   : formData.itemGroup && availableCategories.length === 0
                   ? '⚠️ No categories found under this group. Select another group or create a category first.'
-                  : 'Select category — Item Group will be set automatically.'
+                  : 'Select category for this item.'
               }
             >
               <Select
                 name="itemCategory"
                 value={formData.itemCategory}
                 onChange={handleChange}
-                disabled={submitting || loadingData || (formData.productType === 'FILTER' && (!filterConstructionType || availableCategories.length === 0))}
+                disabled={submitting || loadingData || (formData.productType === 'FILTER' && (!filterType || availableCategories.length === 0))}
               >
                 <option value="">
-                  {formData.productType === 'FILTER' && !filterConstructionType
-                    ? '-- Select Construction Type First --'
-                    : formData.productType === 'FILTER' && filterConstructionType === 'FLANGE' && availableCategories.length === 0
-                    ? '-- No Categories Available for FLANGE --'
+                  {formData.productType === 'FILTER' && !filterType
+                    ? '-- Select Filter Type First --'
+                    : formData.productType === 'FILTER' && availableCategories.length === 0
+                    ? `-- No Categories Available for ${filterType} --`
                     : '-- Select Item Category --'}
                 </option>
                 {availableCategories.map((c) => (
@@ -1097,10 +1209,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
               const selectedVariantObj = selectedFg?.variants?.find(
                 v => getVariantKey(v) === formData.filterGradeVariant || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === formData.filterGradeVariant
               );
-              const matchingVariants = (selectedFg?.variants || []).filter((v) => {
-                if (!filterConstructionType) return true;
-                return getVariantConstruction(v) === filterConstructionType;
-              });
+              const matchingVariants = selectedFg?.variants || [];
               
               return (
                 <div className="col-span-full border border-blue-200 bg-blue-50 p-4 rounded-md mt-2">
@@ -1126,24 +1235,20 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                         label="Filter Grade Variant"
                         required
                         helperText={
-                          !filterConstructionType
-                            ? 'Please select Filter Construction Type above first.'
-                            : matchingVariants.length === 0
-                            ? `No ${filterConstructionType} variants available for ${selectedFg.filterGrade}.`
-                            : `Select the technical variant for this grade (${filterConstructionType} construction)`
+                          matchingVariants.length === 0
+                            ? `No variants available for ${selectedFg.filterGrade}.`
+                            : `Select the technical variant for this grade`
                         }
                       >
                         <Select
                           name="filterGradeVariant"
                           value={formData.filterGradeVariant}
                           onChange={handleChange}
-                          disabled={submitting || loadingData || !filterConstructionType || matchingVariants.length === 0}
+                          disabled={submitting || loadingData || matchingVariants.length === 0}
                         >
                           <option value="">
-                            {!filterConstructionType
-                              ? '-- Select Construction Type Above First --'
-                              : matchingVariants.length === 0
-                              ? `-- No ${filterConstructionType} Variants Available --`
+                            {matchingVariants.length === 0
+                              ? `-- No Variants Available --`
                               : '-- Select Variant --'}
                           </option>
                           {matchingVariants.map((v, i) => {
@@ -1233,6 +1338,83 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </Select>
+            </FormField>
+
+            {/* Image Uploadation right beside Status */}
+            <FormField 
+              label="Item Image" 
+              helperText={
+                uploadingImage 
+                  ? 'Uploading image to cloud...' 
+                  : formData.imageUrl 
+                  ? 'Image uploaded. Click Replace or Remove to update.' 
+                  : 'Upload product photo (PNG, JPG, WEBP, SVG max 5MB).'
+              }
+            >
+              <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2 rounded-md">
+                {formData.imageUrl ? (
+                  <div className="relative group w-14 h-14 rounded border border-slate-300 overflow-hidden bg-white shrink-0 shadow-2xs">
+                    <img
+                      src={formData.imageUrl}
+                      alt={formData.itemName || 'Item'}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageModalOpen(true)}
+                        className="p-1 bg-white/90 rounded text-slate-700 hover:text-slate-900 cursor-pointer"
+                        title="View image"
+                      >
+                        <Eye size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-slate-400 shrink-0">
+                    <ImageIcon size={18} />
+                    <span className="text-[8px] mt-0.5 font-medium">No Image</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageFileChange}
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      icon={uploadingImage ? RefreshCw : (formData.imageUrl ? RefreshCw : UploadCloud)}
+                      disabled={uploadingImage || submitting}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {uploadingImage ? 'Uploading...' : formData.imageUrl ? 'Replace' : 'Upload'}
+                    </Button>
+                    {formData.imageUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-200"
+                        icon={Trash2}
+                        disabled={uploadingImage || submitting}
+                        onClick={handleRemoveImage}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {imageError && (
+                    <span className="text-[11px] text-red-600 font-medium">{imageError}</span>
+                  )}
+                </div>
+              </div>
             </FormField>
 
             <FormField label="Item Description" fullWidth helperText="Additional specifications or usage notes.">
@@ -1520,7 +1702,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                   </div>
 
                   {/* Overall Dimensions Card based on Construction Type */}
-                  {filterConstructionType === 'FLANGE' && (
+                  {overallDims?.isFlange && (
                     <div className="mt-4 border border-blue-200 bg-blue-50/70 p-3.5 rounded-md">
                       <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-blue-200">
                         <div className="text-xs font-bold text-blue-900 uppercase">
@@ -1559,7 +1741,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
                     </div>
                   )}
 
-                  {filterConstructionType === 'BOX' && (
+                  {overallDims?.isBox && (
                     <div className="mt-4 border border-slate-200 bg-slate-100/60 p-3.5 rounded-md">
                       <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-200">
                         <div className="text-xs font-bold text-slate-800 uppercase">
@@ -1910,6 +2092,29 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
           </div>
         )}
       </form>
+
+      {/* Image Preview Lightbox Modal */}
+      {previewImageModalOpen && formData.imageUrl && (
+        <Modal
+          isOpen={previewImageModalOpen}
+          onClose={() => setPreviewImageModalOpen(false)}
+          title={`Image Preview — ${formData.itemName || formData.itemCode}`}
+          size="lg"
+          footer={
+            <Button variant="secondary" onClick={() => setPreviewImageModalOpen(false)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="flex flex-col items-center justify-center p-4 bg-slate-900 rounded-lg">
+            <img
+              src={formData.imageUrl}
+              alt={formData.itemName || 'Item Image'}
+              className="max-h-[65vh] w-auto max-w-full rounded object-contain shadow-lg"
+            />
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };

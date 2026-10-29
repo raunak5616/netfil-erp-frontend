@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getSalesOrders, updateSalesOrderStatus } from '../../services/salesOrderService';
+import { 
+  getSalesOrders, 
+  updateSalesOrderStatus,
+  getSalesOrderDeliveryAlertsSummary,
+  dismissSalesOrderDeliveryAlert
+} from '../../services/salesOrderService';
 import { getClients } from '../../services/clientService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -28,13 +33,21 @@ import {
   Ban,
   RotateCcw,
   Paperclip,
-  Printer
+  Printer,
+  Bell,
+  AlertTriangle,
+  Calendar,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Truck
 } from 'lucide-react';
 
 const SalesOrderList = () => {
   const { hasPermission } = useAuth();
   const [searchParams] = useSearchParams();
   const urlStatus = searchParams.get('status')?.toLowerCase();
+  const urlSOId = searchParams.get('id');
 
   const canCreate = hasPermission('SALES_ORDER_CREATE');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
@@ -44,6 +57,19 @@ const SalesOrderList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+
+  // Delivery Reminders & Alerts State
+  const [deliverySummary, setDeliverySummary] = useState({
+    overdueCount: 0,
+    dueTodayCount: 0,
+    upcomingCount: 0,
+    totalAlerts: 0,
+  });
+  const [deliveryAlerts, setDeliveryAlerts] = useState([]);
+  const [isAlertCenterExpanded, setIsAlertCenterExpanded] = useState(true);
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
+  const [syncingAlerts, setSyncingAlerts] = useState(false);
+  const [dismissingId, setDismissingId] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,18 +95,56 @@ const SalesOrderList = () => {
   const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
   const [drawingWorkspaceSOId, setDrawingWorkspaceSOId] = useState(null);
 
-  const fetchSalesOrdersData = async () => {
+  // Auto-open detail modal if navigated with ?id=
+  useEffect(() => {
+    if (urlSOId) {
+      setSelectedSOId(urlSOId);
+      setIsDetailOpen(true);
+    }
+  }, [urlSOId]);
+
+  const fetchDeliveryAlerts = async () => {
+    try {
+      const res = await getSalesOrderDeliveryAlertsSummary();
+      if (res.success) {
+        setDeliverySummary(
+          res.summary || {
+            overdueCount: 0,
+            dueTodayCount: 0,
+            upcomingCount: 0,
+            totalAlerts: 0,
+          }
+        );
+        setDeliveryAlerts(res.alerts?.deliveryAlerts || []);
+      }
+    } catch (err) {
+      console.error('Failed to load delivery alerts summary:', err);
+    }
+  };
+
+  const fetchSalesOrdersData = async (overrides = {}) => {
     setLoading(true);
     setError('');
     try {
-      const params = { page, limit };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (clientFilter !== 'all') params.client = clientFilter;
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (typeFilter !== 'all') params.orderType = typeFilter;
-      if (categoryFilter !== 'all') params.orderCategory = categoryFilter;
-      if (fromDate) params.from = fromDate;
-      if (toDate) params.to = toDate;
+      const activeSearch = overrides.search !== undefined ? overrides.search : searchTerm;
+      const activeClient = overrides.client !== undefined ? overrides.client : clientFilter;
+      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
+      const activeType = overrides.orderType !== undefined ? overrides.orderType : typeFilter;
+      const activeCategory = overrides.orderCategory !== undefined ? overrides.orderCategory : categoryFilter;
+      const activeFrom = overrides.from !== undefined ? overrides.from : fromDate;
+      const activeTo = overrides.to !== undefined ? overrides.to : toDate;
+      const activeDeliveryStatus = overrides.deliveryStatus !== undefined ? overrides.deliveryStatus : deliveryStatusFilter;
+      const activePage = overrides.page !== undefined ? overrides.page : page;
+
+      const params = { page: activePage, limit };
+      if (activeSearch.trim()) params.search = activeSearch.trim();
+      if (activeClient !== 'all') params.client = activeClient;
+      if (activeStatus !== 'all') params.status = activeStatus;
+      if (activeType !== 'all') params.orderType = activeType;
+      if (activeCategory !== 'all') params.orderCategory = activeCategory;
+      if (activeFrom) params.from = activeFrom;
+      if (activeTo) params.to = activeTo;
+      if (activeDeliveryStatus !== 'all') params.deliveryStatus = activeDeliveryStatus;
 
       const soRes = await getSalesOrders(params);
 
@@ -100,7 +164,8 @@ const SalesOrderList = () => {
 
   useEffect(() => {
     fetchSalesOrdersData();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, page]);
+    fetchDeliveryAlerts();
+  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deliveryStatusFilter, page]);
 
   const loadClientOptions = async (inputValue) => {
     try {
@@ -121,7 +186,7 @@ const SalesOrderList = () => {
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
     setPage(1);
-    fetchSalesOrdersData();
+    fetchSalesOrdersData({ page: 1 });
   };
 
   const handleResetFilters = () => {
@@ -132,7 +197,51 @@ const SalesOrderList = () => {
     setCategoryFilter('all');
     setFromDate('');
     setToDate('');
+    setDeliveryStatusFilter('all');
     setPage(1);
+    fetchSalesOrdersData({
+      search: '',
+      client: 'all',
+      status: 'all',
+      orderType: 'all',
+      orderCategory: 'all',
+      from: '',
+      to: '',
+      deliveryStatus: 'all',
+      page: 1,
+    });
+  };
+
+  const handleKpiCardClick = (targetStatus) => {
+    const nextVal = deliveryStatusFilter === targetStatus ? 'all' : targetStatus;
+    setDeliveryStatusFilter(nextVal);
+    setPage(1);
+    fetchSalesOrdersData({ page: 1, deliveryStatus: nextVal });
+  };
+
+  const handleSyncAlerts = async () => {
+    setSyncingAlerts(true);
+    try {
+      await Promise.all([fetchDeliveryAlerts(), fetchSalesOrdersData()]);
+    } finally {
+      setSyncingAlerts(false);
+    }
+  };
+
+  const handleDismissAlert = async (salesOrderId) => {
+    setDismissingId(salesOrderId);
+    try {
+      await dismissSalesOrderDeliveryAlert(salesOrderId);
+      setDeliveryAlerts((prev) => prev.filter((a) => a.salesOrderId !== salesOrderId));
+      setDeliverySummary((prev) => ({
+        ...prev,
+        totalAlerts: Math.max(0, prev.totalAlerts - 1),
+      }));
+    } catch (err) {
+      console.error('Failed to dismiss delivery alert:', err);
+    } finally {
+      setDismissingId(null);
+    }
   };
 
   const hasActiveFilters =
@@ -142,7 +251,8 @@ const SalesOrderList = () => {
     typeFilter !== 'all' ||
     categoryFilter !== 'all' ||
     fromDate !== '' ||
-    toDate !== '';
+    toDate !== '' ||
+    deliveryStatusFilter !== 'all';
 
   const handleQuickStatusChange = async (so, newStatus) => {
     if (so.status === newStatus) return;
@@ -155,6 +265,7 @@ const SalesOrderList = () => {
       const res = await updateSalesOrderStatus(so._id, newStatus);
       if (res.success) {
         fetchSalesOrdersData();
+        fetchDeliveryAlerts();
       } else {
         setError(res.message || 'Failed to update status');
       }
@@ -164,6 +275,59 @@ const SalesOrderList = () => {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const getDeliveryBadgeInfo = (dateVal, orderStatus) => {
+    if (orderStatus === 'completed') {
+      return {
+        label: 'Delivered',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold',
+      };
+    }
+    if (orderStatus === 'cancelled') {
+      return {
+        label: 'Cancelled',
+        className: 'bg-slate-100 text-slate-500 border-slate-200',
+      };
+    }
+    if (!dateVal) {
+      return {
+        label: 'No Delivery Date',
+        className: 'bg-slate-100 text-slate-500 border-slate-200',
+      };
+    }
+
+    const target = new Date(dateVal);
+    if (isNaN(target.getTime())) {
+      return { label: 'No Delivery Date', className: 'bg-slate-100 text-slate-500 border-slate-200' };
+    }
+
+    const now = new Date();
+    const diffDays = Math.round((new Date(target.toDateString()) - new Date(now.toDateString())) / (24 * 60 * 60 * 1000));
+
+    if (diffDays < 0) {
+      const absDays = Math.abs(diffDays);
+      return {
+        label: absDays === 1 ? 'Overdue (1d)' : `Overdue (${absDays}d)`,
+        className: 'bg-rose-50 text-rose-700 border-rose-200 font-bold',
+      };
+    }
+    if (diffDays === 0) {
+      return {
+        label: 'Due Today',
+        className: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
+      };
+    }
+    if (diffDays <= 3) {
+      return {
+        label: diffDays === 1 ? 'Due Tomorrow' : `Due in ${diffDays}d`,
+        className: 'bg-blue-50 text-blue-700 border-blue-200 font-semibold',
+      };
+    }
+    return {
+      label: `In ${diffDays}d`,
+      className: 'bg-slate-50 text-slate-600 border-slate-200 font-medium',
+    };
   };
 
   const columns = useMemo(
@@ -195,6 +359,26 @@ const SalesOrderList = () => {
             {val ? new Date(val).toLocaleDateString('en-GB') : '-'}
           </span>
         )
+      },
+      {
+        key: 'expectedDeliveryDate',
+        header: 'Expected Delivery',
+        sortable: true,
+        render: (val, row) => {
+          const badge = getDeliveryBadgeInfo(val, row.status);
+          return (
+            <div className="whitespace-nowrap">
+              <div className="font-medium text-slate-800 text-[12.5px]">
+                {val ? new Date(val).toLocaleDateString('en-GB') : '—'}
+              </div>
+              <span
+                className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] border ${badge.className}`}
+              >
+                {badge.label}
+              </span>
+            </div>
+          );
+        }
       },
       {
         key: 'client',
@@ -417,6 +601,199 @@ const SalesOrderList = () => {
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
+      {/* 1. DELIVERY ALERT KPI CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Overdue / Delayed Delivery Card */}
+        <div
+          onClick={() => handleKpiCardClick('delayed')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deliveryStatusFilter === 'delayed' || deliveryStatusFilter === 'overdue'
+              ? 'ring-2 ring-rose-500 border-rose-400 bg-rose-50/30'
+              : 'border-slate-200 hover:border-rose-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+              <AlertTriangle size={14} className="text-rose-600" /> Delayed Delivery
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-rose-100 text-rose-800">
+              Overdue
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {deliverySummary.overdueCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">orders</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deliveryStatusFilter === 'delayed' || deliveryStatusFilter === 'overdue'
+              ? 'Active filter (click to reset)'
+              : 'Click to filter delayed orders'}
+          </div>
+        </div>
+
+        {/* Delivery Due Today Card */}
+        <div
+          onClick={() => handleKpiCardClick('due_today')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deliveryStatusFilter === 'due_today'
+              ? 'ring-2 ring-amber-500 border-amber-400 bg-amber-50/30'
+              : 'border-slate-200 hover:border-amber-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+              <Clock size={14} className="text-amber-600" /> Due Today
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-amber-100 text-amber-900">
+              Immediate
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {deliverySummary.dueTodayCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">orders</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deliveryStatusFilter === 'due_today'
+              ? 'Active filter (click to reset)'
+              : 'Click to filter today’s due orders'}
+          </div>
+        </div>
+
+        {/* Upcoming Delivery Card (1-3 Days) */}
+        <div
+          onClick={() => handleKpiCardClick('upcoming')}
+          className={`cursor-pointer transition-all p-3.5 rounded-lg border bg-white shadow-2xs hover:shadow-xs ${
+            deliveryStatusFilter === 'upcoming' || deliveryStatusFilter === 'upcoming_3_days'
+              ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/30'
+              : 'border-slate-200 hover:border-blue-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11.5px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+              <Truck size={14} className="text-blue-600" /> Upcoming (1–3 Days)
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.2 rounded font-semibold bg-blue-100 text-blue-800">
+              Approaching
+            </span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900 font-mono">
+              {deliverySummary.upcomingCount || 0}
+            </span>
+            <span className="text-xs text-slate-500">orders</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-1 truncate">
+            {deliveryStatusFilter === 'upcoming' || deliveryStatusFilter === 'upcoming_3_days'
+              ? 'Active filter (click to reset)'
+              : 'Click to filter next 3 days'}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. IN-PAGE ACTION CENTER & DELIVERY ALERTS DRAWER */}
+      {deliveryAlerts.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+          {/* Header Bar */}
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Bell size={14} className="text-primary-600" /> Sales Order Delivery Alerts ({deliveryAlerts.length})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncAlerts}
+                disabled={syncingAlerts}
+                className="text-[11.5px] text-slate-600 hover:text-primary-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-200/60 transition-colors"
+                title="Synchronize delivery alert status"
+              >
+                <RefreshCw size={12} className={syncingAlerts ? 'spin' : ''} />
+                <span>Sync</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAlertCenterExpanded(!isAlertCenterExpanded)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
+                title={isAlertCenterExpanded ? 'Collapse' : 'Expand'}
+              >
+                {isAlertCenterExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Drawer Body */}
+          {isAlertCenterExpanded && (
+            <div className="p-3 max-h-64 overflow-y-auto space-y-2">
+              {deliveryAlerts.map((alert) => (
+                <div
+                  key={alert.salesOrderId}
+                  className="p-2.5 bg-slate-50/80 hover:bg-slate-100/70 border border-slate-200 rounded-md flex flex-wrap items-center justify-between gap-2 text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-[280px]">
+                    <span className="font-mono font-bold text-blue-700">{alert.salesOrderNo}</span>
+                    <span className="font-medium text-slate-900">{alert.clientName || 'Customer'}</span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-600">
+                      Delivery: <strong>{new Date(alert.expectedDeliveryDate).toLocaleDateString('en-GB')}</strong>
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        alert.category === 'DELAYED'
+                          ? 'bg-rose-100 text-rose-800'
+                          : alert.category === 'DUE_TODAY'
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      {alert.category === 'DELAYED'
+                        ? `DELAYED (${alert.daysOverdue}d)`
+                        : alert.category === 'DUE_TODAY'
+                        ? 'DUE TODAY'
+                        : `DUE IN ${alert.daysRemaining}d`}
+                    </span>
+                    <span className="text-slate-500 italic text-[11px]">
+                      "{alert.message}"
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11.5px] text-slate-500">
+                    <span className="capitalize">Status: {alert.status?.replace('_', ' ')}</span>
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSOId(alert.salesOrderId);
+                          setDetailInitialTab('details');
+                          setIsDetailOpen(true);
+                        }}
+                        className="px-2 py-0.5 rounded bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium"
+                      >
+                        Open Order
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDismissAlert(alert.salesOrderId)}
+                        disabled={dismissingId === alert.salesOrderId}
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+                        title="Dismiss alert"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Filter Controls Toolbar */}
         <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 mb-4">
@@ -461,6 +838,25 @@ const SalesOrderList = () => {
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
+              </Select>
+            </div>
+
+            {/* Delivery Status Dropdown */}
+            <div className="w-[160px]">
+              <Select
+                value={deliveryStatusFilter}
+                onChange={(e) => {
+                  setDeliveryStatusFilter(e.target.value);
+                  setPage(1);
+                  fetchSalesOrdersData({ page: 1, deliveryStatus: e.target.value });
+                }}
+                title="Filter by Delivery Status"
+              >
+                <option value="all">All Deliveries</option>
+                <option value="delayed">Delayed / Overdue</option>
+                <option value="due_today">Due Today</option>
+                <option value="upcoming">Upcoming (1–3 Days)</option>
+                <option value="no_date">No Delivery Date</option>
               </Select>
             </div>
 

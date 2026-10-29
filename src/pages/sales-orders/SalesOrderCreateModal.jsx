@@ -136,7 +136,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
             drawing: it.drawing?._id || it.drawing || null,
             drawingSnapshot: it.drawingSnapshot || null,
             filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
-            filterGradeName: it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.drawingSnapshot?.filterGradeName || '',
+            filterGradeName: it.filterGradeName || it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.item?.drawingSnapshot?.filterGradeName || it.drawingSnapshot?.filterGradeName || '',
             hsnCode: it.hsnCode || it.dimensions?.hsnCode || '',
             dimensions: it.dimensions ? { ...it.dimensions } : {},
             specifications: Array.isArray(it.specifications) ? [...it.specifications] : []
@@ -348,6 +348,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
         drawing: it.drawing?._id || it.drawing || null,
         drawingSnapshot: it.drawingSnapshot || null,
         filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
+        filterGradeName: it.filterGradeName || it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.item?.drawingSnapshot?.filterGradeName || it.drawingSnapshot?.filterGradeName || '',
         dimensions: it.dimensions || {},
         specifications: it.specifications || [],
         remarks: it.remarks || '',

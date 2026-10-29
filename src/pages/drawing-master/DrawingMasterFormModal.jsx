@@ -26,7 +26,8 @@ import {
   Sparkles,
   ShieldCheck,
   Plus,
-  CheckCircle2
+  CheckCircle2,
+  Disc
 } from 'lucide-react';
 
 const DrawingMasterFormModal = ({
@@ -97,9 +98,23 @@ const DrawingMasterFormModal = ({
   const [showAddCustomHole, setShowAddCustomHole] = useState(false);
 
   const [filterGradesList, setFilterGradesList] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [filePreview, setFilePreview] = useState(null);
-  const [fileType, setFileType] = useState('image');
+
+  // Three-view filter drawing state
+  const [frontFile, setFrontFile] = useState(null);
+  const [frontPreview, setFrontPreview] = useState(null);
+  const [frontFileType, setFrontFileType] = useState('image');
+
+  const [sideFile, setSideFile] = useState(null);
+  const [sidePreview, setSidePreview] = useState(null);
+  const [sideFileType, setSideFileType] = useState('image');
+
+  const [picFile, setPicFile] = useState(null);
+  const [picPreview, setPicPreview] = useState(null);
+  const [picFileType, setPicFileType] = useState('image');
+
+  const frontInputRef = useRef(null);
+  const sideInputRef = useRef(null);
+  const picInputRef = useRef(null);
 
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -109,7 +124,6 @@ const DrawingMasterFormModal = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [gradeSearch, setGradeSearch] = useState('');
   const dropdownRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -205,16 +219,23 @@ const DrawingMasterFormModal = ({
         isDefault: initDefaults.length > 0 || Boolean(initialData.isDefault),
         status: initialData.status || 'active'
       });
-      setSelectedFile(null);
 
-      const effectiveUrl = initialData.holeImageUrl || initialData.fileUrl || initialData.referenceImage || initialData.referenceDrawing;
-      if (effectiveUrl) {
-        setFilePreview(effectiveUrl);
-        const isPdf = initialData.format === 'pdf' || effectiveUrl.toLowerCase().endsWith('.pdf');
-        setFileType(isPdf ? 'pdf' : 'image');
-      } else {
-        setFilePreview(null);
-      }
+      // Populate Three Views
+      const frontUrl = initialData.frontViewImage?.url || initialData.fileUrl || initialData.holeImageUrl || initialData.referenceImage || initialData.referenceDrawing || null;
+      const sideUrl = initialData.sideViewImage?.url || null;
+      const picUrl = initialData.pictorialViewImage?.url || null;
+
+      setFrontFile(null);
+      setFrontPreview(frontUrl);
+      setFrontFileType(frontUrl && (frontUrl.toLowerCase().endsWith('.pdf') || initialData.format === 'pdf') ? 'pdf' : 'image');
+
+      setSideFile(null);
+      setSidePreview(sideUrl);
+      setSideFileType(sideUrl && sideUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image');
+
+      setPicFile(null);
+      setPicPreview(picUrl);
+      setPicFileType(picUrl && picUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image');
     } else {
       const cat = resolveInitialCategory();
       const dt = resolveInitialType();
@@ -234,9 +255,17 @@ const DrawingMasterFormModal = ({
         isDefault: false,
         status: 'active'
       });
-      setSelectedFile(null);
-      setFilePreview(null);
-      setFileType('image');
+      setFrontFile(null);
+      setFrontPreview(null);
+      setFrontFileType('image');
+
+      setSideFile(null);
+      setSidePreview(null);
+      setSideFileType('image');
+
+      setPicFile(null);
+      setPicPreview(null);
+      setPicFileType('image');
     }
     setError('');
     setGradeSearch('');
@@ -373,51 +402,61 @@ const DrawingMasterFormModal = ({
     }));
   };
 
-  // Handle file selection (with format and size validation)
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
+  // Handle view file selection (Section A: Front, Section B: Side, Section C: 3D/Pictorial)
+  const handleViewFileChange = (viewKey, file) => {
     if (!file) return;
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml', 'application/pdf'];
     const ext = file.name.split('.').pop().toLowerCase();
     const isAllowedExt = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'pdf'].includes(ext);
 
+    const viewLabel = viewKey === 'front' ? 'Front View' : viewKey === 'side' ? 'Side View' : '3D / Pictorial View';
+
     if (!allowedTypes.includes(file.type) && !isAllowedExt) {
-      setError('Invalid file type. Please upload a PNG, JPG, JPEG, WEBP, SVG, or PDF file.');
+      setError(`Invalid file type for ${viewLabel}. Please upload a PNG, JPG, JPEG, WEBP, or SVG file.`);
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setError('File size exceeds the 10 MB limit.');
+      setError(`File size for ${viewLabel} exceeds the 10 MB limit.`);
       return;
     }
 
     setError('');
-    setSelectedFile(file);
-
     const isPdf = file.type === 'application/pdf' || ext === 'pdf';
-    setFileType(isPdf ? 'pdf' : 'image');
+    const previewUrl = isPdf ? file.name : URL.createObjectURL(file);
 
-    if (isPdf) {
-      setFilePreview(file.name);
-    } else {
-      const objectUrl = URL.createObjectURL(file);
-      setFilePreview(objectUrl);
+    if (viewKey === 'front') {
+      setFrontFile(file);
+      setFrontPreview(previewUrl);
+      setFrontFileType(isPdf ? 'pdf' : 'image');
+    } else if (viewKey === 'side') {
+      setSideFile(file);
+      setSidePreview(previewUrl);
+      setSideFileType(isPdf ? 'pdf' : 'image');
+    } else if (viewKey === 'pic') {
+      setPicFile(file);
+      setPicPreview(previewUrl);
+      setPicFileType(isPdf ? 'pdf' : 'image');
     }
   };
 
-  const handleRemoveSelectedFile = () => {
-    setSelectedFile(null);
-    if (isEdit && (initialData?.holeImageUrl || initialData?.fileUrl)) {
-      const existing = initialData.holeImageUrl || initialData.fileUrl;
-      setFilePreview(existing);
-      const isPdf = initialData.format === 'pdf' || existing.toLowerCase().endsWith('.pdf');
-      setFileType(isPdf ? 'pdf' : 'image');
-    } else {
-      setFilePreview(null);
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleRemoveViewFile = (viewKey) => {
+    if (viewKey === 'front') {
+      setFrontFile(null);
+      const existing = initialData?.frontViewImage?.url || initialData?.fileUrl || initialData?.holeImageUrl || initialData?.referenceImage || null;
+      setFrontPreview(isEdit ? existing : null);
+      if (frontInputRef.current) frontInputRef.current.value = '';
+    } else if (viewKey === 'side') {
+      setSideFile(null);
+      const existing = initialData?.sideViewImage?.url || null;
+      setSidePreview(isEdit ? existing : null);
+      if (sideInputRef.current) sideInputRef.current.value = '';
+    } else if (viewKey === 'pic') {
+      setPicFile(null);
+      const existing = initialData?.pictorialViewImage?.url || null;
+      setPicPreview(isEdit ? existing : null);
+      if (picInputRef.current) picInputRef.current.value = '';
     }
   };
 
@@ -448,15 +487,21 @@ const DrawingMasterFormModal = ({
       }
     }
 
-    if (!isEdit && !selectedFile) {
-      setError('Please upload a drawing or hole image before saving.');
+    // Require all three views for new configuration
+    const missingViews = [];
+    if (!frontFile && !frontPreview) missingViews.push('Front View');
+    if (!sideFile && !sidePreview) missingViews.push('Side View');
+    if (!picFile && !picPreview) missingViews.push('3D / Pictorial View');
+
+    if (missingViews.length > 0) {
+      setError(`All three drawings are required: ${missingViews.join(', ')} missing.`);
       return false;
     }
 
     return true;
   };
 
-  // Save handler: Saves drawing configuration and image references ONLY (no drawing generation)
+  // Save handler: Saves drawing configuration and three image references
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setError('');
@@ -505,8 +550,16 @@ const DrawingMasterFormModal = ({
       data.append('isDefault', formData.defaultForGrades.length > 0 ? 'true' : 'false');
       data.append('status', formData.status);
 
-      if (selectedFile) {
-        data.append('drawingFile', selectedFile);
+      // Append three views independently
+      if (frontFile) {
+        data.append('frontViewImage', frontFile);
+        data.append('drawingFile', frontFile); // backwards compatibility
+      }
+      if (sideFile) {
+        data.append('sideViewImage', sideFile);
+      }
+      if (picFile) {
+        data.append('pictorialViewImage', picFile);
       }
 
       if (isEdit) {
@@ -543,7 +596,7 @@ const DrawingMasterFormModal = ({
           </span>
         </div>
       }
-      maxWidth="780px"
+      maxWidth="940px"
       zIndex={1150}
       footer={
         <div className="flex items-center justify-between w-full">
@@ -708,95 +761,325 @@ const DrawingMasterFormModal = ({
           </div>
         )}
 
-        {/* ================= SECTION 3: Drawing Image Upload & Management ================= */}
-        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-slate-800 text-white inline-flex items-center justify-center text-[10px]">3</span>
-              <UploadCloud size={15} className="text-blue-600" />
-              {isFlange ? 'Flange Drawing Image / Asset Upload *' : 'Box Drawing Image / Asset Upload *'}
-            </label>
-            <span className="text-[11px] text-slate-500">PNG, JPG, JPEG, WEBP or SVG (Max 10MB)</span>
-          </div>
-
-          {/* Context Badge explaining image binding */}
-          <div className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between text-[11px] text-blue-900">
-            <span className="font-medium">
-              Image bound to: <strong>{isFinePre ? 'Fine/Pre' : 'HEPA'}</strong> • <strong>{formData.drawingType}</strong>
-            </span>
-            <span className="text-[10px] text-blue-600">Drawing Asset</span>
-          </div>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
-            className="hidden"
-          />
-
-          {!filePreview ? (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/30 rounded-xl p-6 text-center cursor-pointer transition-all space-y-2"
-            >
-              <div className="w-10 h-10 rounded-full bg-blue-100/70 text-blue-600 flex items-center justify-center mx-auto">
-                <UploadCloud size={20} />
-              </div>
-              <div className="text-xs text-slate-700 font-medium">
-                Click to upload corresponding drawing / hole image
-              </div>
-              <p className="text-[10px] text-slate-400">
-                Uploaded image is stored securely and linked to this configuration
+        {/* ================= SECTION 3: Three-View Filter Drawing Configuration ================= */}
+        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/70 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <label className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-slate-900 text-white inline-flex items-center justify-center text-[10px]">3</span>
+                <UploadCloud size={16} className="text-blue-600" />
+                Three-View Filter Drawing Configuration *
+              </label>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Upload three distinct drawings per configuration. These views will appear horizontally on the Sales Order drawing PDF: <strong>Front View &rarr; Side View &rarr; 3D / Pictorial View</strong>.
               </p>
             </div>
-          ) : (
-            <div className="border border-slate-200 rounded-xl bg-white p-3 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                  <CheckCircle size={14} className="text-emerald-600" />
-                  {selectedFile ? `Ready to upload: ${selectedFile.name}` : 'Associated Configuration Image'}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                  >
-                    Replace Image
-                  </button>
-                  {selectedFile && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveSelectedFile}
-                      className="text-xs text-red-600 hover:text-red-800 cursor-pointer"
-                    >
-                      Cancel Selection
-                    </button>
-                  )}
+            <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700 shadow-2xs">
+              Category: <strong className={isFinePre ? 'text-emerald-700' : 'text-amber-700'}>{isFinePre ? 'Fine / Pre' : 'HEPA'}</strong> • Type: <strong className="text-blue-700">{formData.drawingType}</strong>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            {/* ---------------- SECTION A: Front View Image ---------------- */}
+            <div className="border border-slate-200 rounded-xl bg-white p-3.5 flex flex-col justify-between shadow-2xs space-y-2.5">
+              <div className="flex items-start justify-between gap-1 pb-1 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <span className="w-4 h-4 rounded-full bg-blue-600 text-white inline-flex items-center justify-center text-[9px] font-bold">A</span>
+                    <span>Front View Drawing *</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Front elevation of the filter</span>
                 </div>
+                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                  Front View
+                </span>
               </div>
 
-              {/* Live Image Preview */}
-              <div className="flex justify-center items-center bg-slate-50 p-2 rounded-lg border border-slate-200 min-h-[160px] max-h-[220px] overflow-hidden">
-                {fileType === 'pdf' ? (
-                  <div className="flex flex-col items-center justify-center text-center p-4">
-                    <FileText size={48} className="text-red-500 mb-1" />
-                    <span className="font-semibold text-slate-800 text-xs">
-                      {selectedFile ? selectedFile.name : (initialData?.fileName || `${formData.drawingCode}.pdf`)}
-                    </span>
-                    <span className="text-[10px] text-slate-500">PDF Drawing Asset</span>
+              <input
+                type="file"
+                ref={frontInputRef}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleViewFileChange('front', f);
+                }}
+                accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
+                className="hidden"
+              />
+
+              {!frontPreview ? (
+                <div
+                  onClick={() => frontInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/30 rounded-lg p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[170px] space-y-1.5 group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors">
+                    <UploadCloud size={18} />
                   </div>
-                ) : (
-                  <img
-                    src={selectedFile ? filePreview : getVersionedImageUrl(filePreview, initialData?.updatedAt)}
-                    alt="Drawing / Hole Preview"
-                    className="max-h-[200px] object-contain rounded"
-                  />
-                )}
+                  <div className="text-[11px] font-semibold text-slate-700">
+                    Upload Front View
+                  </div>
+                  <p className="text-[9px] text-slate-400">
+                    PNG, JPG, JPEG, WEBP, SVG (Max 10MB)
+                  </p>
+                  <span className="inline-block mt-1 text-[10px] text-blue-600 font-semibold group-hover:underline">
+                    Browse files
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1 truncate max-w-[130px]" title={frontFile ? frontFile.name : 'Front View Asset'}>
+                      <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                      <span className="truncate">{frontFile ? frontFile.name : 'Saved Front View'}</span>
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => frontInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        title="Replace Front View image"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveViewFile('front')}
+                        className="text-[11px] font-semibold text-red-600 hover:text-red-800 cursor-pointer"
+                        title="Remove Front View image"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative bg-slate-50 border border-slate-200 rounded-lg h-[150px] p-2 flex items-center justify-center overflow-hidden">
+                    {frontFileType === 'pdf' ? (
+                      <div className="flex flex-col items-center justify-center text-center p-2">
+                        <FileText size={36} className="text-red-500 mb-1" />
+                        <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[150px]">
+                          {frontFile?.name || `${formData.drawingCode || 'Drawing'}_front.pdf`}
+                        </span>
+                        <span className="text-[9px] text-slate-400">PDF Document</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={frontFile ? frontPreview : getVersionedImageUrl(frontPreview, initialData?.updatedAt)}
+                        alt="Front View Drawing"
+                        className="max-h-full max-w-full object-contain rounded"
+                      />
+                    )}
+                    <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-medium backdrop-blur-xs">
+                      1. Front (Left)
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span className="font-medium text-blue-700">Front Elevation</span>
+                <span className="text-slate-400 font-mono">1. Left View</span>
               </div>
             </div>
-          )}
+
+            {/* ---------------- SECTION B: Side View Image ---------------- */}
+            <div className="border border-slate-200 rounded-xl bg-white p-3.5 flex flex-col justify-between shadow-2xs space-y-2.5">
+              <div className="flex items-start justify-between gap-1 pb-1 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <span className="w-4 h-4 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-[9px] font-bold">B</span>
+                    <span>Side View Drawing *</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Side elevation of the filter</span>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
+                  Side View
+                </span>
+              </div>
+
+              <input
+                type="file"
+                ref={sideInputRef}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleViewFileChange('side', f);
+                }}
+                accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
+                className="hidden"
+              />
+
+              {!sidePreview ? (
+                <div
+                  onClick={() => sideInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/30 rounded-lg p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[170px] space-y-1.5 group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-teal-50 group-hover:bg-teal-100 text-teal-600 flex items-center justify-center transition-colors">
+                    <UploadCloud size={18} />
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-700">
+                    Upload Side View
+                  </div>
+                  <p className="text-[9px] text-slate-400">
+                    PNG, JPG, JPEG, WEBP, SVG (Max 10MB)
+                  </p>
+                  <span className="inline-block mt-1 text-[10px] text-teal-600 font-semibold group-hover:underline">
+                    Browse files
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1 truncate max-w-[130px]" title={sideFile ? sideFile.name : 'Side View Asset'}>
+                      <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                      <span className="truncate">{sideFile ? sideFile.name : 'Saved Side View'}</span>
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => sideInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-teal-600 hover:text-teal-800 cursor-pointer"
+                        title="Replace Side View image"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveViewFile('side')}
+                        className="text-[11px] font-semibold text-red-600 hover:text-red-800 cursor-pointer"
+                        title="Remove Side View image"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative bg-slate-50 border border-slate-200 rounded-lg h-[150px] p-2 flex items-center justify-center overflow-hidden">
+                    {sideFileType === 'pdf' ? (
+                      <div className="flex flex-col items-center justify-center text-center p-2">
+                        <FileText size={36} className="text-red-500 mb-1" />
+                        <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[150px]">
+                          {sideFile?.name || `${formData.drawingCode || 'Drawing'}_side.pdf`}
+                        </span>
+                        <span className="text-[9px] text-slate-400">PDF Document</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={sideFile ? sidePreview : getVersionedImageUrl(sidePreview, initialData?.updatedAt)}
+                        alt="Side View Drawing"
+                        className="max-h-full max-w-full object-contain rounded"
+                      />
+                    )}
+                    <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-medium backdrop-blur-xs">
+                      2. Side (Centre)
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span className="font-medium text-teal-700">Side Elevation</span>
+                <span className="text-slate-400 font-mono">2. Centre View</span>
+              </div>
+            </div>
+
+            {/* ---------------- SECTION C: 3D / Pictorial View Image ---------------- */}
+            <div className="border border-slate-200 rounded-xl bg-white p-3.5 flex flex-col justify-between shadow-2xs space-y-2.5">
+              <div className="flex items-start justify-between gap-1 pb-1 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <span className="w-4 h-4 rounded-full bg-purple-600 text-white inline-flex items-center justify-center text-[9px] font-bold">C</span>
+                    <span>3D / Pictorial View Drawing *</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Three-dimensional view</span>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                  3D View
+                </span>
+              </div>
+
+              <input
+                type="file"
+                ref={picInputRef}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleViewFileChange('pic', f);
+                }}
+                accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
+                className="hidden"
+              />
+
+              {!picPreview ? (
+                <div
+                  onClick={() => picInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50/30 rounded-lg p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[170px] space-y-1.5 group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-purple-50 group-hover:bg-purple-100 text-purple-600 flex items-center justify-center transition-colors">
+                    <UploadCloud size={18} />
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-700">
+                    Upload 3D / Pictorial View
+                  </div>
+                  <p className="text-[9px] text-slate-400">
+                    PNG, JPG, JPEG, WEBP, SVG (Max 10MB)
+                  </p>
+                  <span className="inline-block mt-1 text-[10px] text-purple-600 font-semibold group-hover:underline">
+                    Browse files
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1 truncate max-w-[130px]" title={picFile ? picFile.name : '3D View Asset'}>
+                      <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                      <span className="truncate">{picFile ? picFile.name : 'Saved 3D View'}</span>
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => picInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-purple-600 hover:text-purple-800 cursor-pointer"
+                        title="Replace 3D View image"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveViewFile('pic')}
+                        className="text-[11px] font-semibold text-red-600 hover:text-red-800 cursor-pointer"
+                        title="Remove 3D View image"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative bg-slate-50 border border-slate-200 rounded-lg h-[150px] p-2 flex items-center justify-center overflow-hidden">
+                    {picFileType === 'pdf' ? (
+                      <div className="flex flex-col items-center justify-center text-center p-2">
+                        <FileText size={36} className="text-red-500 mb-1" />
+                        <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[150px]">
+                          {picFile?.name || `${formData.drawingCode || 'Drawing'}_3d.pdf`}
+                        </span>
+                        <span className="text-[9px] text-slate-400">PDF Document</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={picFile ? picPreview : getVersionedImageUrl(picPreview, initialData?.updatedAt)}
+                        alt="3D / Pictorial View Drawing"
+                        className="max-h-full max-w-full object-contain rounded"
+                      />
+                    )}
+                    <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-medium backdrop-blur-xs">
+                      3. 3D (Right)
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span className="font-medium text-purple-700">3D / Pictorial</span>
+                <span className="text-slate-400 font-mono">3. Right View</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ================= SECTION 5: Identifiers, Filter Grades, & Metadata ================= */}

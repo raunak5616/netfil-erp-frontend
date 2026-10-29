@@ -305,7 +305,7 @@ const getItemTechnicalSpecs = (it) => {
   }
 
   // 8. Protection Guard Add-on
-  const guardObj = item.guard || item.dimensions?.guard;
+  const guardObj = it.guard || it.dimensions?.guard || itemDoc.guard || itemDoc.dimensions?.guard;
   if (guardObj && (guardObj.hasGuard || guardObj.enabled)) {
     const mat = guardObj.material || 'SS304';
     const sides = guardObj.sides || 'One side';
@@ -585,15 +585,18 @@ const QuotationDetailModal = ({
                 Valid Till: {formatDate(quotation.validTill)}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Attention Deadline: <strong>{formatDate(quotation.deadline)}</strong></span>
-                {quotation.deadline && (() => {
-                  const badge = getDeadlineBadge(quotation.deadline);
+                <span>Attention Deadline: <strong>{formatDate(quotation.deadline || quotation.validTill || quotation.requirement?.deadline)}</strong></span>
+                {(quotation.deadline || quotation.validTill || quotation.requirement?.deadline) && (() => {
+                  const badge = getDeadlineBadge(quotation.deadline || quotation.validTill || quotation.requirement?.deadline);
                   return badge ? (
                     <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-semibold border ${badge.color}`}>
                       {badge.text}
                     </span>
                   ) : null;
                 })()}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
+                Next Follow-up: <strong>{formatDate(quotation.nextFollowUpDate || quotation.requirement?.followUpDate)}</strong>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
                 Currency: {quotation.currency || 'INR'}

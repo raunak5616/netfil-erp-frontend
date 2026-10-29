@@ -463,12 +463,13 @@ const QuotationList = () => {
         key: 'deadline',
         header: 'Attention Deadline',
         sortable: true,
-        render: (val) => {
-          const badge = getDeadlineBadgeInfo(val);
+        render: (val, row) => {
+          const effectiveDeadline = val || row.validTill || row.requirement?.deadline;
+          const badge = getDeadlineBadgeInfo(effectiveDeadline);
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <div style={{ fontSize: '12.5px', fontWeight: val ? 600 : 400, color: val ? 'var(--neutral-900)' : 'var(--neutral-400)' }}>
-                {val ? new Date(val).toLocaleDateString('en-GB') : '—'}
+              <div style={{ fontSize: '12.5px', fontWeight: effectiveDeadline ? 600 : 400, color: effectiveDeadline ? 'var(--neutral-900)' : 'var(--neutral-400)' }}>
+                {effectiveDeadline ? new Date(effectiveDeadline).toLocaleDateString('en-GB') : '—'}
               </div>
               <div>
                 <span className={`inline-flex items-center text-[10.5px] px-1.5 py-0.5 rounded border ${badge.className}`}>
@@ -484,7 +485,8 @@ const QuotationList = () => {
         header: 'Next Follow-up',
         sortable: true,
         render: (val, row) => {
-          if (!val) {
+          const effectiveFollowUp = val || row.requirement?.followUpDate;
+          if (!effectiveFollowUp) {
             return <span style={{ color: 'var(--neutral-400)', fontSize: '12px' }}>—</span>;
           }
           const latestFollowUp = row.followUps && row.followUps.length > 0 ? row.followUps[row.followUps.length - 1] : null;
@@ -492,7 +494,7 @@ const QuotationList = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Calendar size={11} color="var(--primary-600)" />
-                <span>{new Date(val).toLocaleDateString('en-GB')}</span>
+                <span>{new Date(effectiveFollowUp).toLocaleDateString('en-GB')}</span>
                 {latestFollowUp?.followUpTime && (
                   <span style={{ fontSize: '10.5px', color: 'var(--neutral-500)' }}>@{latestFollowUp.followUpTime}</span>
                 )}

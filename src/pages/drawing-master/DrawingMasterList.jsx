@@ -316,13 +316,14 @@ const DrawingMasterList = () => {
         width: '64px',
         render: (_, row) => {
           const isPdf = row.format === 'pdf' || row.fileUrl?.toLowerCase().endsWith('.pdf');
-          const rawSrc = row.holeImageUrl || row.fileUrl;
+          const rawSrc = row.frontViewImage?.url || row.holeImageUrl || row.fileUrl;
           const previewSrc = getVersionedImageUrl(rawSrc, row.updatedAt);
+          const hasThreeViews = Boolean(row.sideViewImage?.url || row.pictorialViewImage?.url);
           return (
             <div
               onClick={() => handlePreview(row)}
-              className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-xs flex items-center justify-center transition-all group shrink-0 mx-auto"
-              title="Click to view full preview"
+              className="relative w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-xs flex items-center justify-center transition-all group shrink-0 mx-auto"
+              title={hasThreeViews ? "Three-View Configuration (Click to preview Front, Side, and 3D views)" : "Click to view full preview"}
             >
               {isPdf ? (
                 <FileText size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
@@ -333,6 +334,11 @@ const DrawingMasterList = () => {
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
               )}
+              {hasThreeViews && (
+                <span className="absolute bottom-0 right-0 bg-blue-600 text-white text-[8px] font-bold px-1 rounded-tl leading-tight">
+                  3V
+                </span>
+              )}
             </div>
           );
         }
@@ -342,25 +348,33 @@ const DrawingMasterList = () => {
         header: 'Drawing Code',
         sortable: true,
         width: '130px',
-        render: (val, row) => (
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                {val || row.drawingCode}
-              </span>
-              {row.isDefault && (
-                <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded" title="Designated Default Drawing">
-                  <Star size={10} className="mr-0.5 fill-emerald-600 text-emerald-600" /> Default
+        render: (val, row) => {
+          const hasThreeViews = Boolean(row.sideViewImage?.url || row.pictorialViewImage?.url);
+          return (
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {val || row.drawingCode}
                 </span>
+                {row.isDefault && (
+                  <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded" title="Designated Default Drawing">
+                    <Star size={10} className="mr-0.5 fill-emerald-600 text-emerald-600" /> Default
+                  </span>
+                )}
+                {hasThreeViews && (
+                  <span className="inline-flex items-center text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded" title="Three-View Configuration (Front, Side, 3D)">
+                    3 Views
+                  </span>
+                )}
+              </div>
+              {row.description && (
+                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
+                  {row.description}
+                </p>
               )}
             </div>
-            {row.description && (
-              <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
-                {row.description}
-              </p>
-            )}
-          </div>
-        )
+          );
+        }
       },
       {
         key: 'category',

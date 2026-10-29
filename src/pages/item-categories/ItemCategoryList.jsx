@@ -456,6 +456,7 @@ const ItemCategoryList = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSuccess={fetchCategoryData}
+        initialItemGroups={itemGroups}
       />
 
       <ItemCategoryDetailModal

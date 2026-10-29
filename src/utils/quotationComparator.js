@@ -189,7 +189,15 @@ export const extractTechnicalDetails = (item) => {
     initialPressureDrop: findSpec(['initialPressureDrop', 'initial_pressure_drop', 'initial pressure', 'initial pd', 'init pd']),
     finalPressureDrop: findSpec(['finalPressureDrop', 'final_pressure_drop', 'final pressure', 'final pd']),
     pressureDrop: findSpec(['pressureDrop', 'pressure drop', 'pd']),
-    filterGrade: findSpec(['filterGrade', 'filter_grade', 'eurovent', 'iso', 'grade']),
+    filterGrade: item.filterGradeName ||
+                 item.filterGrade?.filterGrade ||
+                 item.filterGradeId ||
+                 (typeof item.filterGrade === 'string' ? item.filterGrade : item.filterGrade?._id) ||
+                 item.item?.filterGrade?.filterGrade ||
+                 (typeof item.item?.filterGrade === 'string' ? item.item.filterGrade : item.item?.filterGrade?._id) ||
+                 item.drawingSnapshot?.filterGradeName ||
+                 item.drawingSnapshot?.filterGradeId ||
+                 findSpec(['filterGrade', 'filter_grade', 'eurovent', 'iso', 'grade']),
     bonding: findSpec(['bonding', 'bondingType', 'sealant', 'adhesive']),
     hsnCode: item.hsnCode || dims.hsnCode || null,
     customSpecs
@@ -695,9 +703,33 @@ export const compareQuotationWithSalesOrder = (quotation, quotationItems = [], p
 
       // Engineering Specifications
       const checkSpec = (key, specLabel) => {
-        const qVal = qTech[key];
-        const pVal = pTech[key];
-        if (qVal && pVal && !areStringsEqual(qVal, pVal, true)) {
+        let qVal = qTech[key];
+        let pVal = pTech[key];
+
+        if (key === 'filterGrade') {
+          // Both match by ID or string comparison
+          if (areIdsEqual(qVal, pVal) || areStringsEqual(qVal, pVal, true)) return;
+
+          // Check if payload filterGrade was inherited from quotation item's catalog item filterGrade
+          const qCatalogFg = normalizeId(qIt.item?.filterGrade) || normalizeId(qIt.item?.filterGrade?._id);
+          const pFg = normalizeId(pIt.filterGrade) || normalizeId(pIt.filterGrade?._id) || normalizeId(pVal);
+          if (qCatalogFg && pFg && qCatalogFg === pFg) return;
+
+          // If quotation item has same catalog item and no override was made
+          const qItemId = normalizeId(qIt.item) || normalizeId(qIt.item?._id);
+          const pItemId = normalizeId(pIt.item) || normalizeId(pIt.item?._id);
+          if (qItemId && pItemId && qItemId === pItemId && !qIt.filterGrade && pFg === qCatalogFg) {
+            return;
+          }
+
+          // Use readable display name if available
+          const qDispName = qIt.filterGradeName || qIt.drawingSnapshot?.filterGradeName || qIt.item?.drawingSnapshot?.filterGradeName || qVal;
+          const pDispName = pIt.filterGradeName || pIt.drawingSnapshot?.filterGradeName || pVal;
+          qVal = qDispName;
+          pVal = pDispName;
+        }
+
+        if (qVal && pVal && !areStringsEqual(qVal, pVal, true) && !areIdsEqual(qVal, pVal)) {
           changes.push({
             field: `items[${pIdx}].specifications.${key}`,
             label: `${itemLabel} - ${specLabel}`,

@@ -79,10 +79,17 @@ export const Select = ({ hasError, className = '', children, value, onChange, di
     React.Children.toArray(nodes).forEach(child => {
       if (!child) return;
       if (child.type === 'option') {
+        const rawLabel = child.props.children;
+        const stringLabel = Array.isArray(rawLabel)
+          ? rawLabel.map(c => (typeof c === 'string' || typeof c === 'number' ? c : '')).join('')
+          : typeof rawLabel === 'string' || typeof rawLabel === 'number'
+          ? String(rawLabel)
+          : rawLabel;
+
         options.push({ 
           value: child.props.value, 
-          label: child.props.children, 
-          disabled: child.props.disabled 
+          label: stringLabel, 
+          isDisabled: child.props.disabled 
         });
       } else if (child.props && child.props.children) {
         extractOptions(child.props.children);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getItems, deleteItem } from '../../services/itemService';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getItems, deleteItem, uploadItemImage, removeItemImage } from '../../services/itemService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { getItemCategories } from '../../services/itemCategoryService';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
+import Modal from '../../components/ui/Modal';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
 import ItemTypeSelectionModal from './ItemTypeSelectionModal';
@@ -18,14 +19,18 @@ import {
   Filter, 
   Eye, 
   Edit, 
-  RefreshCw,
-  Package,
-  CheckCircle2,
-  Layers,
-  Tag,
-  ArrowUpDown,
-  RotateCcw,
-  Trash2
+  RefreshCw, 
+  Package, 
+  CheckCircle2, 
+  Layers, 
+  Tag, 
+  ArrowUpDown, 
+  RotateCcw, 
+  Trash2,
+  Camera,
+  Image as ImageIcon,
+  UploadCloud,
+  X
 } from 'lucide-react';
 
 const ItemList = () => {
@@ -69,6 +74,97 @@ const ItemList = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // Replace Image modal state
+  const [imageModalItem, setImageModalItem] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageModalError, setImageModalError] = useState('');
+  const [previewZoomUrl, setPreviewZoomUrl] = useState(null);
+  const listFileInputRef = useRef(null);
+
+  const openImageModal = (item) => {
+    setImageModalItem(item);
+    setImageModalError('');
+    setIsImageModalOpen(true);
+  };
+
+  const handleReplaceImageFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !imageModalItem) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+    const originalNameLower = (file.name || '').toLowerCase();
+    const hasAllowedExt = ['.png', '.jpg', '.jpeg', '.webp', '.svg'].some((ext) => originalNameLower.endsWith(ext));
+
+    if (!allowedTypes.includes(file.type) && !hasAllowedExt) {
+      setImageModalError('Only PNG, JPG, JPEG, WEBP, or SVG images are allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageModalError('Image file size must not exceed 5 MB.');
+      return;
+    }
+
+    setImageModalError('');
+    setImageUploading(true);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append('image', file);
+
+      const res = await uploadItemImage(uploadData, imageModalItem._id);
+      if (res.success && res.imageUrl) {
+        const updated = {
+          ...imageModalItem,
+          imageUrl: res.imageUrl,
+          imagePublicId: res.imagePublicId || '',
+        };
+        setImageModalItem(updated);
+        setItems((prev) =>
+          prev.map((it) => (it._id === imageModalItem._id ? { ...it, imageUrl: res.imageUrl, imagePublicId: res.imagePublicId || '' } : it))
+        );
+        setSuccessMessage(`Image updated successfully for ${imageModalItem.itemCode}`);
+      } else {
+        setImageModalError(res.message || 'Failed to replace image.');
+      }
+    } catch (err) {
+      console.error('Failed to replace image:', err);
+      setImageModalError(err.response?.data?.message || err.message || 'Image replacement failed.');
+    } finally {
+      setImageUploading(false);
+      if (listFileInputRef.current) listFileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveItemImage = async () => {
+    if (!imageModalItem) return;
+    setImageUploading(true);
+    setImageModalError('');
+    try {
+      const res = await removeItemImage(imageModalItem._id);
+      if (res.success) {
+        const updated = {
+          ...imageModalItem,
+          imageUrl: '',
+          imagePublicId: '',
+        };
+        setImageModalItem(updated);
+        setItems((prev) =>
+          prev.map((it) => (it._id === imageModalItem._id ? { ...it, imageUrl: '', imagePublicId: '' } : it))
+        );
+        setSuccessMessage(`Image removed for ${imageModalItem.itemCode}`);
+      } else {
+        setImageModalError(res.message || 'Failed to remove image.');
+      }
+    } catch (err) {
+      console.error('Failed to remove image:', err);
+      setImageModalError(err.response?.data?.message || err.message || 'Image removal failed.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const handleDeleteClick = (item) => {
     setError('');
@@ -230,6 +326,50 @@ const ItemList = () => {
 
   const columns = [
     {
+      key: 'imageUrl',
+      header: 'Image',
+      width: '74px',
+      align: 'center',
+      render: (val, row) => (
+        <div className="flex items-center justify-center">
+          {val ? (
+            <div
+              className="relative group w-11 h-11 rounded-lg border border-slate-200 overflow-hidden bg-white shadow-2xs cursor-pointer hover:border-blue-500 hover:shadow-md transition-all duration-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                openImageModal(row);
+              }}
+              title={`Click to view or replace image for ${row.itemName}`}
+            >
+              <img
+                src={val}
+                alt={row.itemName}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-semibold">
+                <Camera size={13} className="mb-0.5" />
+                <span>Replace</span>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openImageModal(row);
+              }}
+              className="w-11 h-11 rounded-lg border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/80 hover:bg-blue-50/50 flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 transition-all cursor-pointer group shadow-2xs"
+              title={`Upload image for ${row.itemName}`}
+            >
+              <ImageIcon size={14} className="group-hover:scale-110 transition-transform" />
+              <span className="text-[8.5px] font-medium mt-0.5 text-slate-400 group-hover:text-blue-600">+ Image</span>
+            </button>
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'itemCode',
       header: 'Item Code',
       width: '140px',
@@ -349,6 +489,18 @@ const ItemList = () => {
             <Eye size={14} className="text-slate-500" />
             <span>View</span>
           </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => openImageModal(row)}
+              title="Replace / View Item Image"
+              className="text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <Camera size={14} />
+              <span>Image</span>
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="secondary"
@@ -643,6 +795,159 @@ const ItemList = () => {
         item={itemToDelete}
         loading={deleteLoading}
       />
+
+      {/* Replace / Manage Item Image Modal */}
+      {isImageModalOpen && imageModalItem && (
+        <Modal
+          isOpen={isImageModalOpen}
+          onClose={() => {
+            if (!imageUploading) {
+              setIsImageModalOpen(false);
+              setImageModalItem(null);
+              setImageModalError('');
+            }
+          }}
+          title={`Product Image — ${imageModalItem.itemCode}`}
+          size="md"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <div>
+                {imageModalItem.imageUrl && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-200"
+                    icon={Trash2}
+                    disabled={imageUploading}
+                    onClick={handleRemoveItemImage}
+                  >
+                    Remove Image
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={imageUploading}
+                  onClick={() => {
+                    setIsImageModalOpen(false);
+                    setImageModalItem(null);
+                    setImageModalError('');
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={imageUploading ? RefreshCw : (imageModalItem.imageUrl ? Camera : UploadCloud)}
+                  disabled={imageUploading}
+                  onClick={() => listFileInputRef.current?.click()}
+                >
+                  {imageUploading ? 'Uploading...' : imageModalItem.imageUrl ? 'Replace Image' : 'Upload Image'}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded">
+                  {imageModalItem.itemCode}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {imageModalItem.productType || 'ITEM'}
+                </span>
+              </div>
+              <h4 className="text-sm font-semibold text-slate-900 mt-1">
+                {imageModalItem.itemName}
+              </h4>
+            </div>
+
+            {/* Image Preview Box */}
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/60 min-h-[220px]">
+              {imageModalItem.imageUrl ? (
+                <div className="relative group max-w-full">
+                  <img
+                    src={imageModalItem.imageUrl}
+                    alt={imageModalItem.itemName}
+                    className="max-h-64 max-w-full rounded-lg object-contain shadow-sm cursor-pointer hover:opacity-95"
+                    onClick={() => setPreviewZoomUrl(imageModalItem.imageUrl)}
+                    title="Click to view full size"
+                  />
+                  <div className="mt-2 flex items-center justify-center gap-2 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] shadow-2xs">
+                      <CheckCircle2 size={12} className="text-emerald-500" /> Active Image
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoomUrl(imageModalItem.imageUrl)}
+                      className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold underline cursor-pointer"
+                    >
+                      View Full Size
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className="flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:bg-blue-50/30 rounded-lg w-full transition-colors"
+                  onClick={() => listFileInputRef.current?.click()}
+                >
+                  <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-2">
+                    <UploadCloud size={26} />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-700">No image currently attached</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Click here or use the button below to upload (PNG, JPG, WEBP, SVG max 5MB)</p>
+                </div>
+              )}
+            </div>
+
+            {imageUploading && (
+              <div className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 py-2 rounded-md">
+                <RefreshCw size={14} className="animate-spin" />
+                <span>Uploading image to Cloudinary...</span>
+              </div>
+            )}
+
+            {imageModalError && (
+              <Alert type="error" message={imageModalError} />
+            )}
+
+            <input
+              type="file"
+              ref={listFileInputRef}
+              onChange={handleReplaceImageFile}
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+              className="hidden"
+            />
+          </div>
+        </Modal>
+      )}
+
+      {/* Full Size Image Lightbox */}
+      {previewZoomUrl && (
+        <Modal
+          isOpen={!!previewZoomUrl}
+          onClose={() => setPreviewZoomUrl(null)}
+          title="Image Preview"
+          size="lg"
+          footer={
+            <Button variant="secondary" onClick={() => setPreviewZoomUrl(null)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="flex items-center justify-center bg-slate-900 p-4 rounded-lg">
+            <img
+              src={previewZoomUrl}
+              alt="Full Preview"
+              className="max-h-[70vh] max-w-full object-contain rounded shadow-lg"
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

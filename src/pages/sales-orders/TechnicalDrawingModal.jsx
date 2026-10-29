@@ -194,13 +194,17 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
         {/* Drawing Master Assigned Drawing Preview */}
         {(() => {
           const drawingSnap = selectedSnapshot || item.drawingSnapshot || (typeof item.drawing === 'object' ? item.drawing : null) || (typeof item.item === 'object' && item.item?.drawing ? item.item.drawing : null);
-          const masterDrawingUrl = selectedDrawingDoc?.fileUrl || drawingSnap?.fileUrl;
+          const frontUrl = selectedDrawingDoc?.frontViewImage?.url || drawingSnap?.frontViewImage?.url || selectedDrawingDoc?.fileUrl || drawingSnap?.fileUrl;
+          const sideUrl = selectedDrawingDoc?.sideViewImage?.url || drawingSnap?.sideViewImage?.url;
+          const picUrl = selectedDrawingDoc?.pictorialViewImage?.url || drawingSnap?.pictorialViewImage?.url;
+
           const masterDrawingCode = selectedDrawingDoc?.drawingCode || drawingSnap?.drawingCode;
           const masterDrawingName = selectedDrawingDoc?.drawingName || drawingSnap?.drawingName;
           const masterGradeName = selectedDrawingDoc?.filterGrade?.filterGrade || drawingSnap?.filterGradeName || filterGradeName;
-          const isPdf = masterDrawingUrl && ((selectedDrawingDoc?.format === 'pdf' || drawingSnap?.format === 'pdf') || masterDrawingUrl.toLowerCase().endsWith('.pdf'));
 
-          if (!masterDrawingUrl) return null;
+          if (!frontUrl && !sideUrl && !picUrl) return null;
+
+          const hasThreeViews = Boolean(sideUrl || picUrl);
 
           return (
             <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3">
@@ -216,28 +220,62 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
                 )}
               </div>
 
-              <div className="flex justify-center bg-white p-3 rounded-lg border border-emerald-200 min-h-[160px]">
-                {isPdf ? (
-                  <div className="flex flex-col items-center justify-center p-4">
-                    <FileText size={40} className="text-red-500 mb-1" />
-                    <span className="font-semibold text-slate-800 text-xs">{masterDrawingCode}.pdf</span>
-                    <a
-                      href={masterDrawingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center gap-1"
-                    >
-                      <ExternalLink size={12} /> Open PDF in Tab
-                    </a>
+              {hasThreeViews ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                  {/* Front View */}
+                  <div className="bg-white border border-emerald-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-1">
+                      <span className="text-[11px] font-bold text-slate-800">1. Front View</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800">Left</span>
+                    </div>
+                    <div className="flex items-center justify-center bg-slate-50 rounded h-[140px] p-1 overflow-hidden">
+                      {frontUrl ? (
+                        <img src={frontUrl} alt="Front View" className="max-h-full max-w-full object-contain rounded" />
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">No image</span>
+                      )}
+                    </div>
                   </div>
-                ) : (
+
+                  {/* Side View */}
+                  <div className="bg-white border border-emerald-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-1">
+                      <span className="text-[11px] font-bold text-slate-800">2. Side View</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 text-teal-800">Centre</span>
+                    </div>
+                    <div className="flex items-center justify-center bg-slate-50 rounded h-[140px] p-1 overflow-hidden">
+                      {sideUrl ? (
+                        <img src={sideUrl} alt="Side View" className="max-h-full max-w-full object-contain rounded" />
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">No image</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3D / Pictorial View */}
+                  <div className="bg-white border border-emerald-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-1">
+                      <span className="text-[11px] font-bold text-slate-800">3. 3D / Pictorial</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800">Right</span>
+                    </div>
+                    <div className="flex items-center justify-center bg-slate-50 rounded h-[140px] p-1 overflow-hidden">
+                      {picUrl ? (
+                        <img src={picUrl} alt="3D View" className="max-h-full max-w-full object-contain rounded" />
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">No image</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-center bg-white p-3 rounded-lg border border-emerald-200 min-h-[160px]">
                   <img
-                    src={masterDrawingUrl}
+                    src={frontUrl}
                     alt={masterDrawingName || 'Drawing Master'}
                     className="max-h-[240px] object-contain rounded"
                   />
-                )}
-              </div>
+                </div>
+              )}
             </div>
           );
         })()}

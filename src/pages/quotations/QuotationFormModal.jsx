@@ -54,6 +54,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     quotationDate: new Date().toISOString().split('T')[0],
     validTill: '',
     deadline: '',
+    nextFollowUpDate: initialReqObj?.followUpDate ? new Date(initialReqObj.followUpDate).toISOString().split('T')[0] : '',
     currency: 'INR',
     pfAmount: 0,
     freightAmount: 0,
@@ -102,6 +103,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       requirement: selectedReq._id || prev.requirement,
       salesPerson: salesPersonId || prev.salesPerson,
       attentionPerson: (typeof selectedReq.client === 'object' ? selectedReq.client?.contactPerson : '') || prev.attentionPerson,
+      deadline: selectedReq.deadline ? new Date(selectedReq.deadline).toISOString().split('T')[0] : (selectedReq.targetDate ? new Date(selectedReq.targetDate).toISOString().split('T')[0] : prev.deadline),
+      nextFollowUpDate: selectedReq.followUpDate ? new Date(selectedReq.followUpDate).toISOString().split('T')[0] : prev.nextFollowUpDate,
     }));
 
     const reqItemsList = (Array.isArray(selectedReq.items) && selectedReq.items.length > 0)
@@ -338,7 +341,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 salesPerson: q.salesPerson?._id || q.salesPerson || '',
                 quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
                 validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
-                deadline: q.deadline ? new Date(q.deadline).toISOString().split('T')[0] : '',
+                deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
+                nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
                 currency: q.currency || 'INR',
                 pfAmount: q.pfAmount || 0,
                 freightAmount: q.freightAmount || 0,
@@ -362,7 +366,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 salesPerson: q.salesPerson?._id || q.salesPerson || '',
                 quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
                 validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
-                deadline: q.deadline ? new Date(q.deadline).toISOString().split('T')[0] : '',
+                deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
+                nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
                 currency: q.currency || 'INR',
                 pfAmount: q.pfAmount || 0,
                 freightAmount: q.freightAmount || 0,
@@ -731,6 +736,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         quotationDate: formData.quotationDate,
         validTill: formData.validTill || null,
         deadline: formData.deadline || null,
+        nextFollowUpDate: formData.nextFollowUpDate || null,
         currency: formData.currency,
         pfAmount: Number(formData.pfAmount) || 0,
         freightAmount: Number(formData.freightAmount) || 0,
@@ -914,6 +920,17 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                   type="date"
                   value={formData.deadline}
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" title="Scheduled date for customer follow-up">
+                  Next Follow-up Date
+                </label>
+                <Input
+                  type="date"
+                  value={formData.nextFollowUpDate}
+                  onChange={(e) => setFormData({ ...formData, nextFollowUpDate: e.target.value })}
                 />
               </div>
             </div>

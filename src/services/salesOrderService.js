@@ -6,6 +6,16 @@ export const getSalesOrders = async (params = {}) => {
   return response.data;
 };
 
+export const getSalesOrderDeliveryAlertsSummary = async (params = {}) => {
+  const response = await api.get('/sales-orders/alerts/summary', { params });
+  return response.data;
+};
+
+export const dismissSalesOrderDeliveryAlert = async (salesOrderId) => {
+  const response = await api.put(`/sales-orders/alerts/${salesOrderId}/dismiss`);
+  return response.data;
+};
+
 export const getSalesOrderById = async (salesOrderId) => {
   const response = await api.get(`/sales-orders/${salesOrderId}`);
   return response.data;
@@ -68,9 +78,9 @@ export const updateSalesOrderItemDrawingConfig = async (salesOrderId, itemId, co
   return response.data;
 };
 
-export const getSalesOrderItemDrawing = async (salesOrderId, itemId, download = false) => {
+export const getSalesOrderItemDrawing = async (salesOrderId, itemId, download = false, extraParams = {}) => {
   const response = await api.get(`/sales-orders/${salesOrderId}/items/${itemId}/drawing`, {
-    params: download ? { download: 'true' } : {},
+    params: { ...(download ? { download: 'true' } : {}), ...(extraParams || {}) },
     responseType: 'blob'
   });
   return response.data;
