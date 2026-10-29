@@ -4,25 +4,28 @@ import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Package, MapPin, Phone, Mail, User, Info, Edit, Trash2 } from 'lucide-react';
 import { deleteStore } from '../../services/storeService';
+import DeleteStoreModal from './DeleteStoreModal';
 
-const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit }) => {
-  const [loading, setLoading] = useState(false);
+const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit, canDelete }) => {
   const [error, setError] = useState('');
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   if (!store) return null;
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this store? This action cannot be undone.')) {
-      setLoading(true);
-      setError('');
-      try {
-        await deleteStore(store._id);
-        onSuccess();
-        onClose();
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to delete store');
-        setLoading(false);
-      }
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
+    setError('');
+    try {
+      await deleteStore(store._id);
+      setIsDeleteOpen(false);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete store');
+      setIsDeleteOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -106,21 +109,22 @@ const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit }
         {/* Footer actions */}
         <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-6">
           <div>
-            {canEdit && (
+            {(canEdit || canDelete) && (
               <Button 
                 type="button" 
-                variant="danger" 
-                onClick={handleDelete} 
-                disabled={loading}
+                variant="secondary" 
+                onClick={() => setIsDeleteOpen(true)} 
+                disabled={deleteLoading}
                 icon={Trash2}
                 size="sm"
+                className="text-slate-700 hover:text-slate-900 border-slate-300"
               >
                 Delete
               </Button>
             )}
           </div>
           <div className="flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={deleteLoading}>
               Close
             </Button>
             {canEdit && (
@@ -139,6 +143,14 @@ const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit }
           </div>
         </div>
       </div>
+
+      <DeleteStoreModal
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        store={store}
+        loading={deleteLoading}
+      />
     </Modal>
   );
 };

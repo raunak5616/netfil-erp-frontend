@@ -304,6 +304,14 @@ const getItemTechnicalSpecs = (it) => {
     }
   }
 
+  // 8. Protection Guard Add-on
+  const guardObj = item.guard || item.dimensions?.guard;
+  if (guardObj && (guardObj.hasGuard || guardObj.enabled)) {
+    const mat = guardObj.material || 'SS304';
+    const sides = guardObj.sides || 'One side';
+    specs.push({ label: 'Guard', value: `${mat} (${sides})` });
+  }
+
   return specs;
 };
 

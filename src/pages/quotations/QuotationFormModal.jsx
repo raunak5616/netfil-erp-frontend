@@ -12,11 +12,12 @@ import { getRequirements } from '../../services/requirementService';
 import { getItems } from '../../services/itemService';
 import { getUOMs } from '../../services/uomService';
 import { getEmployees } from '../../services/employeeService';
+import { getTerms } from '../../services/termService';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
-import { Plus, Trash2, Calculator, Layers, Package, Maximize2 } from 'lucide-react';
+import { Plus, Trash2, Calculator, Layers, Package, Maximize2, Shield } from 'lucide-react';
 import QuotationRateSuggestion from './QuotationRateSuggestion';
 import DrawingSelector from '../../components/drawing/DrawingSelector';
 
@@ -34,6 +35,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   const [items, setItems] = useState([]);
   const [uoms, setUoms] = useState([]);
   const [salesPersons, setSalesPersons] = useState([]);
+  const [deliveryTermsList, setDeliveryTermsList] = useState([]);
+  const [paymentTermsList, setPaymentTermsList] = useState([]);
 
   // Initial Requirement Resolution
   const initialReqObj = typeof initialRequirement === 'object' ? initialRequirement : null;
@@ -57,8 +60,8 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     discountRate: 0,
     taxName: 'GST',
     taxRate: 18,
-    paymentTerms: '50% Advance, 50% Before Dispatch',
-    deliveryTerms: '2-3 Weeks from PO & Advance',
+    paymentTerms: '',
+    deliveryTerms: '',
     generalTerms: 'Freight extra at actuals.',
     remarks: '',
   });
@@ -78,6 +81,11 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       drawing: null,
       drawingSnapshot: null,
       remarks: '',
+      guard: {
+        hasGuard: false,
+        material: 'SS304',
+        sides: 'One side',
+      },
     },
   ]);
 
@@ -220,6 +228,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         specifications: specs,
         faceVelocity: fpm,
         remarks: remarksText,
+        guard: (reqItem.guard || reqItem.dimensions?.guard) ? {
+          hasGuard: Boolean(reqItem.guard?.hasGuard ?? reqItem.dimensions?.guard?.hasGuard),
+          material: reqItem.guard?.material || reqItem.dimensions?.guard?.material || 'SS304',
+          sides: reqItem.guard?.sides || reqItem.dimensions?.guard?.sides || 'One side',
+        } : {
+          hasGuard: false,
+          material: 'SS304',
+          sides: 'One side',
+        },
       };
     });
 
@@ -237,11 +254,12 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
           return u.startsWith('ITEM-WO-') || u.startsWith('ITEM-INV-') || u.startsWith('ITEM-OBOM-');
         };
 
-        const [rRes, iRes, uRes, eRes] = await Promise.all([
+        const [rRes, iRes, uRes, eRes, termsRes] = await Promise.all([
           getRequirements().catch(() => ({ success: false, requirements: [] })),
           getItems({ typeFilter: 'MASTER', all: true }).catch(() => ({ success: false, items: [] })),
           getUOMs().catch(() => ({ success: false, uoms: [] })),
           getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
+          getTerms({ status: 'active' }).catch(() => ({ success: false, terms: [] })),
         ]);
 
         const reqsList = (rRes.success && Array.isArray(rRes.requirements)) ? rRes.requirements : [];
@@ -249,10 +267,16 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         const uomsList = (uRes.success && Array.isArray(uRes.uoms)) ? uRes.uoms : [];
         const empList = (eRes.success && Array.isArray(eRes.employees)) ? eRes.employees : [];
 
+        const allTerms = (termsRes.success && Array.isArray(termsRes.terms)) ? termsRes.terms : [];
+        const delivTerms = allTerms.filter((t) => t.termType === 'DELIVERY' && t.isActive !== false);
+        const payTerms = allTerms.filter((t) => t.termType === 'PAYMENT' && t.isActive !== false);
+
         setRequirements(reqsList);
         setItems(itemsList);
         setUoms(uomsList);
         setSalesPersons(empList);
+        setDeliveryTermsList(delivTerms);
+        setPaymentTermsList(payTerms);
 
         // If Editing, load complete quotation detail with items
         if (isEdit) {
@@ -281,6 +305,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 specifications: it.specifications || [],
                 faceVelocity: it.dimensions?.faceVelocity || '',
                 remarks: it.remarks || '',
+                guard: (it.guard || it.dimensions?.guard) ? {
+                  hasGuard: Boolean(it.guard?.hasGuard ?? it.dimensions?.guard?.hasGuard ?? it.guard?.enabled ?? it.dimensions?.guard?.enabled),
+                  material: it.guard?.material || it.dimensions?.guard?.material || 'SS304',
+                  sides: it.guard?.sides || it.dimensions?.guard?.sides || 'One side',
+                } : {
+                  hasGuard: false,
+                  material: 'SS304',
+                  sides: 'One side',
+                },
               }));
               setLineItems(loadedLineItems);
 
@@ -350,6 +383,13 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
           if (matchedReq) {
             populateLineItemsFromRequirement(matchedReq, itemsList, uomsList);
           }
+
+          // Automatically default terms from Terms Master if creating a new quotation
+          setFormData((prev) => ({
+            ...prev,
+            paymentTerms: prev.paymentTerms || (payTerms[0] ? (payTerms[0].description ? `${payTerms[0].termName} - ${payTerms[0].description}` : payTerms[0].termName) : ''),
+            deliveryTerms: prev.deliveryTerms || (delivTerms[0] ? (delivTerms[0].description ? `${delivTerms[0].termName} - ${delivTerms[0].description}` : delivTerms[0].termName) : ''),
+          }));
         }
       } catch (err) {
         console.error('Failed to load master options for Quotation form:', err);
@@ -535,8 +575,45 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         unitPrice: 0,
         hsnCode: '',
         remarks: '',
+        guard: {
+          hasGuard: false,
+          material: 'SS304',
+          sides: 'One side',
+        },
       },
     ]);
+  };
+
+  const handleGuardToggle = (index, hasGuard) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const currentGuard = next[index].guard || {};
+      next[index] = {
+        ...next[index],
+        guard: {
+          hasGuard: Boolean(hasGuard),
+          material: currentGuard.material || 'SS304',
+          sides: currentGuard.sides || 'One side',
+        },
+      };
+      return next;
+    });
+  };
+
+  const handleGuardChange = (index, field, value) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const currentGuard = next[index].guard || { hasGuard: true, material: 'SS304', sides: 'One side' };
+      next[index] = {
+        ...next[index],
+        guard: {
+          ...currentGuard,
+          hasGuard: true,
+          [field]: value,
+        },
+      };
+      return next;
+    });
   };
 
   const handleRemoveLineItem = (index) => {
@@ -627,7 +704,19 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         filterGrade: item.filterGrade || null,
         drawing: item.drawing || null,
         drawingSnapshot: item.drawingSnapshot || null,
-        dimensions: item.dimensions || {},
+        dimensions: {
+          ...(item.dimensions || {}),
+          guard: item.guard && item.guard.hasGuard ? {
+            hasGuard: true,
+            material: item.guard.material || 'SS304',
+            sides: item.guard.sides || 'One side',
+          } : undefined,
+        },
+        guard: item.guard && item.guard.hasGuard ? {
+          hasGuard: true,
+          material: item.guard.material || 'SS304',
+          sides: item.guard.sides || 'One side',
+        } : { hasGuard: false, material: null, sides: null },
         specifications: item.specifications || [],
         remarks: item.remarks || '',
       }));
@@ -1058,6 +1147,108 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                       </div>
                     </div>
 
+                    {/* Protection Guard Add-on Option */}
+                    <div className={`col-span-12 rounded-xl border p-3 transition-all ${
+                      line.guard?.hasGuard 
+                        ? 'bg-blue-50/70 border-blue-200 shadow-2xs' 
+                        : 'bg-slate-50/60 border-slate-200/80 hover:border-slate-300'
+                    }`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(line.guard?.hasGuard)}
+                            onChange={(e) => handleGuardToggle(idx, e.target.checked)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <Shield size={15} className={line.guard?.hasGuard ? 'text-blue-600' : 'text-slate-400'} />
+                            <span className="text-xs font-bold text-slate-800">
+                              Protection Guard (Add-on Option)
+                            </span>
+                          </div>
+                        </label>
+
+                        {line.guard?.hasGuard ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-900 border border-blue-200">
+                            <Shield size={12} className="text-blue-700" />
+                            <span>Guard: <strong className="font-bold">{line.guard.material || 'SS304'}</strong> • {line.guard.sides || 'One side'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-medium italic">
+                            Click checkbox to add Guard (SS304 / Alu, One side / Both side)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Revealed options when Guard option is checked */}
+                      {line.guard?.hasGuard && (
+                        <div className="mt-3 pt-3 border-t border-blue-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          {/* Option 1: Material (SS304 / Alu) */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[11px] font-bold text-slate-700">
+                                1. Guard Material
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                Selected: <strong className="text-blue-700">{line.guard.material || 'SS304'}</strong>
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {['SS304', 'Alu'].map((mat) => {
+                                const isSelected = (line.guard.material || 'SS304') === mat;
+                                return (
+                                  <button
+                                    key={mat}
+                                    type="button"
+                                    onClick={() => handleGuardChange(idx, 'material', mat)}
+                                    className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                                      isSelected
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>{mat === 'SS304' ? 'SS304' : 'Alu'}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Option 2: Sides (One side / Both side) */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[11px] font-bold text-slate-700">
+                                2. Guard Placement
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                Selected: <strong className="text-blue-700">{line.guard.sides || 'One side'}</strong>
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {['One side', 'Both side'].map((side) => {
+                                const isSelected = (line.guard.sides || 'One side') === side;
+                                return (
+                                  <button
+                                    key={side}
+                                    type="button"
+                                    onClick={() => handleGuardChange(idx, 'sides', side)}
+                                    className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                                      isSelected
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>{side}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Engineering Drawing Assignment (Drawing Master) */}
                     <div className="col-span-12 mt-1">
                       <DrawingSelector
@@ -1213,18 +1404,100 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Payment Terms</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label mb-0">Payment Terms</label>
+                  {paymentTermsList.length > 0 && (
+                    <span className="text-[11px] text-blue-600 font-medium">
+                      Terms Master ({paymentTermsList.length} available)
+                    </span>
+                  )}
+                </div>
+                {paymentTermsList.length > 0 && (
+                  <Select
+                    className="mb-1.5 text-xs bg-slate-50 border-slate-200"
+                    value={
+                      paymentTermsList.find((t) => {
+                        const termWithDesc = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                        return t.termName === formData.paymentTerms || termWithDesc === formData.paymentTerms;
+                      }) ? (
+                        paymentTermsList.find((t) => {
+                          const termWithDesc = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                          return t.termName === formData.paymentTerms || termWithDesc === formData.paymentTerms;
+                        }).description
+                          ? `${paymentTermsList.find((t) => t.termName === formData.paymentTerms || `${t.termName} - ${t.description}` === formData.paymentTerms).termName} - ${paymentTermsList.find((t) => t.termName === formData.paymentTerms || `${t.termName} - ${t.description}` === formData.paymentTerms).description}`
+                          : formData.paymentTerms
+                      ) : ''
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setFormData({ ...formData, paymentTerms: e.target.value });
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose Master Payment Term --</option>
+                    {paymentTermsList.map((t) => {
+                      const displayVal = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                      return (
+                        <option key={t._id} value={displayVal}>
+                          {t.termName} {t.description ? `(${t.description})` : ''}
+                        </option>
+                      );
+                    })}
+                  </Select>
+                )}
                 <Input
                   type="text"
+                  placeholder="Payment terms..."
                   value={formData.paymentTerms}
                   onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
                 />
               </div>
 
               <div>
-                <label className="form-label">Delivery Terms</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label mb-0">Delivery Terms</label>
+                  {deliveryTermsList.length > 0 && (
+                    <span className="text-[11px] text-blue-600 font-medium">
+                      Terms Master ({deliveryTermsList.length} available)
+                    </span>
+                  )}
+                </div>
+                {deliveryTermsList.length > 0 && (
+                  <Select
+                    className="mb-1.5 text-xs bg-slate-50 border-slate-200"
+                    value={
+                      deliveryTermsList.find((t) => {
+                        const termWithDesc = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                        return t.termName === formData.deliveryTerms || termWithDesc === formData.deliveryTerms;
+                      }) ? (
+                        deliveryTermsList.find((t) => {
+                          const termWithDesc = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                          return t.termName === formData.deliveryTerms || termWithDesc === formData.deliveryTerms;
+                        }).description
+                          ? `${deliveryTermsList.find((t) => t.termName === formData.deliveryTerms || `${t.termName} - ${t.description}` === formData.deliveryTerms).termName} - ${deliveryTermsList.find((t) => t.termName === formData.deliveryTerms || `${t.termName} - ${t.description}` === formData.deliveryTerms).description}`
+                          : formData.deliveryTerms
+                      ) : ''
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setFormData({ ...formData, deliveryTerms: e.target.value });
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose Master Delivery Term --</option>
+                    {deliveryTermsList.map((t) => {
+                      const displayVal = t.description ? `${t.termName} - ${t.description}` : t.termName;
+                      return (
+                        <option key={t._id} value={displayVal}>
+                          {t.termName} {t.description ? `(${t.description})` : ''}
+                        </option>
+                      );
+                    })}
+                  </Select>
+                )}
                 <Input
                   type="text"
+                  placeholder="Delivery terms..."
                   value={formData.deliveryTerms}
                   onChange={(e) => setFormData({ ...formData, deliveryTerms: e.target.value })}
                 />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getItems } from '../../services/itemService';
+import { getItems, deleteItem } from '../../services/itemService';
 import { getItemGroups } from '../../services/itemGroupService';
 import { getItemCategories } from '../../services/itemCategoryService';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ import Alert from '../../components/ui/Alert';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
 import ItemTypeSelectionModal from './ItemTypeSelectionModal';
+import DeleteItemModal from './DeleteItemModal';
 import { 
   Plus, 
   Search, 
@@ -23,7 +24,8 @@ import {
   Layers,
   Tag,
   ArrowUpDown,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 
 const ItemList = () => {
@@ -31,12 +33,19 @@ const ItemList = () => {
 
   const canCreate = hasPermission('ITEM_CREATE');
   const canEdit = hasPermission('ITEM_EDIT');
+  const canDelete = hasPermission('ITEM_DELETE') || hasPermission('ITEM_EDIT');
 
   const [items, setItems] = useState([]);
   const [itemGroups, setItemGroups] = useState([]);
   const [itemCategories, setItemCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Delete modal state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Pagination states (25 records per page)
   const [page, setPage] = useState(1);
@@ -60,6 +69,38 @@ const ItemList = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+
+  const handleDeleteClick = (item) => {
+    setError('');
+    setSuccessMessage('');
+    setItemToDelete(item);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+    setDeleteLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await deleteItem(itemToDelete._id);
+      if (res.success) {
+        setSuccessMessage(res.message || `Item "${itemToDelete.itemName}" (${itemToDelete.itemCode}) deleted successfully.`);
+        setIsDeleteDialogOpen(false);
+        setItemToDelete(null);
+        await fetchItemData();
+      } else {
+        setError(res.message || 'Failed to delete item');
+        setIsDeleteDialogOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to delete item:", err);
+      setError(err.response?.data?.message || err.message || 'Failed to delete item');
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   // Debounce search input (350ms)
   useEffect(() => {
@@ -293,7 +334,7 @@ const ItemList = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '140px',
+      width: '190px',
       render: (_, row) => (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -320,6 +361,18 @@ const ItemList = () => {
             >
               <Edit size={14} className="text-blue-600" />
               <span>Edit</span>
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => handleDeleteClick(row)}
+              title="Delete Item"
+              className="text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+            >
+              <Trash2 size={14} />
+              <span>Delete</span>
             </Button>
           )}
         </div>
@@ -369,6 +422,7 @@ const ItemList = () => {
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       {/* Main Content Card Container */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 space-y-3.5">
@@ -574,6 +628,20 @@ const ItemList = () => {
           setIsFormOpen(true);
         }}
         canEdit={canEdit}
+      />
+
+      {/* Delete Item Confirmation Modal */}
+      <DeleteItemModal
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          if (!deleteLoading) {
+            setIsDeleteDialogOpen(false);
+            setItemToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        item={itemToDelete}
+        loading={deleteLoading}
       />
     </div>
   );

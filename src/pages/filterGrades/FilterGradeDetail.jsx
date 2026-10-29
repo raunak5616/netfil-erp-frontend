@@ -1,11 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { Layers, Edit } from 'lucide-react';
+import { Layers, Edit, Trash2 } from 'lucide-react';
+import { deleteFilterGrade } from '../../services/filterGradeService';
+import DeleteFilterGradeModal from './DeleteFilterGradeModal';
 
-const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, canEdit }) => {
+const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, onSuccess, canEdit, canDelete }) => {
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   if (!isOpen || !grade) return null;
+
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await deleteFilterGrade(grade._id);
+      setIsDeleteOpen(false);
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      console.error("Failed to delete filter grade:", err);
+      setIsDeleteOpen(false);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   return (
     <Modal
@@ -15,22 +35,36 @@ const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, canEdit }) => {
       size="xl"
       icon={Layers}
       footer={
-        <div className="flex gap-2">
-          {canEdit && (
-            <Button
-              variant="secondary"
-              icon={Edit}
-              onClick={() => {
-                onClose();
-                onEdit(grade);
-              }}
-            >
-              Edit
+        <div className="flex items-center justify-between w-full">
+          <div>
+            {(canEdit || canDelete) && (
+              <Button
+                variant="secondary"
+                icon={Trash2}
+                onClick={() => setIsDeleteOpen(true)}
+                className="text-slate-700 hover:text-slate-900 border-slate-300"
+              >
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {canEdit && (
+              <Button
+                variant="secondary"
+                icon={Edit}
+                onClick={() => {
+                  onClose();
+                  onEdit(grade);
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            <Button variant="primary" onClick={onClose}>
+              Close
             </Button>
-          )}
-          <Button variant="primary" onClick={onClose}>
-            Close
-          </Button>
+          </div>
         </div>
       }
     >
@@ -103,6 +137,14 @@ const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, canEdit }) => {
           )}
         </div>
       </div>
+
+      <DeleteFilterGradeModal
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        grade={grade}
+        loading={deleteLoading}
+      />
     </Modal>
   );
 };

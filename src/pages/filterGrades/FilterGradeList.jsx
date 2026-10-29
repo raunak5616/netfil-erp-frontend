@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getFilterGrades, updateFilterGradeStatus } from '../../services/filterGradeService';
+import { getFilterGrades, updateFilterGradeStatus, deleteFilterGrade } from '../../services/filterGradeService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -9,6 +9,7 @@ import Alert from '../../components/ui/Alert';
 import { Input, Select } from '../../components/ui/FormField';
 import FilterGradeForm from './FilterGradeForm';
 import FilterGradeDetail from './FilterGradeDetail';
+import DeleteFilterGradeModal from './DeleteFilterGradeModal';
 import { 
   Layers, 
   Plus, 
@@ -17,7 +18,8 @@ import {
   Eye, 
   Edit, 
   RefreshCw,
-  Power
+  Power,
+  Trash2
 } from 'lucide-react';
 
 const FilterGradeList = () => {
@@ -26,10 +28,12 @@ const FilterGradeList = () => {
   const canCreate = hasPermission('FILTER_GRADE_CREATE');
   const canEdit = hasPermission('FILTER_GRADE_EDIT');
   const canChangeStatus = hasPermission('FILTER_GRADE_STATUS');
+  const canDelete = hasPermission('FILTER_GRADE_DELETE') || hasPermission('FILTER_GRADE_EDIT');
 
   const [grades, setGrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -39,6 +43,11 @@ const FilterGradeList = () => {
   
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState(null);
+
+  // Delete modal state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [gradeToDelete, setGradeToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchGrades = async () => {
     setLoading(true);
@@ -63,7 +72,7 @@ const FilterGradeList = () => {
   }, []);
 
   const filteredGrades = useMemo(() => {
-    return grades.filter((grade) => {
+    const list = grades.filter((grade) => {
       if (statusFilter !== 'all' && grade.status !== statusFilter) return false;
       if (!searchTerm.trim()) return true;
 
@@ -74,6 +83,13 @@ const FilterGradeList = () => {
 
       return code.includes(term) || euro.includes(term) || iso.includes(term);
     });
+
+    return [...list].sort((a, b) =>
+      (a.filterGrade || '').localeCompare(b.filterGrade || '', undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
   }, [grades, searchTerm, statusFilter]);
 
   const toggleStatus = async (grade) => {
@@ -83,6 +99,38 @@ const FilterGradeList = () => {
       fetchGrades();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleDeleteClick = (grade) => {
+    setError('');
+    setSuccessMessage('');
+    setGradeToDelete(grade);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!gradeToDelete) return;
+    setDeleteLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await deleteFilterGrade(gradeToDelete._id);
+      if (res.success) {
+        setSuccessMessage(res.message || `Filter Grade "${gradeToDelete.filterGrade}" deleted successfully.`);
+        setIsDeleteDialogOpen(false);
+        setGradeToDelete(null);
+        await fetchGrades();
+      } else {
+        setError(res.message || 'Failed to delete filter grade');
+        setIsDeleteDialogOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to delete filter grade:", err);
+      setError(err.response?.data?.message || err.message || 'Failed to delete filter grade');
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -159,9 +207,19 @@ const FilterGradeList = () => {
               variant="ghost"
               size="sm"
               icon={Power}
-              className={row.status === 'active' ? 'text-red-500 hover:text-red-700 hover:bg-red-50' : 'text-green-500 hover:text-green-700 hover:bg-green-50'}
+              className={row.status === 'active' ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50' : 'text-green-500 hover:text-green-700 hover:bg-green-50'}
               onClick={() => toggleStatus(row)}
               title={row.status === 'active' ? 'Deactivate Grade' : 'Activate Grade'}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Trash2}
+              className="text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              onClick={() => handleDeleteClick(row)}
+              title="Delete Filter Grade"
             />
           )}
         </div>
@@ -201,6 +259,7 @@ const FilterGradeList = () => {
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -263,6 +322,21 @@ const FilterGradeList = () => {
         }}
         onSuccess={fetchGrades}
         canEdit={canEdit}
+        canDelete={canDelete}
+      />
+
+      {/* Delete Filter Grade Confirmation Modal */}
+      <DeleteFilterGradeModal
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          if (!deleteLoading) {
+            setIsDeleteDialogOpen(false);
+            setGradeToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        grade={gradeToDelete}
+        loading={deleteLoading}
       />
     </div>
   );

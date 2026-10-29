@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getStores, updateStoreStatus } from '../../services/storeService';
+import { getStores, updateStoreStatus, deleteStore } from '../../services/storeService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -9,6 +9,7 @@ import Alert from '../../components/ui/Alert';
 import { Input, Select } from '../../components/ui/FormField';
 import StoreFormModal from './StoreFormModal';
 import StoreDetailModal from './StoreDetailModal';
+import DeleteStoreModal from './DeleteStoreModal';
 import { 
   Package, 
   Plus, 
@@ -17,7 +18,8 @@ import {
   Eye, 
   Edit, 
   RefreshCw,
-  Power
+  Power,
+  Trash2
 } from 'lucide-react';
 
 const StoreList = () => {
@@ -26,10 +28,12 @@ const StoreList = () => {
   const canCreate = hasPermission('STORE_CREATE');
   const canEdit = hasPermission('STORE_EDIT');
   const canChangeStatus = hasPermission('STORE_STATUS');
+  const canDelete = hasPermission('STORE_DELETE') || hasPermission('STORE_EDIT');
 
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +44,11 @@ const StoreList = () => {
   const [editingStore, setEditingStore] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState(null);
+
+  // Delete modal state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [storeToDelete, setStoreToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchStoreData = async () => {
     setLoading(true);
@@ -84,6 +93,38 @@ const StoreList = () => {
       fetchStoreData();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleDeleteClick = (store) => {
+    setError('');
+    setSuccessMessage('');
+    setStoreToDelete(store);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!storeToDelete) return;
+    setDeleteLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await deleteStore(storeToDelete._id);
+      if (res.success) {
+        setSuccessMessage(res.message || `Store "${storeToDelete.storeName}" (${storeToDelete.storeCode}) deleted successfully.`);
+        setIsDeleteDialogOpen(false);
+        setStoreToDelete(null);
+        await fetchStoreData();
+      } else {
+        setError(res.message || 'Failed to delete store');
+        setIsDeleteDialogOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to delete store:", err);
+      setError(err.response?.data?.message || err.message || 'Failed to delete store');
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -162,9 +203,19 @@ const StoreList = () => {
               variant="ghost"
               size="sm"
               icon={Power}
-              className={row.status === 'ACTIVE' ? 'text-red-500 hover:text-red-700 hover:bg-red-50' : 'text-green-500 hover:text-green-700 hover:bg-green-50'}
+              className={row.status === 'ACTIVE' ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50' : 'text-green-500 hover:text-green-700 hover:bg-green-50'}
               onClick={() => toggleStatus(row)}
               title={row.status === 'ACTIVE' ? 'Deactivate Store' : 'Activate Store'}
+            />
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Trash2}
+              className="text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              onClick={() => handleDeleteClick(row)}
+              title="Delete Store"
             />
           )}
         </div>
@@ -204,6 +255,7 @@ const StoreList = () => {
       />
 
       {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
@@ -270,6 +322,21 @@ const StoreList = () => {
         }}
         onSuccess={fetchStoreData}
         canEdit={canEdit}
+        canDelete={canDelete}
+      />
+
+      {/* Delete Store Confirmation Modal */}
+      <DeleteStoreModal
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          if (!deleteLoading) {
+            setIsDeleteDialogOpen(false);
+            setStoreToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        store={storeToDelete}
+        loading={deleteLoading}
       />
     </div>
   );

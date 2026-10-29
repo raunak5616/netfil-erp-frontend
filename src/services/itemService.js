@@ -44,3 +44,8 @@ export const removeItemSpecification = async (itemId, specificationId) => {
   const response = await api.delete(`/items/${itemId}/specifications/${specificationId}`);
   return response.data;
 };
+
+export const deleteItem = async (itemId) => {
+  const response = await api.delete(`/items/${itemId}`);
+  return response.data;
+};

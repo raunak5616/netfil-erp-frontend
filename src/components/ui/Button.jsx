@@ -19,6 +19,7 @@ const Button = ({
     outline: 'bg-transparent text-blue-700 border-blue-700 hover:bg-blue-50',
     danger: 'bg-red-700 text-white border-transparent hover:bg-red-800',
     ghost: 'bg-transparent text-slate-600 border-transparent hover:bg-slate-100 hover:text-slate-900',
+    dark: 'bg-slate-900 text-white border-transparent hover:bg-slate-800 active:bg-black',
   };
 
   const sizeClasses = {

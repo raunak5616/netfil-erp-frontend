@@ -109,7 +109,7 @@ const MainLayout = () => {
     const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/flange-designs', '/drawing-master'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
-    const partyMasterPaths = ['/clients', '/parties'];
+    const partyMasterPaths = ['/clients', '/parties', '/terms'];
     const isPartyMasterChild = partyMasterPaths.some((p) => path.startsWith(p));
 
     const commercialPaths = ['/requirements', '/enquiries', '/enquiry-mis', '/quotations', '/sales-orders'];
@@ -196,6 +196,7 @@ const MainLayout = () => {
       '/drawing-master': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Drawing Master' }],
       '/clients': [{ label: 'Master' }, { label: 'Party Master' }],
       '/parties': [{ label: 'Master' }, { label: 'Party Master' }],
+      '/terms': [{ label: 'Master' }, { label: 'Terms Master' }],
       '/requirements': [{ label: 'Commercial' }, { label: 'Client Requirements' }],
       '/enquiries': [{ label: 'Commercial' }, { label: 'Client Enquiries' }],
       '/enquiry-mis': [{ label: 'Commercial' }, { label: 'Enquiry MIS Reports' }],
@@ -289,6 +290,7 @@ const MainLayout = () => {
               ],
             },
             { label: 'Party Master', path: '/clients', icon: Users, permission: ['PARTY_VIEW', 'CLIENT_VIEW'] },
+            { label: 'Terms Master', path: '/terms', icon: FileText, permission: ['TERM_VIEW', 'TERMS_VIEW', 'QUOTATION_VIEW'] },
           ],
         },
         {
@@ -342,6 +344,7 @@ const MainLayout = () => {
     { label: 'Drawing Master', path: '/drawing-master', category: 'Item Master', permission: 'FILTER_GRADE_VIEW' },
     { label: 'Units of Measure', path: '/uoms', category: 'Item Master', permission: 'UOM_VIEW' },
     { label: 'Party Master', path: '/clients', category: 'Master', permission: ['PARTY_VIEW', 'CLIENT_VIEW'] },
+    { label: 'Terms Master', path: '/terms', category: 'Master', permission: ['TERM_VIEW', 'TERMS_VIEW', 'QUOTATION_VIEW'] },
     { label: 'Requirement / Enquiry', path: '/requirements', category: 'Commercial', permission: 'REQUIREMENT_VIEW' },
     { label: 'Quotation Register', path: '/quotations', category: 'Commercial', permission: 'QUOTATION_VIEW' },
     { label: 'Sales Orders', path: '/sales-orders', category: 'Commercial', permission: 'SALES_ORDER_VIEW' },

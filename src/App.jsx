@@ -17,6 +17,7 @@ import SpecificationList from './pages/specifications/SpecificationList';
 import FilterGradeList from './pages/filterGrades/FilterGradeList';
 import FlangeDesignList from './pages/flange-designs/FlangeDesignList';
 import DrawingMasterList from './pages/drawing-master/DrawingMasterList';
+import TermsMasterList from './pages/terms/TermsMasterList';
 import ClientList from './pages/clients/ClientList';
 import RequirementList from './pages/requirements/RequirementList';
 import EnquiryMis from './pages/requirements/EnquiryMis';
@@ -215,6 +216,11 @@ function App() {
               {/* Protected Items Module Route */}
               <Route element={<ProtectedRoute requiredPermission="ITEM_VIEW" />}>
                 <Route path="/items" element={<ItemList />} />
+              </Route>
+
+              {/* Protected Terms Master Route */}
+              <Route element={<ProtectedRoute requiredPermission={["TERM_VIEW", "TERMS_VIEW", "QUOTATION_VIEW"]} />}>
+                <Route path="/terms" element={<TermsMasterList />} />
               </Route>
 
               {/* Default Redirect */}
