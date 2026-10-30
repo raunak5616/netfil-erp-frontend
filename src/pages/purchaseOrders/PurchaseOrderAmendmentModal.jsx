@@ -3,7 +3,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField';
-import { createPurchaseOrderAmendment } from '../../services/purchaseOrderService';
+import { useCreatePurchaseOrderAmendmentMutation } from '../../features/purchase/purchaseApi';
 import { Plus, Trash2, Save, FileEdit } from 'lucide-react';
 
 const PurchaseOrderAmendmentModal = ({
@@ -16,7 +16,9 @@ const PurchaseOrderAmendmentModal = ({
 }) => {
   if (!isOpen || !purchaseOrder) return null;
 
-  const [loading, setLoading] = useState(false);
+  const [createPurchaseOrderAmendmentMutation, { isLoading: isCreating }] = useCreatePurchaseOrderAmendmentMutation();
+  const [submitting, setSubmitting] = useState(false);
+  const loading = submitting || isCreating;
   const [error, setError] = useState('');
   const [reason, setReason] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -188,19 +190,15 @@ const PurchaseOrderAmendmentModal = ({
       }))
     };
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const res = await createPurchaseOrderAmendment(purchaseOrder._id, payload);
-      if (res.success) {
-        if (onSuccess) onSuccess(res.amendment, res.purchaseOrder);
-      } else {
-        setError(res.message || 'Failed to create amendment.');
-      }
+      const res = await createPurchaseOrderAmendmentMutation({ id: purchaseOrder._id, data: payload }).unwrap();
+      if (onSuccess) onSuccess(res?.amendment, res?.purchaseOrder);
     } catch (err) {
       console.error('Create Amendment error:', err);
-      setError(err.response?.data?.message || 'Error creating Purchase Order Amendment.');
+      setError(err?.data?.message || err.message || 'Error creating Purchase Order Amendment.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 

@@ -1,172 +1,117 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import {
+  setCredentials,
+  updateUser,
+  logout as authLogout,
+  setAuthLoading,
+  setAuthError,
+  selectCurrentUser,
+  selectCurrentToken,
+  selectIsAuthenticated,
+  selectAuthLoading,
+  selectAuthError,
+  selectIsAdmin,
+  checkUserPermission,
+  PERMISSION_ALIASES,
+  getEquivalentPermissionCodes,
+} from '../features/auth/authSlice';
+import { apiSlice } from '../features/api/apiSlice';
 
-export const PERMISSION_ALIASES = {
-  CLIENT_VIEW: ['CLIENT_VIEW', 'PARTY_VIEW'],
-  PARTY_VIEW: ['PARTY_VIEW', 'CLIENT_VIEW'],
-  CLIENT_CREATE: ['CLIENT_CREATE', 'PARTY_CREATE'],
-  PARTY_CREATE: ['PARTY_CREATE', 'CLIENT_CREATE'],
-  CLIENT_EDIT: ['CLIENT_EDIT', 'PARTY_EDIT'],
-  PARTY_EDIT: ['PARTY_EDIT', 'CLIENT_EDIT'],
-  CLIENT_DELETE: ['CLIENT_DELETE', 'PARTY_DELETE'],
-  PARTY_DELETE: ['PARTY_DELETE', 'CLIENT_DELETE'],
-  TERM_VIEW: ['TERM_VIEW', 'TERMS_VIEW', 'QUOTATION_VIEW'],
-  TERMS_VIEW: ['TERMS_VIEW', 'TERM_VIEW', 'QUOTATION_VIEW'],
-  TERM_CREATE: ['TERM_CREATE', 'TERMS_CREATE', 'QUOTATION_CREATE', 'TERM_EDIT'],
-  TERMS_CREATE: ['TERMS_CREATE', 'TERM_CREATE', 'QUOTATION_CREATE', 'TERM_EDIT'],
-  TERM_EDIT: ['TERM_EDIT', 'TERMS_EDIT', 'QUOTATION_EDIT'],
-  TERMS_EDIT: ['TERMS_EDIT', 'TERM_EDIT', 'QUOTATION_EDIT'],
-  TERM_DELETE: ['TERM_DELETE', 'TERMS_DELETE', 'TERM_EDIT', 'QUOTATION_EDIT'],
-  TERMS_DELETE: ['TERMS_DELETE', 'TERM_DELETE', 'TERM_EDIT', 'QUOTATION_EDIT'],
-};
-
-export const getEquivalentPermissionCodes = (permissionCode) => {
-  if (!permissionCode) return [];
-  if (Array.isArray(permissionCode)) {
-    return Array.from(new Set(permissionCode.flatMap((c) => getEquivalentPermissionCodes(c))));
-  }
-  return PERMISSION_ALIASES[permissionCode] || [permissionCode];
-};
+export { PERMISSION_ALIASES, getEquivalentPermissionCodes };
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('netfil_user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('netfil_token') || null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(selectCurrentUser);
+  const token = useAppSelector(selectCurrentToken);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const loading = useAppSelector(selectAuthLoading);
+  const error = useAppSelector(selectAuthError);
+  const isAdmin = useAppSelector(selectIsAdmin);
 
   // Initialize & verify session on startup
   useEffect(() => {
     const verifySession = async () => {
       if (token) {
+        dispatch(setAuthLoading(true));
         try {
           const res = await api.get('/auth/me');
           if (res.data && res.data.success && res.data.user) {
-            setUser(res.data.user);
-            localStorage.setItem('netfil_user', JSON.stringify(res.data.user));
+            dispatch(updateUser(res.data.user));
           }
         } catch (err) {
           console.error("Session verification failed:", err);
           logout();
+        } finally {
+          dispatch(setAuthLoading(false));
         }
+      } else {
+        dispatch(setAuthLoading(false));
       }
-      setLoading(false);
     };
 
     verifySession();
-  }, [token]);
+  }, [token, dispatch]);
 
   // Login handler
   const login = async (username, password) => {
-    setError(null);
+    dispatch(setAuthError(null));
     try {
       const response = await api.post('/auth/login', { username, password });
       const { success, token: authToken, user: userData, message } = response.data;
 
       if (success) {
-        setToken(authToken);
-        setUser(userData);
-        localStorage.setItem('netfil_token', authToken);
-        localStorage.setItem('netfil_user', JSON.stringify(userData));
+        dispatch(setCredentials({ user: userData, token: authToken }));
         return { success: true };
       } else {
-        setError(message || 'Login failed');
-        return { success: false, message: message || 'Login failed' };
+        const msg = message || 'Login failed';
+        dispatch(setAuthError(msg));
+        return { success: false, message: msg };
       }
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
-      setError(msg);
+      dispatch(setAuthError(msg));
       return { success: false, message: msg };
     }
   };
 
-  // Logout handler
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('netfil_token');
-    localStorage.removeItem('netfil_user');
-  };
+  // Logout handler - clears auth state AND resets all RTK Query server caches to prevent data leakage between users
+  const logout = useCallback(() => {
+    dispatch(authLogout());
+    dispatch(apiSlice.util.resetApiState());
+  }, [dispatch]);
 
   /**
    * RBAC Permission Checker
-   * Evaluates user-specific overrides first (DENY -> ALLOW), then checks Admin role, then checks Role permissions union.
+   * Uses centralized pure checkUserPermission algorithm
    */
-  const hasPermission = useCallback((permissionCode) => {
-    if (!user) return false;
+  const hasPermission = useCallback(
+    (permissionCode) => {
+      return checkUserPermission(user, permissionCode);
+    },
+    [user]
+  );
 
-    const codesToCheck = getEquivalentPermissionCodes(permissionCode);
-
-    // 1. Check user-level permission overrides
-    if (user.permissions && Array.isArray(user.permissions)) {
-      const userOverrides = user.permissions.filter((item) => {
-        const code = typeof item.permission === 'string'
-          ? item.permission
-          : item.permission?.permissionCode;
-        return codesToCheck.includes(code);
-      });
-
-      if (userOverrides.some((item) => item.effect === 'DENY')) return false;
-      if (userOverrides.some((item) => item.effect === 'ALLOW')) return true;
-    }
-
-    // Support both user.roles (array) and fallback user.role (object)
-    const rolesArray = user.roles
-      ? user.roles
-      : user.role
-      ? [user.role]
-      : [];
-
-    if (!Array.isArray(rolesArray) || rolesArray.length === 0) return false;
-
-    // 2. Check if user has an "Admin" role (Admin has all permissions)
-    const isAdmin = rolesArray.some((r) => {
-      if (!r) return false;
-      const roleName = typeof r === 'string' ? r : r.roleName;
-      return roleName?.toLowerCase() === 'admin';
-    });
-
-    if (isAdmin) return true;
-
-    // 3. Check union of all assigned roles permissions
-    return rolesArray.some((role) => {
-      if (!role || typeof role === 'string' || !role.permissions || !Array.isArray(role.permissions)) return false;
-      return role.permissions.some((perm) => {
-        if (!perm) return false;
-        const permCode = typeof perm === 'string' ? perm : perm.permissionCode;
-        return codesToCheck.includes(permCode);
-      });
-    });
-  }, [user]);
-
-  const isAdmin = React.useMemo(() => {
-    if (!user) return false;
-    const rolesArray = user.roles ? user.roles : user.role ? [user.role] : [];
-    return rolesArray.some((r) => {
-      if (!r) return false;
-      const roleName = typeof r === 'string' ? r : r.roleName;
-      return roleName?.toLowerCase() === 'admin';
-    });
-  }, [user]);
+  const contextValue = useMemo(
+    () => ({
+      user,
+      token,
+      loading,
+      error,
+      login,
+      logout,
+      hasPermission,
+      isAdmin,
+      isAuthenticated,
+    }),
+    [user, token, loading, error, logout, hasPermission, isAdmin, isAuthenticated]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        error,
-        login,
-        logout,
-        hasPermission,
-        isAdmin,
-        isAuthenticated: !!token && !!user,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -179,3 +124,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;

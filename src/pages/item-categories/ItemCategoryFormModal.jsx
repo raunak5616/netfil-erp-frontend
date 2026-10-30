@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createItemCategory, updateItemCategory } from '../../services/itemCategoryService';
-import { getItemGroups } from '../../services/itemGroupService';
+import {
+  useCreateItemCategoryMutation,
+  useUpdateItemCategoryMutation,
+  useGetItemGroupsQuery,
+} from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -8,6 +11,17 @@ import { FormField, Input, Select } from '../../components/ui/FormField';
 
 const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialItemGroups = [] }) => {
   const isEditMode = !!category;
+
+  const [createItemCategoryMutation] = useCreateItemCategoryMutation();
+  const [updateItemCategoryMutation] = useUpdateItemCategoryMutation();
+
+  const {
+    data: itemGroupsData,
+    isLoading: groupsLoading,
+    error: groupsQueryError,
+  } = useGetItemGroupsQuery({ typeFilter: 'MASTER' }, { skip: !isOpen });
+
+  const groupsError = groupsQueryError?.data?.message || '';
 
   const [formData, setFormData] = useState({
     categoryCode: '',
@@ -17,60 +31,21 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
     status: 'active',
   });
 
-  const [itemGroups, setItemGroups] = useState(initialItemGroups || []);
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [groupsError, setGroupsError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Synchronize initial item groups from parent if available
-  useEffect(() => {
-    if (initialItemGroups && initialItemGroups.length > 0) {
-      setItemGroups(initialItemGroups);
-    }
-  }, [initialItemGroups]);
-
-  // Fetch available Item Groups for the dropdown when modal is open
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let isMounted = true;
-    const fetchGroups = async () => {
-      // Only show loading spinner if we don't already have cached/initial groups
-      if (!itemGroups || itemGroups.length === 0) {
-        setGroupsLoading(true);
-      }
-      setGroupsError('');
-      try {
-        const res = await getItemGroups({ typeFilter: 'MASTER' });
-        if (isMounted && res?.success && Array.isArray(res.itemGroups)) {
-          setItemGroups(res.itemGroups);
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Failed to fetch item groups:", err);
-          if (!itemGroups || itemGroups.length === 0) {
-            setGroupsError(err.response?.data?.message || 'Failed to fetch item groups from server.');
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setGroupsLoading(false);
-        }
-      }
-    };
-
-    fetchGroups();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
+  const rawGroups = useMemo(() => {
+    return (
+      itemGroupsData?.itemGroups ||
+      itemGroupsData?.groups ||
+      (Array.isArray(itemGroupsData) ? itemGroupsData : initialItemGroups || [])
+    );
+  }, [itemGroupsData, initialItemGroups]);
 
   // Filter out system internal groups and guarantee currently edited category's item group is included
   const displayGroups = useMemo(() => {
-    const list = [...(itemGroups || [])];
+    const list = [...rawGroups];
 
     // If editing a category and its group is an object not currently in list, inject it
     if (category?.itemGroup && typeof category.itemGroup === 'object' && category.itemGroup._id) {
@@ -85,7 +60,7 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
       const code = String(g.groupCode || '').toUpperCase();
       return !code.startsWith('GP-WO-') && code !== 'GP-INV' && code !== 'GP-OBOM';
     });
-  }, [itemGroups, category]);
+  }, [rawGroups, category]);
 
   useEffect(() => {
     if (category) {
@@ -153,26 +128,22 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
 
     try {
       if (isEditMode) {
-        const res = await updateItemCategory(category._id, formData);
-        if (res.success) {
-          setSuccessMessage('Item category updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await updateItemCategoryMutation({ id: category._id, ...formData }).unwrap();
+        setSuccessMessage('Item category updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createItemCategory(formData);
-        if (res.success) {
-          setSuccessMessage('Item category created successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await createItemCategoryMutation(formData).unwrap();
+        setSuccessMessage('Item category created successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save item category.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save item category.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

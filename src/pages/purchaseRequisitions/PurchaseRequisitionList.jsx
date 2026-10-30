@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getPurchaseRequisitions,
-  deletePurchaseRequisition
-} from '../../services/purchaseRequisitionService';
-import { getDepartments } from '../../services/departmentService';
-import { getEmployees } from '../../services/employeeService';
+  useGetPurchaseRequisitionsQuery,
+  useDeletePurchaseRequisitionMutation,
+} from '../../features/purchase/purchaseApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -36,16 +36,13 @@ const PurchaseRequisitionList = () => {
   const canEdit = hasPermission('PURCHASE_REQUISITION_EDIT');
   const canCancel = hasPermission('PURCHASE_REQUISITION_CANCEL');
 
-  const [requisitions, setRequisitions] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -56,82 +53,69 @@ const PurchaseRequisitionList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const params = { page, limit };
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (priorityFilter !== 'all') params.priority = priorityFilter;
+    if (departmentFilter !== 'all') params.department = departmentFilter;
+    if (employeeFilter !== 'all') params.requestingEmployee = employeeFilter;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return params;
+  }, [page, limit, debouncedSearch, statusFilter, priorityFilter, departmentFilter, employeeFilter, startDate, endDate]);
+
+  const {
+    data: prData,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useGetPurchaseRequisitionsQuery(queryParams);
+
+  const { data: deptData } = useGetDepartmentsQuery();
+  const { data: empData } = useGetEmployeesQuery({ limit: 1000 });
+  const [deletePurchaseRequisitionMutation] = useDeletePurchaseRequisitionMutation();
+
+  const requisitions = useMemo(() => {
+    return prData?.purchaseRequisitions || prData?.requisitions || [];
+  }, [prData]);
+
+  const totalCount = prData?.pagination?.totalCount || 0;
+  const totalPages = prData?.pagination?.totalPages || 1;
+
+  const departments = useMemo(() => {
+    const raw = deptData?.departments || [];
+    return Array.isArray(raw) ? raw.filter((d) => d.status === 'active') : [];
+  }, [deptData]);
+
+  const employees = useMemo(() => {
+    const raw = empData?.employees || [];
+    return Array.isArray(raw) ? raw.filter((e) => e.status === 'active') : [];
+  }, [empData]);
 
   // Confirm Delete / Cancel Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const fetchRequisitions = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (priorityFilter !== 'all') params.priority = priorityFilter;
-      if (departmentFilter !== 'all') params.department = departmentFilter;
-      if (employeeFilter !== 'all') params.requestingEmployee = employeeFilter;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      const res = await getPurchaseRequisitions(params);
-
-      if (res.success && Array.isArray(res.purchaseRequisitions)) {
-        setRequisitions(res.purchaseRequisitions);
-        if (res.pagination) {
-          setTotalCount(res.pagination.totalCount || 0);
-          setTotalPages(res.pagination.totalPages || 1);
-        }
-      } else {
-        setError('Unexpected response structure from server');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Purchase Requisitions:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMasterData = async () => {
-    try {
-      const [deptRes, empRes] = await Promise.all([
-        getDepartments().catch(() => ({ success: false, departments: [] })),
-        getEmployees({ all: true }).catch(() => ({ success: false, employees: [] }))
-      ]);
-
-      if (deptRes.success && Array.isArray(deptRes.departments)) {
-        setDepartments(deptRes.departments.filter((d) => d.status === 'active'));
-      }
-      if (empRes.success && Array.isArray(empRes.employees)) {
-        setEmployees(empRes.employees.filter((e) => e.status === 'active'));
-      }
-    } catch (err) {
-      console.error('Failed to fetch master data:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchMasterData();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchRequisitions();
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, statusFilter, priorityFilter, departmentFilter, employeeFilter, startDate, endDate, page, limit]);
-
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
+    setDebouncedSearch(searchTerm);
     setPage(1);
-    fetchRequisitions();
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setStatusFilter('all');
     setPriorityFilter('all');
     setDepartmentFilter('all');
@@ -147,16 +131,11 @@ const PurchaseRequisitionList = () => {
     setActionLoading(deleteTarget._id);
     setError('');
     try {
-      const res = await deletePurchaseRequisition(deleteTarget._id);
-      if (res.success) {
-        setSuccessMessage(res.message || 'Purchase Requisition action completed');
-        fetchRequisitions();
-      } else {
-        setError(res.message || 'Failed to delete/cancel Purchase Requisition');
-      }
+      const res = await deletePurchaseRequisitionMutation(deleteTarget._id).unwrap();
+      setSuccessMessage(res?.message || 'Purchase Requisition action completed');
     } catch (err) {
       console.error('Delete/Cancel PR error:', err);
-      setError(err.response?.data?.message || 'Failed to perform action');
+      setError(err?.data?.message || err.message || 'Failed to perform action');
     } finally {
       setActionLoading(null);
       setDeleteTarget(null);
@@ -319,10 +298,10 @@ const PurchaseRequisitionList = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={fetchRequisitions}
-              disabled={loading}
+              onClick={() => refetch()}
+              disabled={loading || isFetching}
             >
-              <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={14} className={`mr-1.5 ${loading || isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             {canCreate && (

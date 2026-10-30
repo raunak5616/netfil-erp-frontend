@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { createEmployee, updateEmployee, getDepartments } from '../../services/employeeService';
+import {
+  useCreateEmployeeMutation,
+  useUpdateEmployeeMutation,
+} from '../../features/employees/employeesApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { AlertCircle, CheckCircle2, FileText, Upload, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 
 const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!employee;
+
+  const [createEmployee, { isLoading: isCreating }] = useCreateEmployeeMutation();
+  const [updateEmployee, { isLoading: isUpdating }] = useUpdateEmployeeMutation();
 
   const [formData, setFormData] = useState({
     employeeCode: '',
@@ -22,32 +29,15 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   const [removeDocument, setRemoveDocument] = useState(false);
   const [fileError, setFileError] = useState('');
 
-  const [departments, setDepartments] = useState([]);
-  const [loadingDepts, setLoadingDepts] = useState(false);
+  // Use cached departments from RTK Query
+  const { data: deptData, isLoading: loadingDepts } = useGetDepartmentsQuery(undefined, {
+    skip: !isOpen,
+  });
+  const departments = deptData?.departments || [];
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Fetch departments for dropdown
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchDepts = async () => {
-      setLoadingDepts(true);
-      try {
-        const res = await getDepartments();
-        if (res.success && Array.isArray(res.departments)) {
-          setDepartments(res.departments);
-        }
-      } catch (err) {
-        console.warn("Could not load departments list:", err.message);
-      } finally {
-        setLoadingDepts(false);
-      }
-    };
-
-    fetchDepts();
-  }, [isOpen]);
 
   // Populate form data on edit or reset on create
   useEffect(() => {
@@ -197,7 +187,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
       }
 
       if (isEditMode) {
-        const res = await updateEmployee(employee._id, data);
+        const res = await updateEmployee({ id: employee._id, data }).unwrap();
         if (res.success) {
           setSuccessMessage('Employee updated successfully!');
           setTimeout(() => {
@@ -206,7 +196,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
           }, 800);
         }
       } else {
-        const res = await createEmployee(data);
+        const res = await createEmployee(data).unwrap();
         if (res.success) {
           setSuccessMessage('Employee created successfully!');
           setTimeout(() => {
@@ -216,7 +206,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
         }
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save employee.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save employee.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

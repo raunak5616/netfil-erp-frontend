@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { createSpecification, updateSpecification } from '../../services/specificationService';
-import { getUOMs } from '../../services/uomService';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  useCreateSpecificationMutation,
+  useUpdateSpecificationMutation,
+  useGetUOMsQuery,
+} from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -9,6 +12,14 @@ import { Plus, X } from 'lucide-react';
 
 const SpecificationFormModal = ({ specification, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!specification;
+
+  const [createSpecificationMutation] = useCreateSpecificationMutation();
+  const [updateSpecificationMutation] = useUpdateSpecificationMutation();
+  const { data: uomsData, isLoading: uomsLoading } = useGetUOMsQuery(undefined, { skip: !isOpen });
+
+  const uoms = useMemo(() => {
+    return uomsData?.uoms || (Array.isArray(uomsData) ? uomsData : []);
+  }, [uomsData]);
 
   const [formData, setFormData] = useState({
     specificationCode: '',
@@ -20,32 +31,10 @@ const SpecificationFormModal = ({ specification, isOpen, onClose, onSuccess }) =
     status: 'active',
   });
 
-  const [uoms, setUoms] = useState([]);
-  const [uomsLoading, setUomsLoading] = useState(false);
   const [newOptionInput, setNewOptionInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Fetch UOMs for the unit dropdown
-  useEffect(() => {
-    if (isOpen) {
-      const fetchUnits = async () => {
-        setUomsLoading(true);
-        try {
-          const res = await getUOMs();
-          if (res.success && Array.isArray(res.uoms)) {
-            setUoms(res.uoms);
-          }
-        } catch (err) {
-          console.error("Failed to fetch UOMs:", err);
-        } finally {
-          setUomsLoading(false);
-        }
-      };
-      fetchUnits();
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     if (specification) {
@@ -147,26 +136,22 @@ const SpecificationFormModal = ({ specification, isOpen, onClose, onSuccess }) =
 
     try {
       if (isEditMode) {
-        const res = await updateSpecification(specification._id, payload);
-        if (res.success) {
-          setSuccessMessage('Specification updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await updateSpecificationMutation({ id: specification._id, ...payload }).unwrap();
+        setSuccessMessage('Specification updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createSpecification(payload);
-        if (res.success) {
-          setSuccessMessage('Specification created successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await createSpecificationMutation(payload).unwrap();
+        setSuccessMessage('Specification created successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save specification.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save specification.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

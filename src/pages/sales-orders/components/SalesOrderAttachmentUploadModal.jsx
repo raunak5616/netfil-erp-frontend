@@ -3,9 +3,9 @@ import Modal from '../../../components/ui/Modal';
 import Button from '../../../components/ui/Button';
 import Alert from '../../../components/ui/Alert';
 import { 
-  uploadSalesOrderAttachment, 
-  replaceSalesOrderAttachment 
-} from '../../../services/salesOrderService';
+  useUploadSalesOrderAttachmentMutation, 
+  useReplaceSalesOrderAttachmentMutation 
+} from '../../../features/salesOrders/salesOrdersApi';
 import { 
   Upload, 
   FileText, 
@@ -60,8 +60,11 @@ const SalesOrderAttachmentUploadModal = ({
   const [remarks, setRemarks] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [uploadAttachmentMutation, { isLoading: uploading }] = useUploadSalesOrderAttachmentMutation();
+  const [replaceAttachmentMutation, { isLoading: replacing }] = useReplaceSalesOrderAttachmentMutation();
+  const loading = uploading || replacing;
 
   useEffect(() => {
     if (isOpen) {
@@ -190,22 +193,27 @@ const SalesOrderAttachmentUploadModal = ({
       let res;
       if (isReplaceMode) {
         if (changeSummary.trim()) formData.append('changeSummary', changeSummary.trim());
-        res = await replaceSalesOrderAttachment(salesOrderId, existingAttachment._id, formData);
+        res = await replaceAttachmentMutation({
+          id: salesOrderId,
+          attachmentId: existingAttachment._id,
+          formData,
+        }).unwrap();
       } else {
-        res = await uploadSalesOrderAttachment(salesOrderId, formData);
+        res = await uploadAttachmentMutation({
+          id: salesOrderId,
+          formData,
+        }).unwrap();
       }
 
-      if (res.success) {
-        if (onSuccess) onSuccess(res.attachment, isReplaceMode);
+      if (res.success || res.attachment) {
+        if (onSuccess) onSuccess(res.attachment || res, isReplaceMode);
         onClose();
       } else {
         setError(res.message || 'Operation failed');
       }
     } catch (err) {
       console.error('Upload attachment error:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to attach document.');
-    } finally {
-      setLoading(false);
+      setError(err?.data?.message || err?.message || 'Failed to attach document.');
     }
   };
 

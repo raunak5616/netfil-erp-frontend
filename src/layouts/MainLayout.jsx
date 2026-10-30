@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import {
+  toggleSidebar as toggleSidebarAction,
+  toggleMobileSidebar,
+  setMobileSidebarOpen,
+  toggleNavGroup,
+  setNavGroups,
+  setSearchModalOpen,
+  setSearchQuery,
+  selectSidebarCollapsed,
+  selectSidebarExpandedGroups,
+  selectMobileSidebarOpen,
+  selectSearchModalOpen,
+  selectSearchQuery,
+} from '../features/ui/uiSlice';
 import { 
   Users, 
   UserCheck,
@@ -30,39 +45,23 @@ import {
 
 const MainLayout = () => {
   const { user, logout, hasPermission, isAdmin } = useAuth();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Screen size check for mobile drawer mode
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
 
-  // Sidebar collapsed state for desktop
-  const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem('netfil_sidebar_collapsed') === 'true';
-  });
+  // Redux-managed UI states
+  const collapsed = useAppSelector(selectSidebarCollapsed);
+  const mobileOpen = useAppSelector(selectMobileSidebarOpen);
+  const expandedGroups = useAppSelector(selectSidebarExpandedGroups);
+  const searchOpen = useAppSelector(selectSearchModalOpen);
+  const searchQuery = useAppSelector(selectSearchQuery);
 
-  // Mobile sidebar open drawer state
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Dropdown states for header popovers
+  // Local dropdown states for header popovers
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
   const userMenuRef = useRef(null);
-
-  // Track expanded navigation groups
-  const [expandedGroups, setExpandedGroups] = useState(() => {
-    const savedState = localStorage.getItem('netfil_sidebar_expanded_groups');
-    if (savedState) {
-      try {
-        return JSON.parse(savedState);
-      } catch (e) {
-        console.error("Failed to parse expanded groups state:", e);
-      }
-    }
-    return { 'master-module': true, 'item-master': true, 'commercial-module': true, 'bom-module': true, 'production-module': true, 'purchase-module': true, 'store-module': true };
-  });
 
   // Handle window resize for mobile breakpoint
   useEffect(() => {
@@ -70,12 +69,12 @@ const MainLayout = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (!mobile) {
-        setMobileOpen(false);
+        dispatch(setMobileSidebarOpen(false));
       }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [dispatch]);
 
   // Close popovers on click outside
   useEffect(() => {
@@ -93,15 +92,15 @@ const MainLayout = () => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setSearchOpen((prev) => !prev);
+        dispatch(setSearchModalOpen(!searchOpen));
       }
       if (e.key === 'Escape') {
-        setSearchOpen(false);
+        dispatch(setSearchModalOpen(false));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [searchOpen, dispatch]);
 
   // Auto-expand parent group on route change
   useEffect(() => {
@@ -127,49 +126,47 @@ const MainLayout = () => {
     const storePaths = ['/purchase-requisitions', '/stores'];
     const isStoreChild = storePaths.some((p) => path.startsWith(p));
 
+    const updates = {};
     if (isItemMasterChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'master-module': true, 'item-master': true }));
+      updates['master-module'] = true;
+      updates['item-master'] = true;
     }
     if (isPartyMasterChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'master-module': true }));
+      updates['master-module'] = true;
     }
     if (isCommercialChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'commercial-module': true }));
+      updates['commercial-module'] = true;
     }
     if (isBomChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'bom-module': true }));
+      updates['bom-module'] = true;
     }
     if (isProductionChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'production-module': true }));
+      updates['production-module'] = true;
     }
     if (isPurchaseChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'purchase-module': true }));
+      updates['purchase-module'] = true;
     }
     if (isStoreChild) {
-      setExpandedGroups((prev) => ({ ...prev, 'store-module': true }));
+      updates['store-module'] = true;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      dispatch(setNavGroups(updates));
     }
     // Close mobile drawer on route navigation
-    setMobileOpen(false);
-  }, [location.pathname]);
+    dispatch(setMobileSidebarOpen(false));
+  }, [location.pathname, dispatch]);
 
   const toggleSidebar = () => {
     if (isMobile) {
-      setMobileOpen((prev) => !prev);
+      dispatch(toggleMobileSidebar());
     } else {
-      setCollapsed((prev) => {
-        const next = !prev;
-        localStorage.setItem('netfil_sidebar_collapsed', String(next));
-        return next;
-      });
+      dispatch(toggleSidebarAction());
     }
   };
 
   const toggleGroup = (groupId) => {
-    setExpandedGroups((prev) => {
-      const next = { ...prev, [groupId]: !prev[groupId] };
-      localStorage.setItem('netfil_sidebar_expanded_groups', JSON.stringify(next));
-      return next;
-    });
+    dispatch(toggleNavGroup(groupId));
   };
 
   const handleLogout = () => {
@@ -716,7 +713,7 @@ const MainLayout = () => {
           <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
             <button
               type="button"
-              onClick={() => setSearchOpen(true)}
+              onClick={() => dispatch(setSearchModalOpen(true))}
               className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-100/90 hover:bg-slate-100 border border-slate-200/80 text-xs text-slate-500 transition-all shadow-2xs group cursor-pointer"
             >
               <div className="flex items-center gap-2">
@@ -808,12 +805,12 @@ const MainLayout = () => {
                 type="text"
                 autoFocus
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => dispatch(setSearchQuery(e.target.value))}
                 placeholder="Jump to page or module..."
                 className="w-full text-sm bg-transparent outline-none text-slate-900 placeholder-slate-400"
               />
               <button
-                onClick={() => setSearchOpen(false)}
+                onClick={() => dispatch(setSearchModalOpen(false))}
                 className="p-1 rounded text-slate-400 hover:text-slate-600"
               >
                 <X size={16} />
@@ -827,8 +824,8 @@ const MainLayout = () => {
                   <button
                     key={idx}
                     onClick={() => {
-                      setSearchOpen(false);
-                      setSearchQuery('');
+                      dispatch(setSearchModalOpen(false));
+                      dispatch(setSearchQuery(''));
                       navigate(item.path);
                     }}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between text-xs text-slate-700 transition-colors cursor-pointer group"

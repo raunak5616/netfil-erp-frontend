@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getOpsDashboardSummary,
-  getRecentSalesOrders,
-  getActiveWorkOrders,
-  getSalesPipelineData
-} from '../../services/dashboardService';
+  useGetDashboardSummaryQuery,
+  useGetRecentSalesOrdersQuery,
+  useGetActiveWorkOrdersQuery,
+  useGetSalesPipelineQuery,
+} from '../../features/dashboard/dashboardApi';
 
 import OpsDashboardMetric from './components/OpsDashboardMetric';
 import RecentSalesOrdersTable from './components/RecentSalesOrdersTable';
@@ -15,56 +15,58 @@ import OpsQuickActions from './components/OpsQuickActions';
 
 const Dashboard = () => {
   const { hasPermission } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
+  const canViewSO = hasPermission('SALES_ORDER_VIEW');
+  const canViewWO = hasPermission('WORK_ORDER_VIEW');
 
-  const [data, setData] = useState({
-    summary: null,
-    recentSalesOrders: [],
-    activeWorkOrders: [],
-    pipeline: []
-  });
+  const {
+    data: summaryData,
+    isLoading: summaryLoading,
+    isFetching: summaryFetching,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = useGetDashboardSummaryQuery();
 
-  const fetchData = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
+  const {
+    data: recentSalesOrdersData,
+    isLoading: soLoading,
+    isFetching: soFetching,
+    error: soError,
+    refetch: refetchSO,
+  } = useGetRecentSalesOrdersQuery(undefined, { skip: !canViewSO });
 
-    try {
-      const canViewSO = hasPermission('SALES_ORDER_VIEW');
-      const canViewWO = hasPermission('WORK_ORDER_VIEW');
+  const {
+    data: activeWorkOrdersData,
+    isLoading: woLoading,
+    isFetching: woFetching,
+    error: woError,
+    refetch: refetchWO,
+  } = useGetActiveWorkOrdersQuery(undefined, { skip: !canViewWO });
 
-      const [
-        summaryRes,
-        salesRes,
-        woRes,
-        pipelineRes
-      ] = await Promise.allSettled([
-        getOpsDashboardSummary(),
-        canViewSO ? getRecentSalesOrders() : Promise.resolve([]),
-        canViewWO ? getActiveWorkOrders() : Promise.resolve([]),
-        canViewSO ? getSalesPipelineData() : Promise.resolve([])
-      ]);
+  const {
+    data: pipelineData,
+    isLoading: pipelineLoading,
+    isFetching: pipelineFetching,
+    error: pipelineError,
+    refetch: refetchPipeline,
+  } = useGetSalesPipelineQuery(undefined, { skip: !canViewSO });
 
-      setData({
-        summary: summaryRes.status === 'fulfilled' ? summaryRes.value : {},
-        recentSalesOrders: salesRes.status === 'fulfilled' ? salesRes.value : [],
-        activeWorkOrders: woRes.status === 'fulfilled' ? woRes.value : [],
-        pipeline: pipelineRes.status === 'fulfilled' ? pipelineRes.value : []
-      });
-    } catch (err) {
-      console.error('Dashboard fetch error:', err);
-      setError('Failed to load dashboard data.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [hasPermission]);
+  const loading = summaryLoading || (canViewSO && soLoading) || (canViewWO && woLoading) || (canViewSO && pipelineLoading);
+  const refreshing = summaryFetching || soFetching || woFetching || pipelineFetching;
+  const error = summaryError || soError || woError || pipelineError ? 'Failed to load some dashboard operations data.' : null;
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const data = useMemo(() => ({
+    summary: summaryData || {},
+    recentSalesOrders: recentSalesOrdersData || [],
+    activeWorkOrders: activeWorkOrdersData || [],
+    pipeline: pipelineData || [],
+  }), [summaryData, recentSalesOrdersData, activeWorkOrdersData, pipelineData]);
+
+  const refetchAll = () => {
+    refetchSummary();
+    if (canViewSO) refetchSO();
+    if (canViewWO) refetchWO();
+    if (canViewSO) refetchPipeline();
+  };
 
   if (loading) {
     return (
@@ -83,7 +85,7 @@ const Dashboard = () => {
           <p className="text-slate-500 text-[13px] mt-1">High-level overview of sales pipeline and production status</p>
         </div>
         <button
-          onClick={() => fetchData(true)}
+          onClick={refetchAll}
           disabled={refreshing}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 text-xs font-medium rounded shadow-sm hover:bg-slate-50 disabled:opacity-50"
         >
@@ -104,7 +106,7 @@ const Dashboard = () => {
       {error && (
         <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => fetchData()} className="text-red-700 font-medium underline text-xs">Retry</button>
+          <button onClick={refetchAll} className="text-red-700 font-medium underline text-xs">Retry</button>
         </div>
       )}
 

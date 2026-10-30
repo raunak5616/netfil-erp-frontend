@@ -3,7 +3,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Select, Textarea, FormField } from '../../components/ui/FormField';
-import { markQuotationLost } from '../../services/quotationService';
+import { useMarkQuotationLostMutation } from '../../features/quotations/quotationsApi';
 import { AlertTriangle, FileX } from 'lucide-react';
 
 const LOST_REASONS = [
@@ -23,8 +23,9 @@ const LOST_REASONS = [
 const QuotationLostModal = ({ isOpen, onClose, quotation, onSuccess }) => {
   const [lostReason, setLostReason] = useState('');
   const [lostRemarks, setLostRemarks] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const [markQuotationLostMutation, { isLoading: submitting }] = useMarkQuotationLostMutation();
 
   if (!isOpen || !quotation) return null;
 
@@ -40,25 +41,25 @@ const QuotationLostModal = ({ isOpen, onClose, quotation, onSuccess }) => {
       return;
     }
 
-    setSubmitting(true);
     setError('');
 
     try {
-      const res = await markQuotationLost(quotation._id, {
-        lostReason,
-        lostRemarks: lostRemarks.trim(),
-      });
+      const res = await markQuotationLostMutation({
+        id: quotation._id,
+        data: {
+          lostReason,
+          lostRemarks: lostRemarks.trim(),
+        },
+      }).unwrap();
 
-      if (res.success) {
-        onSuccess(res.quotation);
+      if (res.success || res.quotation) {
+        onSuccess(res.quotation || res);
       } else {
         setError(res.message || 'Failed to mark quotation as lost');
       }
     } catch (err) {
       console.error('Mark Quotation Lost error:', err);
-      setError(err.response?.data?.message || 'Error occurred while updating quotation');
-    } finally {
-      setSubmitting(false);
+      setError(err?.data?.message || err?.message || 'Error occurred while updating quotation');
     }
   };
 

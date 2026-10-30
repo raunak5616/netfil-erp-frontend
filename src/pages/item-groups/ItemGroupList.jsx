@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getItemGroups, updateItemGroupStatus } from '../../services/itemGroupService';
+import React, { useState, useMemo } from 'react';
+import { useGetItemGroupsQuery, useUpdateItemGroupStatusMutation } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -25,8 +25,9 @@ const ItemGroupList = () => {
   const canCreate = hasPermission('ITEM_GROUP_CREATE');
   const canEdit = hasPermission('ITEM_GROUP_EDIT');
 
-  const [itemGroups, setItemGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: itemGroupsData, isLoading: loading, error: queryError, refetch } = useGetItemGroupsQuery();
+  const [updateItemGroupStatusMutation] = useUpdateItemGroupStatusMutation();
+
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null); // Track ID for inline status toggle loading
 
@@ -41,27 +42,9 @@ const ItemGroupList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
 
-  const fetchItemGroupData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getItemGroups();
-      if (data.success && Array.isArray(data.itemGroups)) {
-        setItemGroups(data.itemGroups);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch Item Groups:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchItemGroupData();
-  }, []);
+  const itemGroups = useMemo(() => {
+    return itemGroupsData?.itemGroups || itemGroupsData?.groups || (Array.isArray(itemGroupsData) ? itemGroupsData : []);
+  }, [itemGroupsData]);
 
   const handleStatusToggle = async (group) => {
     const nextStatus = group.status === 'active' ? 'inactive' : 'active';
@@ -70,15 +53,10 @@ const ItemGroupList = () => {
 
     setActionLoading(group._id);
     try {
-      const res = await updateItemGroupStatus(group._id, nextStatus);
-      if (res.success) {
-        setItemGroups((prev) =>
-          prev.map((g) => (g._id === group._id ? { ...g, status: nextStatus } : g))
-        );
-      }
+      await updateItemGroupStatusMutation({ id: group._id, status: nextStatus }).unwrap();
     } catch (err) {
       console.error("Failed to update status:", err);
-      setError(err.response?.data?.message || 'Failed to update item group status');
+      setError(err?.data?.message || err?.message || 'Failed to update item group status');
     } finally {
       setActionLoading(null);
     }
@@ -202,7 +180,7 @@ const ItemGroupList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchItemGroupData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -221,7 +199,13 @@ const ItemGroupList = () => {
         }
       />
 
-      {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {(error || queryError) && (
+        <Alert
+          type="danger"
+          message={error || queryError?.data?.message || 'Error loading item groups'}
+          onClose={() => setError('')}
+        />
+      )}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
@@ -285,7 +269,7 @@ const ItemGroupList = () => {
         itemGroup={editingGroup}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchItemGroupData}
+        onSuccess={refetch}
       />
 
       <ItemGroupDetailModal

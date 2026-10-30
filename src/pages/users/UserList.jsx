@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getUsers, updateUserStatus } from '../../services/userService';
+import React, { useState, useMemo } from 'react';
+import { useGetUsersQuery, useUpdateUserStatusMutation } from '../../features/users/usersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -31,8 +31,11 @@ const UserList = () => {
   const canCreate = hasPermission('USER_CREATE');
   const canEdit = hasPermission('USER_EDIT');
 
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: usersData, isLoading: loading, error: queryError, refetch } = useGetUsersQuery();
+  const [updateUserStatusMutation] = useUpdateUserStatusMutation();
+
+  const users = usersData?.users || [];
   const [error, setError] = useState('');
 
   // Filter states
@@ -54,28 +57,6 @@ const UserList = () => {
   const [selectedStatusUser, setSelectedStatusUser] = useState(null);
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [statusSubmitting, setStatusSubmitting] = useState(false);
-
-  const fetchUserData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getUsers();
-      if (data.success && Array.isArray(data.users)) {
-        setUsers(data.users);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch users:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserData();
-  }, []);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -140,15 +121,12 @@ const UserList = () => {
     setError('');
     try {
       const nextStatus = !selectedStatusUser.isActive;
-      const res = await updateUserStatus(selectedStatusUser._id, nextStatus);
-      if (res.success) {
-        setIsStatusConfirmOpen(false);
-        setSelectedStatusUser(null);
-        await fetchUserData();
-      }
+      await updateUserStatusMutation({ id: selectedStatusUser._id, isActive: nextStatus }).unwrap();
+      setIsStatusConfirmOpen(false);
+      setSelectedStatusUser(null);
     } catch (err) {
       console.error("Failed to update status:", err);
-      setError(err.response?.data?.message || 'Failed to update user status');
+      setError(err?.data?.message || err?.message || 'Failed to update user status');
     } finally {
       setStatusSubmitting(false);
     }
@@ -302,7 +280,7 @@ const UserList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchUserData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -370,7 +348,7 @@ const UserList = () => {
       <CreateUserModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={fetchUserData}
+        onSuccess={refetch}
         existingUsers={users}
       />
 
@@ -392,7 +370,7 @@ const UserList = () => {
           setIsEditModalOpen(false);
           setSelectedEditUser(null);
         }}
-        onSuccess={fetchUserData}
+        onSuccess={refetch}
         existingUsers={users}
       />
 
@@ -404,7 +382,7 @@ const UserList = () => {
           setIsPasswordModalOpen(false);
           setSelectedPasswordUser(null);
         }}
-        onSuccess={fetchUserData}
+        onSuccess={refetch}
       />
 
       {/* Activate / Deactivate Confirmation Dialog */}

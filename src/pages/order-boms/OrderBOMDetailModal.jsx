@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { getOrderBOMById } from '../../services/orderBomService';
+import { useGetOrderBOMByIdQuery } from '../../features/boms/bomsApi';
 import { useAuth } from '../../context/AuthContext';
 import OrderBOMRouteModal from './OrderBOMRouteModal';
 import {
@@ -32,40 +32,23 @@ const OrderBOMDetailModal = ({ isOpen, orderBOMId, onClose, onOrderBOMUpdated })
   const canEdit = hasPermission('ORDER_BOM_EDIT');
   const canCreateWorkOrder = hasPermission('WORK_ORDER_CREATE');
 
-  const [orderBOM, setOrderBOM] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Routing Modal state
   const [routeModalOpen, setRouteModalOpen] = useState(false);
   const [routeActionType, setRouteActionType] = useState(null);
 
-  const fetchDetail = async () => {
-    if (!orderBOMId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getOrderBOMById(orderBOMId);
-      if (res.success) {
-        setOrderBOM(res.orderBOM);
-        setItems(res.items || []);
-      } else {
-        setError(res.message || 'Failed to fetch Order BOM detail');
-      }
-    } catch (err) {
-      console.error('Fetch Order BOM Detail error:', err);
-      setError(err.response?.data?.message || 'Error connecting to server');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // RTK Query Hook
+  const {
+    data: detailData,
+    isLoading: loading,
+    error: queryError,
+    refetch: fetchDetail
+  } = useGetOrderBOMByIdQuery(orderBOMId, {
+    skip: !isOpen || !orderBOMId
+  });
 
-  useEffect(() => {
-    if (isOpen && orderBOMId) {
-      fetchDetail();
-    }
-  }, [isOpen, orderBOMId]);
+  const orderBOM = detailData?.orderBOM || null;
+  const items = detailData?.items || [];
+  const error = queryError ? (queryError.data?.message || queryError.message || 'Error connecting to server') : '';
 
   const handleRouteAction = (actionType) => {
     setRouteActionType(actionType);

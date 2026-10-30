@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getBOMs, releaseBOM } from '../../services/masterBomService';
-import { getItems } from '../../services/itemService';
+import React, { useState, useMemo } from 'react';
+import { useGetMasterBOMsQuery, useReleaseMasterBOMMutation } from '../../features/boms/bomsApi';
+import { useGetProductsQuery } from '../../features/products/productsApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -32,11 +32,8 @@ const MasterBOMList = () => {
   const canEdit = hasPermission('BOM_EDIT');
   const canRelease = hasPermission('BOM_RELEASE');
 
-  const [boms, setBoms] = useState([]);
-  const [parentItems, setParentItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [localError, setLocalError] = useState('');
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +44,33 @@ const MasterBOMList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
+
+  const queryArgs = useMemo(() => {
+    const params = { page, limit };
+    if (parentFilter !== 'all') params.parentItem = parentFilter;
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (versionFilter.trim()) params.version = versionFilter.trim();
+    return params;
+  }, [page, limit, parentFilter, statusFilter, versionFilter]);
+
+  // RTK Query Hooks
+  const {
+    data: bomData,
+    isLoading: loadingBOMs,
+    isFetching: fetchingBOMs,
+    error: bomQueryError,
+    refetch: fetchBOMsData
+  } = useGetMasterBOMsQuery(queryArgs);
+
+  const { data: prodData } = useGetProductsQuery({ all: true });
+  const [releaseMasterBOM] = useReleaseMasterBOMMutation();
+
+  const boms = useMemo(() => bomData?.boms || [], [bomData]);
+  const totalRecords = bomData?.total || 0;
+  const parentItems = useMemo(() => prodData?.items || prodData?.products || [], [prodData]);
+
+  const loading = loadingBOMs || fetchingBOMs;
+  const error = localError || (bomQueryError ? (bomQueryError.data?.message || bomQueryError.message || 'Failed to load Master BOMs') : '');
 
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -56,42 +79,6 @@ const MasterBOMList = () => {
   const [editingBOM, setEditingBOM] = useState(null);
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [copyingBOM, setCopyingBOM] = useState(null);
-
-  const fetchBOMsData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (parentFilter !== 'all') params.parentItem = parentFilter;
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (versionFilter.trim()) params.version = versionFilter.trim();
-
-      const [bomRes, itemRes] = await Promise.all([
-        getBOMs(params),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] }))
-      ]);
-
-      if (bomRes.success && Array.isArray(bomRes.boms)) {
-        setBoms(bomRes.boms);
-        if (bomRes.total !== undefined) setTotalRecords(bomRes.total);
-      } else {
-        setError('Unexpected response format from server');
-      }
-
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setParentItems(itemRes.items);
-      }
-    } catch (err) {
-      console.error('Failed to fetch Master BOMs:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBOMsData();
-  }, [parentFilter, statusFilter, versionFilter, page, limit]);
 
   // Client-side search filtering on loaded records
   const filteredBOMs = useMemo(() => {
@@ -112,16 +99,12 @@ const MasterBOMList = () => {
     if (!window.confirm(confirmMsg)) return;
 
     setActionLoading(b._id);
+    setLocalError('');
     try {
-      const res = await releaseBOM(b._id);
-      if (res.success) {
-        fetchBOMsData();
-      } else {
-        setError(res.message || 'Failed to release Master BOM');
-      }
+      await releaseMasterBOM(b._id).unwrap();
     } catch (err) {
       console.error('Failed to release BOM:', err);
-      setError(err.response?.data?.message || 'Error releasing Master BOM');
+      setLocalError(err.data?.message || err.message || 'Error releasing Master BOM');
     } finally {
       setActionLoading(null);
     }

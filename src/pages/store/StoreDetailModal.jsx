@@ -3,10 +3,11 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Package, MapPin, Phone, Mail, User, Info, Edit, Trash2 } from 'lucide-react';
-import { deleteStore } from '../../services/storeService';
+import { useDeleteStoreMutation } from '../../features/stores/storesApi';
 import DeleteStoreModal from './DeleteStoreModal';
 
 const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit, canDelete }) => {
+  const [deleteStoreMutation] = useDeleteStoreMutation();
   const [error, setError] = useState('');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -17,12 +18,12 @@ const StoreDetailModal = ({ store, isOpen, onClose, onEdit, onSuccess, canEdit, 
     setDeleteLoading(true);
     setError('');
     try {
-      await deleteStore(store._id);
+      await deleteStoreMutation(store._id).unwrap();
       setIsDeleteOpen(false);
-      onSuccess();
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete store');
+      setError(err?.data?.message || err?.message || 'Failed to delete store');
       setIsDeleteOpen(false);
     } finally {
       setDeleteLoading(false);

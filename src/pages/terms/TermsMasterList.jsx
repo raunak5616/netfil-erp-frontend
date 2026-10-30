@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { getTerms, updateTermStatus, deleteTerm } from '../../services/termService';
+import React, { useState, useMemo } from 'react';
+import { 
+  useGetTermsQuery, 
+  useUpdateTermStatusMutation, 
+  useDeleteTermMutation 
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -35,9 +39,12 @@ const TermsMasterList = () => {
   // Active Tab state ('DELIVERY' | 'PAYMENT')
   const [activeTab, setActiveTab] = useState(TAB_DELIVERY);
 
-  // Raw data from single API / single MongoDB collection
-  const [terms, setTerms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: termsData, isLoading: loading, error: queryError, refetch } = useGetTermsQuery();
+  const [updateTermStatusMutation] = useUpdateTermStatusMutation();
+  const [deleteTermMutation] = useDeleteTermMutation();
+
+  const terms = termsData?.terms || [];
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -52,29 +59,6 @@ const TermsMasterList = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [termToDelete, setTermToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Fetch all terms from the shared API
-  const fetchTerms = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getTerms();
-      if (data.success && Array.isArray(data.terms)) {
-        setTerms(data.terms);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error('Failed to fetch terms:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTerms();
-  }, [fetchTerms]);
 
   // Tab counts for quick metrics
   const deliveryCount = useMemo(
@@ -122,16 +106,15 @@ const TermsMasterList = () => {
   const handleToggleStatus = async (term) => {
     try {
       const newActiveState = !(term.isActive !== undefined ? term.isActive : term.status === 'active');
-      await updateTermStatus(term._id, newActiveState);
+      await updateTermStatusMutation({ id: term._id, statusOrIsActive: newActiveState }).unwrap();
       setSuccessMessage(
         `${term.termType === TAB_DELIVERY ? 'Delivery' : 'Payment'} term "${
           term.termName
         }" ${newActiveState ? 'activated' : 'deactivated'} successfully.`
       );
-      fetchTerms();
     } catch (err) {
       console.error('Failed to toggle term status:', err);
-      setError(err.response?.data?.message || 'Failed to update term status');
+      setError(err?.data?.message || err?.message || 'Failed to update term status');
     }
   };
 
@@ -150,24 +133,18 @@ const TermsMasterList = () => {
     setError('');
     setSuccessMessage('');
     try {
-      const res = await deleteTerm(termToDelete._id);
-      if (res.success) {
-        setSuccessMessage(
-          res.message ||
-            `${termToDelete.termType === TAB_DELIVERY ? 'Delivery' : 'Payment'} term "${
-              termToDelete.termName
-            }" deleted successfully.`
-        );
-        setIsDeleteDialogOpen(false);
-        setTermToDelete(null);
-        await fetchTerms();
-      } else {
-        setError(res.message || 'Failed to delete term');
-        setIsDeleteDialogOpen(false);
-      }
+      const res = await deleteTermMutation(termToDelete._id).unwrap();
+      setSuccessMessage(
+        res?.message ||
+          `${termToDelete.termType === TAB_DELIVERY ? 'Delivery' : 'Payment'} term "${
+            termToDelete.termName
+          }" deleted successfully.`
+      );
+      setIsDeleteDialogOpen(false);
+      setTermToDelete(null);
     } catch (err) {
       console.error('Failed to delete term:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to delete term');
+      setError(err?.data?.message || err?.message || 'Failed to delete term');
       setIsDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);
@@ -323,7 +300,7 @@ const TermsMasterList = () => {
               variant="secondary"
               icon={RefreshCw}
               loading={loading}
-              onClick={fetchTerms}
+              onClick={refetch}
             >
               Refresh
             </Button>
@@ -461,7 +438,7 @@ const TermsMasterList = () => {
         onClose={() => setIsFormOpen(false)}
         onSuccess={(msg) => {
           setSuccessMessage(msg);
-          fetchTerms();
+          refetch();
         }}
       />
 

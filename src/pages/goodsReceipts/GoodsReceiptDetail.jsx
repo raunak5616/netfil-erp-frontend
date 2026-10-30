@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getGoodsReceiptById,
-  updateGoodsReceiptStatus,
-  deleteGoodsReceipt
-} from '../../services/goodsReceiptService';
+  useGetGoodsReceiptByIdQuery,
+  useUpdateGoodsReceiptStatusMutation,
+  useDeleteGoodsReceiptMutation,
+} from '../../features/purchase/purchaseApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -44,11 +44,14 @@ const GoodsReceiptDetail = () => {
   const canPost = hasPermission('GOODS_RECEIPT_POST');
   const canCancel = hasPermission('GOODS_RECEIPT_CANCEL');
 
-  const [grn, setGrn] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: grnData, isLoading: loading, error: fetchError } = useGetGoodsReceiptByIdQuery(id);
+  const grn = grnData?.goodsReceipt;
+
+  const [updateGoodsReceiptStatus, { isLoading: isUpdatingStatus }] = useUpdateGoodsReceiptStatusMutation();
+  const [deleteGoodsReceipt, { isLoading: isDeleting }] = useDeleteGoodsReceiptMutation();
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
   // Workflow Confirmation Modal State ('POST' or 'CANCEL')
   const [activeAction, setActiveAction] = useState(null);
@@ -57,38 +60,20 @@ const GoodsReceiptDetail = () => {
   // Delete Draft Dialog State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const fetchGRNDetail = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getGoodsReceiptById(id);
-      if (res.success && res.goodsReceipt) {
-        setGrn(res.goodsReceipt);
-      } else {
-        setError('Goods Receipt record not found.');
-      }
-    } catch (err) {
-      console.error('Fetch GRN Detail Error:', err);
-      setError(err.response?.data?.message || 'Failed to fetch Goods Receipt details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchGRNDetail();
-  }, [id]);
+  const actionLoading = isUpdatingStatus || isDeleting;
 
   const handleExecuteAction = async () => {
     if (!activeAction || !grn) return;
 
-    setActionLoading(true);
     setError('');
     try {
-      const res = await updateGoodsReceiptStatus(grn._id, activeAction, actionRemarks.trim());
+      const res = await updateGoodsReceiptStatus({
+        id: grn._id,
+        action: activeAction,
+        remarks: actionRemarks.trim(),
+      }).unwrap();
       if (res.success && res.goodsReceipt) {
         setSuccess(`Goods Receipt status updated to '${STATUS_DISPLAY_MAP[res.goodsReceipt.status] || res.goodsReceipt.status}'`);
-        setGrn(res.goodsReceipt);
         setActiveAction(null);
         setActionRemarks('');
       } else {
@@ -96,19 +81,16 @@ const GoodsReceiptDetail = () => {
       }
     } catch (err) {
       console.error('GRN Workflow transition error:', err);
-      setError(err.response?.data?.message || 'Error executing workflow transition.');
-    } finally {
-      setActionLoading(false);
+      setError(err?.data?.message || err?.message || 'Error executing workflow transition.');
     }
   };
 
   const handleDeleteDraft = async () => {
     if (!grn) return;
 
-    setActionLoading(true);
     setError('');
     try {
-      const res = await deleteGoodsReceipt(grn._id);
+      const res = await deleteGoodsReceipt(grn._id).unwrap();
       if (res.success) {
         setSuccess('Draft Goods Receipt deleted successfully.');
         setTimeout(() => navigate('/goods-receipts'), 800);
@@ -117,9 +99,8 @@ const GoodsReceiptDetail = () => {
       }
     } catch (err) {
       console.error('Delete GRN error:', err);
-      setError(err.response?.data?.message || 'Error deleting Goods Receipt.');
+      setError(err?.data?.message || err?.message || 'Error deleting Goods Receipt.');
     } finally {
-      setActionLoading(false);
       setIsDeleteDialogOpen(false);
     }
   };
@@ -133,10 +114,12 @@ const GoodsReceiptDetail = () => {
     );
   }
 
-  if (error && !grn) {
+  const displayError = error || fetchError?.data?.message || (fetchError ? 'Failed to fetch Goods Receipt details.' : '');
+
+  if (displayError && !grn) {
     return (
       <div className="space-y-4">
-        <Alert type="danger" message={error} />
+        <Alert type="danger" message={displayError} />
         <Button variant="secondary" size="sm" onClick={() => navigate('/goods-receipts')}>
           <ArrowLeft size={14} className="mr-1.5" /> Back to Goods Receipts
         </Button>

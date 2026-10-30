@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getWorkOrders } from '../../services/workOrderService';
-import { getSalesOrders } from '../../services/salesOrderService';
-import { getItems } from '../../services/itemService';
-import { getPlants } from '../../services/plantService';
+import { useGetWorkOrdersQuery } from '../../features/workOrders/workOrdersApi';
+import { useGetSalesOrdersQuery } from '../../features/salesOrders/salesOrdersApi';
+import { useGetProductsQuery } from '../../features/products/productsApi';
+import { useGetPlantsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -44,14 +44,6 @@ const WorkOrderList = () => {
   const queryParams = new URLSearchParams(location.search);
   const urlStatus = queryParams.get('status')?.toUpperCase();
 
-  const [workOrders, setWorkOrders] = useState([]);
-  const [salesOrders, setSalesOrders] = useState([]);
-  const [parentItems, setParentItems] = useState([]);
-  const [plants, setPlants] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState(urlStatus || 'all');
@@ -62,7 +54,39 @@ const WorkOrderList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
+
+  // RTK Query parameters
+  const queryArgs = useMemo(() => {
+    const params = { page, limit };
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (salesOrderFilter !== 'all') params.salesOrder = salesOrderFilter;
+    if (parentItemFilter !== 'all') params.parentItem = parentItemFilter;
+    if (plantFilter !== 'all') params.plant = plantFilter;
+    if (searchTerm.trim()) params.search = searchTerm.trim();
+    return params;
+  }, [page, limit, statusFilter, salesOrderFilter, parentItemFilter, plantFilter, searchTerm]);
+
+  // RTK Query Hooks
+  const {
+    data: woData,
+    isLoading: loadingWO,
+    isFetching: fetchingWO,
+    error: woQueryError,
+    refetch: fetchWorkOrdersData
+  } = useGetWorkOrdersQuery(queryArgs);
+
+  const { data: soData } = useGetSalesOrdersQuery({ limit: 100 });
+  const { data: prodData } = useGetProductsQuery({ all: true });
+  const { data: plantData } = useGetPlantsQuery({ status: 'active' });
+
+  const workOrders = useMemo(() => woData?.workOrders || [], [woData]);
+  const totalRecords = woData?.total || 0;
+  const salesOrders = useMemo(() => soData?.salesOrders || [], [soData]);
+  const parentItems = useMemo(() => prodData?.items || prodData?.products || [], [prodData]);
+  const plants = useMemo(() => plantData?.plants || [], [plantData]);
+
+  const loading = loadingWO || fetchingWO;
+  const error = woQueryError ? (woQueryError.data?.message || woQueryError.message || 'Failed to load Work Orders') : '';
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -87,54 +111,6 @@ const WorkOrderList = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
-
-  const fetchWorkOrdersData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (salesOrderFilter !== 'all') params.salesOrder = salesOrderFilter;
-      if (parentItemFilter !== 'all') params.parentItem = parentItemFilter;
-      if (plantFilter !== 'all') params.plant = plantFilter;
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-
-      const [woRes, soRes, itemRes, plantRes] = await Promise.all([
-        getWorkOrders(params),
-        getSalesOrders({ limit: 100 }).catch(() => ({ success: false, salesOrders: [] })),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
-        getPlants({ status: 'active' }).catch(() => ({ success: false, plants: [] }))
-      ]);
-
-      if (woRes.success && Array.isArray(woRes.workOrders)) {
-        setWorkOrders(woRes.workOrders);
-        if (woRes.total !== undefined) setTotalRecords(woRes.total);
-      } else {
-        setError('Unexpected response format from server');
-      }
-
-      if (soRes.success && Array.isArray(soRes.salesOrders)) {
-        setSalesOrders(soRes.salesOrders);
-      }
-
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setParentItems(itemRes.items);
-      }
-
-      if (plantRes.success && Array.isArray(plantRes.plants)) {
-        setPlants(plantRes.plants);
-      }
-    } catch (err) {
-      console.error('Failed to fetch Work Orders:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchWorkOrdersData();
-  }, [statusFilter, salesOrderFilter, parentItemFilter, plantFilter, page, limit]);
 
   // Client-side search filtering fallback
   const filteredWorkOrders = useMemo(() => {

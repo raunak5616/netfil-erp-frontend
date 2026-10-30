@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createTerm, updateTerm } from '../../services/termService';
+import { useCreateTermMutation, useUpdateTermMutation } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -16,6 +16,9 @@ const TermFormModal = ({
   const isEdit = !!term;
   const currentType = isEdit ? term.termType : defaultTermType;
   const isDelivery = currentType === 'DELIVERY';
+
+  const [createTermMutation] = useCreateTermMutation();
+  const [updateTermMutation] = useUpdateTermMutation();
 
   const [formData, setFormData] = useState({
     termName: '',
@@ -73,9 +76,9 @@ const TermFormModal = ({
       };
 
       if (isEdit) {
-        await updateTerm(term._id, payload);
+        await updateTermMutation({ id: term._id, ...payload }).unwrap();
       } else {
-        await createTerm(payload);
+        await createTermMutation(payload).unwrap();
       }
 
       onSuccess(
@@ -87,8 +90,8 @@ const TermFormModal = ({
     } catch (err) {
       console.error('Error saving term:', err);
       setError(
-        err.response?.data?.message ||
-          err.message ||
+        err?.data?.message ||
+          err?.message ||
           `Failed to ${isEdit ? 'update' : 'create'} term.`
       );
     } finally {

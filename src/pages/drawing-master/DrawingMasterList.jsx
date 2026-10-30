@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  getDrawings,
-  updateDrawingStatus,
-  deleteDrawing,
-  getVersionedImageUrl
-} from '../../services/drawingMasterService';
-import { getFilterGrades } from '../../services/filterGradeService';
+  useGetDrawingsQuery,
+  useUpdateDrawingStatusMutation,
+  useDeleteDrawingMutation,
+} from '../../features/drawingMaster/drawingMasterApi';
+import { useGetFilterGradesQuery } from '../../features/masterData/masterDataApi';
+import { getVersionedImageUrl } from '../../services/drawingMasterService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -80,11 +80,27 @@ const DrawingMasterList = () => {
     }, { replace: true });
   };
 
-  const [drawings, setDrawings] = useState([]);
-  const [filterGrades, setFilterGrades] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [localError, setLocalError] = useState('');
+
+  // RTK Query Hooks
+  const {
+    data: drawingsData,
+    isLoading: loadingDrawings,
+    isFetching: fetchingDrawings,
+    error: drawingsQueryError,
+    refetch: fetchDrawings
+  } = useGetDrawingsQuery({ status: 'all' });
+
+  const { data: filterGradesData } = useGetFilterGradesQuery();
+
+  const [updateDrawingStatus] = useUpdateDrawingStatusMutation();
+  const [deleteDrawing] = useDeleteDrawingMutation();
+
+  const drawings = drawingsData?.drawings || [];
+  const filterGrades = filterGradesData?.filterGrades || [];
+  const loading = loadingDrawings || fetchingDrawings;
+  const error = localError || (drawingsQueryError ? (drawingsQueryError.data?.message || drawingsQueryError.message || 'Failed to connect to server') : '');
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,36 +116,6 @@ const DrawingMasterList = () => {
   const [previewDrawing, setPreviewDrawing] = useState(null);
 
   const [viewGradesModalDrawing, setViewGradesModalDrawing] = useState(null);
-
-  const fetchDrawings = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [drwRes, fgRes] = await Promise.all([
-        getDrawings({ status: 'all' }),
-        getFilterGrades().catch(() => ({ success: false, filterGrades: [] }))
-      ]);
-
-      if (drwRes.success && Array.isArray(drwRes.drawings)) {
-        setDrawings(drwRes.drawings);
-      } else {
-        setError('Unexpected API response format');
-      }
-
-      if (fgRes.success && Array.isArray(fgRes.filterGrades)) {
-        setFilterGrades(fgRes.filterGrades);
-      }
-    } catch (err) {
-      console.error('Failed to fetch drawings:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDrawings();
-  }, []);
 
   const handleCreate = () => {
     setEditingDrawing(null);
@@ -148,13 +134,13 @@ const DrawingMasterList = () => {
 
   const handleToggleStatus = async (drawing) => {
     try {
+      setLocalError('');
       const newStatus = drawing.status === 'active' ? 'inactive' : 'active';
-      await updateDrawingStatus(drawing._id, newStatus);
+      await updateDrawingStatus({ id: drawing._id, status: newStatus }).unwrap();
       setSuccessMsg(`Drawing ${drawing.drawingCode} is now ${newStatus}`);
       setTimeout(() => setSuccessMsg(''), 3000);
-      fetchDrawings();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update status');
+      setLocalError(err.data?.message || err.message || 'Failed to update status');
     }
   };
 
@@ -164,12 +150,12 @@ const DrawingMasterList = () => {
     }
 
     try {
-      await deleteDrawing(drawing._id);
+      setLocalError('');
+      await deleteDrawing(drawing._id).unwrap();
       setSuccessMsg(`Drawing ${drawing.drawingCode} deleted successfully`);
       setTimeout(() => setSuccessMsg(''), 3000);
-      fetchDrawings();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete drawing');
+      setLocalError(err.data?.message || err.message || 'Failed to delete drawing');
     }
   };
 

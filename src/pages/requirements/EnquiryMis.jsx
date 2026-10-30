@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  getUnifiedMis,
-  getCustomerMis,
-  getItemMis,
-  getItemCategoryMis,
-  getStatusMis,
-  getSalesPersonMis,
-} from '../../services/requirementService';
-import { getClients } from '../../services/clientService';
-import { getItemCategories } from '../../services/itemCategoryService';
-import { getItems } from '../../services/itemService';
-import { getEmployees } from '../../services/employeeService';
+  useLazyGetUnifiedMisQuery,
+  useLazyGetCustomerMisQuery,
+  useLazyGetItemMisQuery,
+  useLazyGetItemCategoryMisQuery,
+  useLazyGetStatusMisQuery,
+  useLazyGetSalesPersonMisQuery,
+} from '../../features/requirements/requirementsApi';
+import { useGetItemCategoriesQuery, useLazyGetClientsQuery } from '../../features/masterData/masterDataApi';
+import { useGetItemsQuery } from '../../features/products/productsApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
@@ -48,11 +47,46 @@ const EnquiryMis = () => {
   // Report Data
   const [reportData, setReportData] = useState([]);
 
-  // Master Filter Data Options
-  const [clients, setClients] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [items, setItems] = useState([]);
-  const [salesPersons, setSalesPersons] = useState([]);
+  // RTK Query Lazy Triggers
+  const [triggerUnified] = useLazyGetUnifiedMisQuery();
+  const [triggerCustomer] = useLazyGetCustomerMisQuery();
+  const [triggerItem] = useLazyGetItemMisQuery();
+  const [triggerCategory] = useLazyGetItemCategoryMisQuery();
+  const [triggerStatus] = useLazyGetStatusMisQuery();
+  const [triggerSalesPerson] = useLazyGetSalesPersonMisQuery();
+  const [triggerGetClients] = useLazyGetClientsQuery();
+
+  // Cached Master Filter Queries
+  const { data: catData } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' });
+  const { data: itemData } = useGetItemsQuery({ typeFilter: 'MASTER', all: true });
+  const { data: empData } = useGetEmployeesQuery({ all: true });
+
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return (
+      u.startsWith('CAT-WO-') ||
+      u === 'CAT-INV' ||
+      u === 'CAT-OBOM' ||
+      u.startsWith('ITEM-WO-') ||
+      u.startsWith('ITEM-INV-') ||
+      u.startsWith('ITEM-OBOM-')
+    );
+  };
+
+  const categories = useMemo(() => {
+    const list = catData?.itemCategories || catData?.categories || (Array.isArray(catData) ? catData : []);
+    return list.filter((c) => !isSystemCode(c.categoryCode));
+  }, [catData]);
+
+  const items = useMemo(() => {
+    const list = itemData?.items || (Array.isArray(itemData) ? itemData : []);
+    return list.filter((i) => !isSystemCode(i.itemCode));
+  }, [itemData]);
+
+  const salesPersons = useMemo(() => {
+    return empData?.employees || (Array.isArray(empData) ? empData : []);
+  }, [empData]);
 
   // Active Filter Inputs
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,43 +111,6 @@ const EnquiryMis = () => {
     won: 0,
     overdue: 0,
   });
-
-  // Load Master Selectors Data Once
-  useEffect(() => {
-    const loadMasterOptions = async () => {
-      try {
-        const isSystemCode = (code) => {
-          if (!code) return false;
-          const u = String(code).toUpperCase();
-          return (
-            u.startsWith('CAT-WO-') ||
-            u === 'CAT-INV' ||
-            u === 'CAT-OBOM' ||
-            u.startsWith('ITEM-WO-') ||
-            u.startsWith('ITEM-INV-') ||
-            u.startsWith('ITEM-OBOM-')
-          );
-        };
-
-        const [catRes, itemRes, empRes] = await Promise.all([
-          getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: false, itemCategories: [] })),
-          getItems({ typeFilter: 'MASTER', all: true }).catch(() => ({ success: false, items: [] })),
-          getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
-        ]);
-
-        if (catRes.success && Array.isArray(catRes.itemCategories)) {
-          setCategories(catRes.itemCategories.filter((c) => !isSystemCode(c.categoryCode)));
-        }
-        if (itemRes.success && Array.isArray(itemRes.items)) {
-          setItems(itemRes.items.filter((i) => !isSystemCode(i.itemCode)));
-        }
-        if (empRes.success && Array.isArray(empRes.employees)) setSalesPersons(empRes.employees);
-      } catch (err) {
-        console.error('Error loading master filter options:', err);
-      }
-    };
-    loadMasterOptions();
-  }, []);
 
   // Fetch Report Data based on active tab and filters
   const fetchReportData = async () => {
@@ -142,44 +139,44 @@ const EnquiryMis = () => {
 
       let response;
       if (activeTab === 'unified') {
-        response = await getUnifiedMis(params);
-        if (response.success && Array.isArray(response.requirements)) {
+        response = await triggerUnified(params).unwrap();
+        if (response?.success && Array.isArray(response.requirements)) {
           setReportData(response.requirements);
           calculateSummaryMetrics(response.requirements);
         } else {
           setReportData([]);
         }
       } else if (activeTab === 'customer') {
-        response = await getCustomerMis(params);
-        if (response.success && Array.isArray(response.data)) {
+        response = await triggerCustomer(params).unwrap();
+        if (response?.success && Array.isArray(response.data)) {
           setReportData(response.data);
         } else {
           setReportData([]);
         }
       } else if (activeTab === 'item') {
-        response = await getItemMis(params);
-        if (response.success && Array.isArray(response.data)) {
+        response = await triggerItem(params).unwrap();
+        if (response?.success && Array.isArray(response.data)) {
           setReportData(response.data);
         } else {
           setReportData([]);
         }
       } else if (activeTab === 'category') {
-        response = await getItemCategoryMis(params);
-        if (response.success && Array.isArray(response.data)) {
+        response = await triggerCategory(params).unwrap();
+        if (response?.success && Array.isArray(response.data)) {
           setReportData(response.data);
         } else {
           setReportData([]);
         }
       } else if (activeTab === 'status') {
-        response = await getStatusMis(params);
-        if (response.success && Array.isArray(response.data)) {
+        response = await triggerStatus(params).unwrap();
+        if (response?.success && Array.isArray(response.data)) {
           setReportData(response.data);
         } else {
           setReportData([]);
         }
       } else if (activeTab === 'salesPerson') {
-        response = await getSalesPersonMis(params);
-        if (response.success && Array.isArray(response.data)) {
+        response = await triggerSalesPerson(params).unwrap();
+        if (response?.success && Array.isArray(response.data)) {
           setReportData(response.data);
         } else {
           setReportData([]);
@@ -187,7 +184,7 @@ const EnquiryMis = () => {
       }
     } catch (err) {
       console.error('Failed to fetch MIS report data:', err);
-      setError(err.response?.data?.message || 'Failed to load MIS report data');
+      setError(err?.data?.message || err?.message || 'Failed to load MIS report data');
       setReportData([]);
     } finally {
       setLoading(false);
@@ -196,8 +193,8 @@ const EnquiryMis = () => {
 
   const loadClientOptions = async (inputValue) => {
     try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
-      if (res.success && Array.isArray(res.clients)) {
+      const res = await triggerGetClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' }).unwrap();
+      if (res?.success && Array.isArray(res.clients)) {
         return res.clients.map((c) => ({
           value: c._id,
           label: c.companyName,

@@ -3,18 +3,32 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Select, Textarea, FormField } from '../../components/ui/FormField';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
-import { createBOM, updateBOM, addBOMItem, updateBOMItem, deleteBOMItem } from '../../services/masterBomService';
+import { useGetProductsQuery } from '../../features/products/productsApi';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
+import { useCreateMasterBOMMutation, useUpdateMasterBOMMutation } from '../../features/boms/bomsApi';
 import { Plus, Trash2, Layers, Package, AlertCircle } from 'lucide-react';
 
 const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
   const isEdit = Boolean(bom);
 
-  // Dropdown lists
-  const [items, setItems] = useState([]);
-  const [uoms, setUoms] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  // RTK Query hooks
+  const { data: itemData, isLoading: loadingItems } = useGetProductsQuery(
+    { all: true },
+    { skip: !isOpen }
+  );
+
+  const { data: uomData, isLoading: loadingUoms } = useGetUOMsQuery(
+    undefined,
+    { skip: !isOpen }
+  );
+
+  const [createMasterBOM, { isLoading: creating }] = useCreateMasterBOMMutation();
+  const [updateMasterBOM, { isLoading: updating }] = useUpdateMasterBOMMutation();
+
+  const items = (itemData?.items || itemData?.products || []).filter(i => i.status === 'active');
+  const uoms = (uomData?.uoms || []).filter(u => u.status === 'active');
+  const loadingData = loadingItems || loadingUoms;
+  const submitting = creating || updating;
 
   // Header Fields
   const [parentItem, setParentItem] = useState('');
@@ -26,37 +40,11 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
 
   // Component Items List State (for Create & Edit)
   const [components, setComponents] = useState([]);
-
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const loadMasterData = async () => {
-      setLoadingData(true);
-      setError('');
-      try {
-        const [itemRes, uomRes] = await Promise.all([
-          getItems({ all: true }),
-          getUOMs()
-        ]);
-
-        if (itemRes.success && Array.isArray(itemRes.items)) {
-          setItems(itemRes.items.filter(i => i.status === 'active'));
-        }
-        if (uomRes.success && Array.isArray(uomRes.uoms)) {
-          setUoms(uomRes.uoms.filter(u => u.status === 'active'));
-        }
-      } catch (err) {
-        console.error('Failed to load master data:', err);
-        setError('Failed to fetch items or UOMs from server.');
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    loadMasterData();
+    setError('');
 
     if (bom) {
       const pId = typeof bom.parentItem === 'object' ? bom.parentItem?._id : bom.parentItem;
@@ -189,12 +177,8 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
           }))
         };
 
-        const res = await createBOM(payload);
-        if (res.success) {
-          onSuccess();
-        } else {
-          setError(res.message || 'Failed to create Master BOM');
-        }
+        await createMasterBOM(payload).unwrap();
+        onSuccess();
       } else {
         // EDIT DRAFT BOM HEADER
         const headerPayload = {
@@ -205,18 +189,12 @@ const MasterBOMFormModal = ({ isOpen, bom, onClose, onSuccess }) => {
           remarks: remarks.trim()
         };
 
-        const res = await updateBOM(bom._id, headerPayload);
-        if (res.success) {
-          onSuccess();
-        } else {
-          setError(res.message || 'Failed to update Master BOM header');
-        }
+        await updateMasterBOM({ id: bom._id, ...headerPayload }).unwrap();
+        onSuccess();
       }
     } catch (err) {
       console.error('Master BOM form error:', err);
-      setError(err.response?.data?.message || 'Server error saving Master BOM');
-    } finally {
-      setSubmitting(false);
+      setError(err.data?.message || err.message || 'Server error saving Master BOM');
     }
   };
 

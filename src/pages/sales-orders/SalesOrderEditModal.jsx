@@ -3,7 +3,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Textarea, FormField } from '../../components/ui/FormField';
-import { updateSalesOrder } from '../../services/salesOrderService';
+import { useUpdateSalesOrderMutation } from '../../features/salesOrders/salesOrdersApi';
 import { ShoppingBag, Lock, Calculator, AlertCircle } from 'lucide-react';
 
 const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
@@ -25,8 +25,9 @@ const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
   const [taxName, setTaxName] = useState('GST');
   const [taxRate, setTaxRate] = useState(0);
 
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const [updateSalesOrderMutation, { isLoading: submitting }] = useUpdateSalesOrderMutation();
 
   useEffect(() => {
     if (!salesOrder || !isOpen) return;
@@ -50,7 +51,6 @@ const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
     e.preventDefault();
     if (!salesOrder) return;
 
-    setSubmitting(true);
     setError('');
     try {
       const payload = {
@@ -72,17 +72,15 @@ const SalesOrderEditModal = ({ isOpen, salesOrder, onClose, onSuccess }) => {
         payload.taxRate = Number(taxRate) || 0;
       }
 
-      const res = await updateSalesOrder(salesOrder._id, payload);
-      if (res.success) {
+      const res = await updateSalesOrderMutation({ id: salesOrder._id, data: payload }).unwrap();
+      if (res.success || res.salesOrder) {
         onSuccess();
       } else {
         setError(res.message || 'Failed to update Sales Order');
       }
     } catch (err) {
       console.error('Update Sales Order error:', err);
-      setError(err.response?.data?.message || 'Server error updating Sales Order');
-    } finally {
-      setSubmitting(false);
+      setError(err?.data?.message || err?.message || 'Server error updating Sales Order');
     }
   };
 

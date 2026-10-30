@@ -3,10 +3,11 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Layers, Edit, Trash2 } from 'lucide-react';
-import { deleteFilterGrade } from '../../services/filterGradeService';
+import { useDeleteFilterGradeMutation } from '../../features/masterData/masterDataApi';
 import DeleteFilterGradeModal from './DeleteFilterGradeModal';
 
 const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, onSuccess, canEdit, canDelete }) => {
+  const [deleteFilterGradeMutation] = useDeleteFilterGradeMutation();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -15,7 +16,7 @@ const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, onSuccess, canEdit,
   const handleConfirmDelete = async () => {
     setDeleteLoading(true);
     try {
-      await deleteFilterGrade(grade._id);
+      await deleteFilterGradeMutation(grade._id).unwrap();
       setIsDeleteOpen(false);
       if (onSuccess) onSuccess();
       onClose();

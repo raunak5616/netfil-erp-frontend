@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  getSupplierById,
-  getSupplierPurchaseSummary,
-  getSupplierPurchaseHistory,
-  getSupplierItemPriceHistory,
-  approveOrRejectSupplier
-} from '../../services/supplierService';
+  useGetSupplierByIdQuery,
+  useGetSupplierPurchaseSummaryQuery,
+  useGetSupplierPurchaseHistoryQuery,
+  useGetSupplierItemPriceHistoryQuery,
+  useApproveOrRejectSupplierMutation
+} from '../../features/suppliers/suppliersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -50,11 +50,6 @@ const SupplierDetail = () => {
 
   const canEdit = hasPermission('SUPPLIER_EDIT') || hasPermission('PARTY_EDIT');
 
-  // Core Supplier State
-  const [supplier, setSupplier] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Approval Action States
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -65,100 +60,48 @@ const SupplierDetail = () => {
   // Active Tab State: 'overview' | 'history' | 'price-history'
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Calculated Summary State
-  const [summary, setSummary] = useState(null);
-
-  // Tab 2: Purchase History State
-  const [historyPOs, setHistoryPOs] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  // Tab 2: Purchase History Filter State
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
 
-  // Tab 3: Item Price History State
-  const [priceItems, setPriceItems] = useState([]);
-  const [priceLoading, setPriceLoading] = useState(false);
+  // Tab 3: Item Price History Filter State
   const [priceSearch, setPriceSearch] = useState('');
   const [expandedItemKey, setExpandedItemKey] = useState(null);
 
-  // Fetch Supplier Details
-  const fetchSupplierDetails = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getSupplierById(id);
-      if (res.success && res.supplier) {
-        setSupplier(res.supplier);
-      } else {
-        setError('Supplier record not found.');
-      }
-    } catch (err) {
-      console.error('Failed to load supplier details:', err);
-      setError(err.response?.data?.message || 'Error loading supplier details');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // RTK Query Hooks
+  const { data: supplierData, isLoading: loading, error: supplierError } = useGetSupplierByIdQuery(id);
+  const supplier = supplierData?.supplier;
+  const error = supplierError ? (supplierError?.data?.message || 'Error loading supplier details') : '';
 
-  // Fetch Summary Calculations
-  const fetchSummary = async () => {
-    try {
-      const res = await getSupplierPurchaseSummary(id);
-      if (res.success && res.summary) {
-        setSummary(res.summary);
-      }
-    } catch (err) {
-      console.error('Failed to load purchase summary:', err);
-    }
-  };
+  const { data: summaryData } = useGetSupplierPurchaseSummaryQuery(id, { skip: !id });
+  const summary = summaryData?.summary;
 
-  // Fetch Purchase Orders History
-  const fetchPurchaseHistory = async () => {
-    setHistoryLoading(true);
-    try {
-      const params = {};
-      if (historyStatusFilter !== 'all') params.status = historyStatusFilter;
-      if (historySearch) params.search = historySearch;
+  const historyParams = useMemo(() => {
+    const params = {};
+    if (historyStatusFilter !== 'all') params.status = historyStatusFilter;
+    if (historySearch) params.search = historySearch;
+    return params;
+  }, [historyStatusFilter, historySearch]);
 
-      const res = await getSupplierPurchaseHistory(id, params);
-      if (res.success && Array.isArray(res.purchaseOrders)) {
-        setHistoryPOs(res.purchaseOrders);
-      }
-    } catch (err) {
-      console.error('Failed to load purchase history:', err);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
+  const { data: historyData, isLoading: historyLoading } = useGetSupplierPurchaseHistoryQuery(
+    { id, params: historyParams },
+    { skip: !id || activeTab !== 'history' }
+  );
+  const historyPOs = historyData?.purchaseOrders || [];
 
-  // Fetch Item Price History
-  const fetchItemPriceHistory = async () => {
-    setPriceLoading(true);
-    try {
-      const params = {};
-      if (priceSearch) params.search = priceSearch;
-      const res = await getSupplierItemPriceHistory(id, params);
-      if (res.success && Array.isArray(res.items)) {
-        setPriceItems(res.items);
-      }
-    } catch (err) {
-      console.error('Failed to load item price history:', err);
-    } finally {
-      setPriceLoading(false);
-    }
-  };
+  const priceParams = useMemo(() => {
+    const params = {};
+    if (priceSearch) params.search = priceSearch;
+    return params;
+  }, [priceSearch]);
 
-  useEffect(() => {
-    fetchSupplierDetails();
-    fetchSummary();
-  }, [id]);
+  const { data: priceData, isLoading: priceLoading } = useGetSupplierItemPriceHistoryQuery(
+    { id, params: priceParams },
+    { skip: !id || activeTab !== 'price-history' }
+  );
+  const priceItems = priceData?.items || [];
 
-  useEffect(() => {
-    if (activeTab === 'history') {
-      fetchPurchaseHistory();
-    } else if (activeTab === 'price-history') {
-      fetchItemPriceHistory();
-    }
-  }, [id, activeTab, historyStatusFilter, historySearch, priceSearch]);
+  const [approveOrRejectMutation] = useApproveOrRejectSupplierMutation();
 
   if (loading) {
     return (
@@ -200,18 +143,15 @@ const SupplierDetail = () => {
   };
 
   const handleApprove = async () => {
-    if (!window.confirm(`Approve Supplier "${supplier.supplierName}" (${supplier.supplierCode})?`)) return;
+    if (!window.confirm(`Approve Supplier "${supplier?.supplierName}" (${supplier?.supplierCode})?`)) return;
     setActionLoading(true);
     setActionError('');
     setActionSuccess('');
     try {
-      const res = await approveOrRejectSupplier(id, { action: 'APPROVE' });
-      if (res.success) {
-        setSupplier(res.supplier);
-        setActionSuccess('Supplier approved successfully.');
-      }
+      await approveOrRejectMutation({ id, action: 'APPROVE' }).unwrap();
+      setActionSuccess('Supplier approved successfully.');
     } catch (err) {
-      setActionError(err.response?.data?.message || 'Failed to approve supplier');
+      setActionError(err?.data?.message || err?.message || 'Failed to approve supplier');
     } finally {
       setActionLoading(false);
     }
@@ -227,18 +167,16 @@ const SupplierDetail = () => {
     setActionError('');
     setActionSuccess('');
     try {
-      const res = await approveOrRejectSupplier(id, {
+      await approveOrRejectMutation({
+        id,
         action: 'REJECT',
         rejectionReason: rejectionReason.trim(),
-      });
-      if (res.success) {
-        setSupplier(res.supplier);
-        setIsRejecting(false);
-        setRejectionReason('');
-        setActionSuccess('Supplier rejected.');
-      }
+      }).unwrap();
+      setIsRejecting(false);
+      setRejectionReason('');
+      setActionSuccess('Supplier rejected.');
     } catch (err) {
-      setActionError(err.response?.data?.message || 'Failed to reject supplier');
+      setActionError(err?.data?.message || err?.message || 'Failed to reject supplier');
     } finally {
       setActionLoading(false);
     }

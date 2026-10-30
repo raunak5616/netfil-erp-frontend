@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { updateUser } from '../../services/userService';
-import { getEmployees } from '../../services/employeeService';
-import { getRoles } from '../../services/roleService';
+import { useUpdateUserMutation } from '../../features/users/usersApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
+import { useGetRolesQuery } from '../../features/roles/rolesApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -18,13 +18,18 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
 
-  const [employees, setEmployees] = useState([]);
-  const [roles, setRoles] = useState([]);
-
-  const [loadingData, setLoadingData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // RTK Query hooks
+  const { data: empData, isLoading: loadingEmployees } = useGetEmployeesQuery({ all: true }, { skip: !isOpen });
+  const { data: rolesData, isLoading: loadingRoles } = useGetRolesQuery(undefined, { skip: !isOpen });
+  const [updateUserMutation] = useUpdateUserMutation();
+
+  const employees = empData?.employees || [];
+  const roles = rolesData?.roles || [];
+  const loadingData = loadingEmployees || loadingRoles;
 
   // Other user account employee IDs (excluding current user)
   const otherUsersEmployeeIds = useMemo(() => new Set(
@@ -41,31 +46,6 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
 
   useEffect(() => {
     if (!isOpen || !user) return;
-
-    const fetchData = async () => {
-      setLoadingData(true);
-      setErrorMessage('');
-      try {
-        const [empRes, roleRes] = await Promise.all([
-          getEmployees({ all: true }),
-          getRoles(),
-        ]);
-
-        if (empRes.success && Array.isArray(empRes.employees)) {
-          setEmployees(empRes.employees);
-        }
-        if (roleRes.success && Array.isArray(roleRes.roles)) {
-          setRoles(roleRes.roles);
-        }
-      } catch (err) {
-        console.error("Failed to load employees or roles:", err);
-        setErrorMessage("Could not load employee or role options. Please try again.");
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    fetchData();
 
     // Populate user data
     setFormData({
@@ -139,21 +119,20 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
     setSuccessMessage('');
 
     try {
-      const res = await updateUser(user._id, {
+      await updateUserMutation({
+        id: user._id,
         employeeId: formData.employeeId,
         roleIds: selectedRoleIds,
         isActive: formData.isActive === 'true' || formData.isActive === true,
-      });
+      }).unwrap();
 
-      if (res.success) {
-        setSuccessMessage('User account updated successfully!');
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 800);
-      }
+      setSuccessMessage('User account updated successfully!');
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+      }, 800);
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to update user account.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to update user account.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

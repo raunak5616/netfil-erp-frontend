@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getPurchaseEnquiryById,
-  updatePurchaseEnquiryStatus
-} from '../../services/purchaseEnquiryService';
+  useGetPurchaseEnquiryByIdQuery,
+  useUpdatePurchaseEnquiryStatusMutation,
+} from '../../features/purchase/purchaseApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -49,37 +49,18 @@ const PurchaseEnquiryDetail = () => {
   const canSend = hasPermission('PURCHASE_ENQUIRY_SEND');
   const canCancel = hasPermission('PURCHASE_ENQUIRY_CANCEL');
 
-  const [pe, setPe] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: peData, isLoading: loading, error: queryError } = useGetPurchaseEnquiryByIdQuery(id);
+  const [updateStatusMutation, { isLoading: isUpdatingStatus }] = useUpdatePurchaseEnquiryStatusMutation();
+
+  const pe = peData?.purchaseEnquiry || null;
+  const actionLoading = isUpdatingStatus;
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
   // Workflow Confirmation Modal State
   const [activeAction, setActiveAction] = useState(null); // 'SEND', 'PENDING', 'RECEIVE', 'EVALUATE', 'CLOSE', 'CANCEL'
   const [actionRemarks, setActionRemarks] = useState('');
-
-  const fetchPEDetail = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getPurchaseEnquiryById(id);
-      if (res.success && res.purchaseEnquiry) {
-        setPe(res.purchaseEnquiry);
-      } else {
-        setError('Purchase Enquiry record not found.');
-      }
-    } catch (err) {
-      console.error('Fetch PE Detail Error:', err);
-      setError(err.response?.data?.message || 'Failed to fetch Purchase Enquiry details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPEDetail();
-  }, [id]);
 
   const handleExecuteAction = async () => {
     if (!activeAction || !pe) return;
@@ -89,23 +70,20 @@ const PurchaseEnquiryDetail = () => {
       return;
     }
 
-    setActionLoading(true);
     setError('');
     try {
-      const res = await updatePurchaseEnquiryStatus(pe._id, activeAction, actionRemarks.trim());
-      if (res.success && res.purchaseEnquiry) {
-        setSuccess(`Purchase Enquiry status transitioned to '${STATUS_DISPLAY_MAP[res.purchaseEnquiry.status] || res.purchaseEnquiry.status}'`);
-        setPe(res.purchaseEnquiry);
-        setActiveAction(null);
-        setActionRemarks('');
-      } else {
-        setError(res.message || 'Workflow transition failed.');
-      }
+      const res = await updateStatusMutation({
+        id: pe._id,
+        action: activeAction,
+        remarks: actionRemarks.trim(),
+      }).unwrap();
+      const nextStatus = res?.purchaseEnquiry?.status || activeAction;
+      setSuccess(`Purchase Enquiry status transitioned to '${STATUS_DISPLAY_MAP[nextStatus] || nextStatus}'`);
+      setActiveAction(null);
+      setActionRemarks('');
     } catch (err) {
       console.error('PE Workflow transition error:', err);
-      setError(err.response?.data?.message || 'Error executing workflow transition.');
-    } finally {
-      setActionLoading(false);
+      setError(err?.data?.message || err.message || 'Error executing workflow transition.');
     }
   };
 

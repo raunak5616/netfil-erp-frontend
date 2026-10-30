@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { getEmployees, getDepartments } from '../../services/employeeService';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -26,23 +27,48 @@ const EmployeeList = () => {
   const canCreate = hasPermission('EMPLOYEE_CREATE');
   const canEdit = hasPermission('EMPLOYEE_EDIT');
 
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Pagination states (25 records per page)
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [departments, setDepartments] = useState([]);
   const [sortBy, setSortBy] = useState('name_asc');
+
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const params = {
+      page,
+      limit: pageSize,
+    };
+    if (debouncedSearch && debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (departmentFilter !== 'all') params.department = departmentFilter;
+    if (sortBy) params.sortBy = sortBy;
+    return params;
+  }, [page, pageSize, debouncedSearch, statusFilter, departmentFilter, sortBy]);
+
+  // RTK Query hooks
+  const { data: employeeData, isLoading: loading, error: queryError, refetch } = useGetEmployeesQuery(queryParams);
+  const { data: deptData } = useGetDepartmentsQuery();
+
+  const employees = employeeData?.employees || [];
+  const totalRecords = typeof employeeData?.total === 'number' ? employeeData.total : (employeeData?.count || 0);
+  const totalPages = employeeData?.totalPages || Math.ceil(totalRecords / pageSize) || 1;
+  const departments = deptData?.departments || [];
+
+  const error = queryError?.data?.message || (queryError ? 'Failed to connect to server' : '');
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -50,77 +76,9 @@ const EmployeeList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  // Debounce search input (350ms)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 350);
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
-
-  // Load department list for filter dropdown
-  useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        const data = await getDepartments();
-        if (data.success && Array.isArray(data.departments)) {
-          setDepartments(data.departments);
-        }
-      } catch (err) {
-        console.warn('Could not load departments for filter dropdown:', err.message || err);
-      }
-    };
-    loadDepartments();
-  }, []);
-
-  const fetchEmployeeData = async (overrides = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
-      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
-      const activeDepartment = overrides.department !== undefined ? overrides.department : departmentFilter;
-      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
-      const activePage = overrides.page !== undefined ? overrides.page : page;
-
-      const params = {
-        page: activePage,
-        limit: pageSize,
-      };
-
-      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
-      if (activeStatus !== 'all') params.status = activeStatus;
-      if (activeDepartment !== 'all') params.department = activeDepartment;
-      if (activeSortBy) params.sortBy = activeSortBy;
-
-      const data = await getEmployees(params);
-      if (data.success && Array.isArray(data.employees)) {
-        setEmployees(data.employees);
-        const total = typeof data.total === 'number' ? data.total : (data.count || 0);
-        setTotalRecords(total);
-        setTotalPages(data.totalPages || Math.ceil(total / pageSize) || 1);
-        if (data.page) setPage(data.page);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch employees:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Re-fetch from page 1 whenever filters, search, or sorting change
-  useEffect(() => {
-    setPage(1);
-    fetchEmployeeData({ page: 1, search: debouncedSearch });
-  }, [debouncedSearch, statusFilter, departmentFilter, sortBy]);
-
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
     setPage(newPage);
-    fetchEmployeeData({ page: newPage });
   };
 
   const handleClearFilters = () => {
@@ -130,13 +88,6 @@ const EmployeeList = () => {
     setDepartmentFilter('all');
     setSortBy('name_asc');
     setPage(1);
-    fetchEmployeeData({
-      page: 1,
-      search: '',
-      status: 'all',
-      department: 'all',
-      sortBy: 'name_asc',
-    });
   };
 
   const formatDate = (dateString) => {
@@ -378,7 +329,7 @@ const EmployeeList = () => {
         employee={editingEmployee}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={() => fetchEmployeeData()}
+        onSuccess={() => refetch()}
       />
 
       <EmployeeDetailModal

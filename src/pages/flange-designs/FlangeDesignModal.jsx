@@ -3,10 +3,13 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Select, Textarea, FormField } from '../../components/ui/FormField';
-import { createFlangeDesign, updateFlangeDesign } from '../../services/flangeDesignService';
+import { useCreateFlangeDesignMutation, useUpdateFlangeDesignMutation } from '../../features/masterData/masterDataApi';
 
 const FlangeDesignModal = ({ isOpen, flangeDesign, onClose, onSuccess }) => {
   const isEditing = Boolean(flangeDesign);
+
+  const [createFlangeDesignMutation] = useCreateFlangeDesignMutation();
+  const [updateFlangeDesignMutation] = useUpdateFlangeDesignMutation();
 
   const [designCode, setDesignCode] = useState('');
   const [designName, setDesignName] = useState('');
@@ -68,21 +71,16 @@ const FlangeDesignModal = ({ isOpen, flangeDesign, onClose, onSuccess }) => {
         status
       };
 
-      let res;
       if (isEditing) {
-        res = await updateFlangeDesign(flangeDesign._id, payload);
+        await updateFlangeDesignMutation({ id: flangeDesign._id, ...payload }).unwrap();
       } else {
-        res = await createFlangeDesign(payload);
+        await createFlangeDesignMutation(payload).unwrap();
       }
 
-      if (res.success) {
-        onSuccess();
-      } else {
-        setError(res.message || 'Failed to save Flange Design');
-      }
+      onSuccess();
     } catch (err) {
       console.error('Save Flange Design error:', err);
-      setError(err.response?.data?.message || 'Server error saving Flange Design');
+      setError(err?.data?.message || err?.message || 'Server error saving Flange Design');
     } finally {
       setSubmitting(false);
     }

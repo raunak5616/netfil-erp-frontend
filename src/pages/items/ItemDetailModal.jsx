@@ -3,32 +3,23 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { getItemSpecifications } from '../../services/itemService';
+import { useGetItemSpecificationsQuery } from '../../features/products/productsApi';
 import { Edit, Sliders, Layers, Package, Scale, ShieldCheck, FileText, History, Maximize2, Wind } from 'lucide-react';
 
 const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'specifications' | 'uom' | 'inventory' | 'accounting_history'
-  const [specifications, setSpecifications] = useState([]);
-  const [loadingSpecs, setLoadingSpecs] = useState(false);
+
+  const { data: specsData, isLoading: loadingSpecs } = useGetItemSpecificationsQuery(item?._id, {
+    skip: !isOpen || !item?._id
+  });
+
+  const specifications = specsData?.specifications || [];
 
   useEffect(() => {
-    if (!isOpen || !item) return;
-
-    setActiveTab('general');
-    setLoadingSpecs(true);
-    getItemSpecifications(item._id)
-      .then((res) => {
-        if (res.success && Array.isArray(res.specifications)) {
-          setSpecifications(res.specifications);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load Item Specifications:", err);
-      })
-      .finally(() => {
-        setLoadingSpecs(false);
-      });
-  }, [item, isOpen]);
+    if (isOpen) {
+      setActiveTab('general');
+    }
+  }, [isOpen]);
 
   if (!isOpen || !item) return null;
 

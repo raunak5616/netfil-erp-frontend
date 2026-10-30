@@ -4,16 +4,22 @@ import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Textarea } from '../../components/ui/FormField';
 import {
-  releaseWorkOrder,
-  startWorkOrder,
-  completeWorkOrder,
-  cancelWorkOrder
-} from '../../services/workOrderService';
+  useReleaseWorkOrderMutation,
+  useStartWorkOrderMutation,
+  useCompleteWorkOrderMutation,
+  useCancelWorkOrderMutation
+} from '../../features/workOrders/workOrdersApi';
 
 const WorkOrderActionModal = ({ isOpen, actionType, workOrder, onClose, onSuccess }) => {
   const [remarks, setRemarks] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [releaseWorkOrder, { isLoading: releasing }] = useReleaseWorkOrderMutation();
+  const [startWorkOrder, { isLoading: starting }] = useStartWorkOrderMutation();
+  const [completeWorkOrder, { isLoading: completing }] = useCompleteWorkOrderMutation();
+  const [cancelWorkOrder, { isLoading: cancelling }] = useCancelWorkOrderMutation();
+
+  const loading = releasing || starting || completing || cancelling;
 
   useEffect(() => {
     if (!isOpen || !actionType) return;
@@ -65,30 +71,27 @@ const WorkOrderActionModal = ({ isOpen, actionType, workOrder, onClose, onSucces
     e.preventDefault();
     if (!workOrder?._id) return;
     setError('');
-    setLoading(true);
 
     try {
       let res;
       if (actionType === 'RELEASE') {
-        res = await releaseWorkOrder(workOrder._id, { remarks });
+        res = await releaseWorkOrder({ id: workOrder._id, data: { remarks } }).unwrap();
       } else if (actionType === 'START') {
-        res = await startWorkOrder(workOrder._id, { remarks });
+        res = await startWorkOrder({ id: workOrder._id, data: { remarks } }).unwrap();
       } else if (actionType === 'COMPLETE') {
-        res = await completeWorkOrder(workOrder._id, { remarks });
+        res = await completeWorkOrder({ id: workOrder._id, data: { remarks } }).unwrap();
       } else if (actionType === 'CANCEL') {
-        res = await cancelWorkOrder(workOrder._id, { remarks });
+        res = await cancelWorkOrder({ id: workOrder._id, data: { remarks } }).unwrap();
       }
 
-      if (res && res.success) {
-        onSuccess(res.workOrder || res.message);
+      if (res && (res.success || res.workOrder || res.message)) {
+        onSuccess(res.workOrder || res.message || res);
       } else {
         setError(res?.message || 'Failed to complete action');
       }
     } catch (err) {
       console.error('Work Order action error:', err);
-      setError(err.response?.data?.message || 'Error processing request');
-    } finally {
-      setLoading(false);
+      setError(err.data?.message || err.message || 'Error processing request');
     }
   };
 

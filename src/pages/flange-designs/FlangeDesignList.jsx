@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
 import Button from '../../components/ui/Button';
@@ -9,10 +9,10 @@ import Modal from '../../components/ui/Modal';
 import { Input, Select } from '../../components/ui/FormField';
 
 import {
-  getFlangeDesigns,
-  updateFlangeDesignStatus,
-  deleteFlangeDesign
-} from '../../services/flangeDesignService';
+  useGetFlangeDesignsQuery,
+  useUpdateFlangeDesignMutation,
+  useDeleteFlangeDesignMutation
+} from '../../features/masterData/masterDataApi';
 import FlangeDesignModal from './FlangeDesignModal';
 
 import {
@@ -30,10 +30,6 @@ import {
 } from 'lucide-react';
 
 const FlangeDesignList = () => {
-  const [designs, setDesigns] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -43,44 +39,32 @@ const FlangeDesignList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDesign, setEditingDesign] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [error, setError] = useState('');
 
-  const fetchDesigns = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = {};
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (typeFilter !== 'all') params.constructionType = typeFilter;
+  const queryParams = useMemo(() => {
+    const params = {};
+    if (searchTerm.trim()) params.search = searchTerm.trim();
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (typeFilter !== 'all') params.constructionType = typeFilter;
+    return params;
+  }, [searchTerm, statusFilter, typeFilter]);
 
-      const res = await getFlangeDesigns(params);
-      if (res.success && Array.isArray(res.flangeDesigns)) {
-        setDesigns(res.flangeDesigns);
-      } else {
-        setError('Unexpected response from server');
-      }
-    } catch (err) {
-      console.error('Fetch Flange Designs error:', err);
-      setError(err.response?.data?.message || 'Failed to load Flange Designs');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // RTK Query hooks
+  const { data: designsData, isLoading: loading, error: queryError, refetch } = useGetFlangeDesignsQuery(queryParams);
+  const [updateFlangeDesignMutation] = useUpdateFlangeDesignMutation();
+  const [deleteFlangeDesignMutation] = useDeleteFlangeDesignMutation();
 
-  useEffect(() => {
-    fetchDesigns();
-  }, [statusFilter, typeFilter]);
+  const designs = designsData?.flangeDesigns || [];
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
-    fetchDesigns();
+    refetch();
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
     setTypeFilter('all');
-    fetchDesigns();
   };
 
   const handleToggleStatus = async (design, newStatus) => {
@@ -88,15 +72,10 @@ const FlangeDesignList = () => {
     if (!window.confirm(confirmMsg)) return;
 
     try {
-      const res = await updateFlangeDesignStatus(design._id, newStatus);
-      if (res.success) {
-        fetchDesigns();
-      } else {
-        setError(res.message || 'Failed to update status');
-      }
+      await updateFlangeDesignMutation({ id: design._id, status: newStatus }).unwrap();
     } catch (err) {
       console.error('Status update error:', err);
-      setError(err.response?.data?.message || 'Error updating status');
+      setError(err?.data?.message || err?.message || 'Error updating status');
     }
   };
 
@@ -104,15 +83,10 @@ const FlangeDesignList = () => {
     if (!window.confirm(`Are you sure you want to delete Flange Design "${design.designCode}"?`)) return;
 
     try {
-      const res = await deleteFlangeDesign(design._id);
-      if (res.success) {
-        fetchDesigns();
-      } else {
-        setError(res.message || 'Failed to delete record');
-      }
+      await deleteFlangeDesignMutation(design._id).unwrap();
     } catch (err) {
       console.error('Delete error:', err);
-      setError(err.response?.data?.message || 'Failed to delete Flange Design');
+      setError(err?.data?.message || err?.message || 'Failed to delete Flange Design');
     }
   };
 
@@ -261,7 +235,7 @@ const FlangeDesignList = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchDesigns}
+              onClick={refetch}
               disabled={loading}
             >
               <RefreshCw size={14} className={loading ? 'spin mr-1.5' : 'mr-1.5'} />
@@ -360,7 +334,7 @@ const FlangeDesignList = () => {
           onSuccess={() => {
             setIsModalOpen(false);
             setEditingDesign(null);
-            fetchDesigns();
+            refetch();
           }}
         />
       )}

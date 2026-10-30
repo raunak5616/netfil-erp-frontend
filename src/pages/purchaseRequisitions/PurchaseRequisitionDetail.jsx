@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getPurchaseRequisitionById,
-  updatePurchaseRequisitionStatus
-} from '../../services/purchaseRequisitionService';
+  useGetPurchaseRequisitionByIdQuery,
+  useUpdatePurchaseRequisitionStatusMutation,
+} from '../../features/purchase/purchaseApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -38,37 +38,18 @@ const PurchaseRequisitionDetail = () => {
   const canApprove = hasPermission('PURCHASE_REQUISITION_APPROVE');
   const canCancel = hasPermission('PURCHASE_REQUISITION_CANCEL');
 
-  const [pr, setPr] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: prData, isLoading: loading, error: queryError } = useGetPurchaseRequisitionByIdQuery(id);
+  const [updateStatusMutation, { isLoading: isUpdatingStatus }] = useUpdatePurchaseRequisitionStatusMutation();
+
+  const pr = prData?.purchaseRequisition || null;
+  const actionLoading = isUpdatingStatus;
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
   // Workflow Confirmation Modal State
   const [activeAction, setActiveAction] = useState(null); // 'SUBMIT', 'REVIEW', 'APPROVE', 'REJECT', 'CANCEL', 'CLOSE'
   const [actionRemarks, setActionRemarks] = useState('');
-
-  const fetchPRDetail = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getPurchaseRequisitionById(id);
-      if (res.success && res.purchaseRequisition) {
-        setPr(res.purchaseRequisition);
-      } else {
-        setError('Purchase Requisition record not found.');
-      }
-    } catch (err) {
-      console.error('Fetch PR Detail Error:', err);
-      setError(err.response?.data?.message || 'Failed to fetch Purchase Requisition details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPRDetail();
-  }, [id]);
 
   const handleExecuteAction = async () => {
     if (!activeAction || !pr) return;
@@ -78,23 +59,19 @@ const PurchaseRequisitionDetail = () => {
       return;
     }
 
-    setActionLoading(true);
     setError('');
     try {
-      const res = await updatePurchaseRequisitionStatus(pr._id, activeAction, actionRemarks.trim());
-      if (res.success && res.purchaseRequisition) {
-        setSuccess(`Purchase Requisition status transitioned to '${res.purchaseRequisition.status}'`);
-        setPr(res.purchaseRequisition);
-        setActiveAction(null);
-        setActionRemarks('');
-      } else {
-        setError(res.message || 'Workflow transition failed.');
-      }
+      const res = await updateStatusMutation({
+        id: pr._id,
+        action: activeAction,
+        remarks: actionRemarks.trim(),
+      }).unwrap();
+      setSuccess(`Purchase Requisition status transitioned to '${res?.purchaseRequisition?.status || activeAction}'`);
+      setActiveAction(null);
+      setActionRemarks('');
     } catch (err) {
       console.error('Workflow transition error:', err);
-      setError(err.response?.data?.message || 'Error executing workflow transition.');
-    } finally {
-      setActionLoading(false);
+      setError(err?.data?.message || err.message || 'Error executing workflow transition.');
     }
   };
 

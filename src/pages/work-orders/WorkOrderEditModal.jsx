@@ -3,20 +3,25 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Select, Input, Textarea } from '../../components/ui/FormField';
-import { getPlants } from '../../services/plantService';
-import { updateWorkOrder } from '../../services/workOrderService';
+import { useGetPlantsQuery } from '../../features/masterData/masterDataApi';
+import { useUpdateWorkOrderMutation } from '../../features/workOrders/workOrdersApi';
 
 const WorkOrderEditModal = ({ isOpen, workOrder, onClose, onSuccess }) => {
-  const [plants, setPlants] = useState([]);
   const [productionQuantity, setProductionQuantity] = useState('');
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [plannedStartDate, setPlannedStartDate] = useState('');
   const [plannedEndDate, setPlannedEndDate] = useState('');
   const [remarks, setRemarks] = useState('');
-
-  const [loadingPlants, setLoadingPlants] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const { data: plantData, isLoading: loadingPlants } = useGetPlantsQuery(
+    { status: 'active' },
+    { skip: !isOpen }
+  );
+
+  const [updateWorkOrder, { isLoading: submitting }] = useUpdateWorkOrderMutation();
+
+  const plants = plantData?.plants || [];
 
   useEffect(() => {
     if (!isOpen || !workOrder) return;
@@ -26,16 +31,6 @@ const WorkOrderEditModal = ({ isOpen, workOrder, onClose, onSuccess }) => {
     setPlannedStartDate(workOrder.plannedStartDate ? new Date(workOrder.plannedStartDate).toISOString().split('T')[0] : '');
     setPlannedEndDate(workOrder.plannedEndDate ? new Date(workOrder.plannedEndDate).toISOString().split('T')[0] : '');
     setRemarks(workOrder.remarks || '');
-
-    setLoadingPlants(true);
-    getPlants({ status: 'active' })
-      .then((res) => {
-        if (res.success && Array.isArray(res.plants)) {
-          setPlants(res.plants);
-        }
-      })
-      .catch((err) => console.warn('Could not load plants:', err))
-      .finally(() => setLoadingPlants(false));
   }, [isOpen, workOrder]);
 
   const handleSubmit = async (e) => {
@@ -53,7 +48,6 @@ const WorkOrderEditModal = ({ isOpen, workOrder, onClose, onSuccess }) => {
       return;
     }
 
-    setSubmitting(true);
     setError('');
 
     const payload = {
@@ -65,17 +59,15 @@ const WorkOrderEditModal = ({ isOpen, workOrder, onClose, onSuccess }) => {
     };
 
     try {
-      const res = await updateWorkOrder(workOrder._id, payload);
-      if (res.success) {
-        onSuccess(res.workOrder);
+      const res = await updateWorkOrder({ id: workOrder._id, ...payload }).unwrap();
+      if (res.success || res.workOrder) {
+        onSuccess(res.workOrder || res);
       } else {
         setError(res.message || 'Failed to update Work Order');
       }
     } catch (err) {
       console.error('Update Work Order error:', err);
-      setError(err.response?.data?.message || 'Server error updating Work Order');
-    } finally {
-      setSubmitting(false);
+      setError(err.data?.message || 'Server error updating Work Order');
     }
   };
 

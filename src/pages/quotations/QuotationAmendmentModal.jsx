@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  createQuotationAmendment,
-  getQuotationAmendments,
-} from '../../services/quotationService';
+  useGetQuotationAmendmentsQuery,
+  useCreateQuotationAmendmentMutation,
+} from '../../features/quotations/quotationsApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -11,10 +11,7 @@ import { FileDiff, History, Plus } from 'lucide-react';
 
 const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
   const [activeTab, setActiveTab] = useState('create');
-  const [submitting, setSubmitting] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState('');
-  const [amendmentHistory, setAmendmentHistory] = useState([]);
 
   // Form Data for Amendment
   const [reason, setReason] = useState('');
@@ -24,6 +21,17 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
   const [freightAmount, setFreightAmount] = useState(quotation?.freightAmount || 0);
   const [taxRate, setTaxRate] = useState(quotation?.taxRate || 0);
 
+  const {
+    data: amendmentsData,
+    isLoading: loadingHistory,
+  } = useGetQuotationAmendmentsQuery(quotation?._id, {
+    skip: !isOpen || !quotation?._id,
+  });
+
+  const [createQuotationAmendmentMutation, { isLoading: submitting }] = useCreateQuotationAmendmentMutation();
+
+  const amendmentHistory = amendmentsData?.amendments || [];
+
   useEffect(() => {
     if (isOpen && quotation?._id) {
       setReason('');
@@ -32,24 +40,9 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
       setPfAmount(quotation.pfAmount || 0);
       setFreightAmount(quotation.freightAmount || 0);
       setTaxRate(quotation.taxRate || 0);
-      fetchHistory();
+      setError('');
     }
   }, [isOpen, quotation?._id]);
-
-  const fetchHistory = async () => {
-    if (!quotation?._id) return;
-    setLoadingHistory(true);
-    try {
-      const res = await getQuotationAmendments(quotation._id);
-      if (res.success && Array.isArray(res.amendments)) {
-        setAmendmentHistory(res.amendments);
-      }
-    } catch (err) {
-      console.error('Failed to fetch amendment history:', err);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +53,6 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
       return;
     }
 
-    setSubmitting(true);
     try {
       const payload = {
         reason: reason.trim(),
@@ -73,17 +65,19 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
         },
       };
 
-      const res = await createQuotationAmendment(quotation._id, payload);
-      if (res.success) {
+      const res = await createQuotationAmendmentMutation({
+        id: quotation._id,
+        data: payload,
+      }).unwrap();
+
+      if (res.success || res.amendment) {
         onSuccess();
       } else {
         setError(res.message || 'Failed to create amendment');
       }
     } catch (err) {
       console.error('Create amendment error:', err);
-      setError(err.response?.data?.message || 'Failed to create quotation amendment');
-    } finally {
-      setSubmitting(false);
+      setError(err?.data?.message || err?.message || 'Failed to create quotation amendment');
     }
   };
 

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
-  getSalesOrders, 
-  updateSalesOrderStatus,
-  getSalesOrderDeliveryAlertsSummary,
-  dismissSalesOrderDeliveryAlert
-} from '../../services/salesOrderService';
-import { getClients } from '../../services/clientService';
+  useGetSalesOrdersQuery,
+  useGetSalesOrderDeliveryAlertsSummaryQuery,
+  useUpdateSalesOrderStatusMutation,
+  useDismissSalesOrderDeliveryAlertMutation,
+} from '../../features/salesOrders/salesOrdersApi';
+import { useLazyGetClientsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -53,26 +53,17 @@ const SalesOrderList = () => {
   const canEdit = hasPermission('SALES_ORDER_EDIT');
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
 
-  const [salesOrders, setSalesOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [customError, setCustomError] = useState('');
 
   // Delivery Reminders & Alerts State
-  const [deliverySummary, setDeliverySummary] = useState({
-    overdueCount: 0,
-    dueTodayCount: 0,
-    upcomingCount: 0,
-    totalAlerts: 0,
-  });
-  const [deliveryAlerts, setDeliveryAlerts] = useState([]);
   const [isAlertCenterExpanded, setIsAlertCenterExpanded] = useState(true);
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
-  const [syncingAlerts, setSyncingAlerts] = useState(false);
   const [dismissingId, setDismissingId] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState(urlStatus || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -83,7 +74,6 @@ const SalesOrderList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -103,81 +93,70 @@ const SalesOrderList = () => {
     }
   }, [urlSOId]);
 
-  const fetchDeliveryAlerts = async () => {
-    try {
-      const res = await getSalesOrderDeliveryAlertsSummary();
-      if (res.success) {
-        setDeliverySummary(
-          res.summary || {
-            overdueCount: 0,
-            dueTodayCount: 0,
-            upcomingCount: 0,
-            totalAlerts: 0,
-          }
-        );
-        setDeliveryAlerts(res.alerts?.deliveryAlerts || []);
-      }
-    } catch (err) {
-      console.error('Failed to load delivery alerts summary:', err);
-    }
-  };
-
-  const fetchSalesOrdersData = async (overrides = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      const activeSearch = overrides.search !== undefined ? overrides.search : searchTerm;
-      const activeClient = overrides.client !== undefined ? overrides.client : clientFilter;
-      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
-      const activeType = overrides.orderType !== undefined ? overrides.orderType : typeFilter;
-      const activeCategory = overrides.orderCategory !== undefined ? overrides.orderCategory : categoryFilter;
-      const activeFrom = overrides.from !== undefined ? overrides.from : fromDate;
-      const activeTo = overrides.to !== undefined ? overrides.to : toDate;
-      const activeDeliveryStatus = overrides.deliveryStatus !== undefined ? overrides.deliveryStatus : deliveryStatusFilter;
-      const activePage = overrides.page !== undefined ? overrides.page : page;
-
-      const params = { page: activePage, limit };
-      if (activeSearch.trim()) params.search = activeSearch.trim();
-      if (activeClient !== 'all') params.client = activeClient;
-      if (activeStatus !== 'all') params.status = activeStatus;
-      if (activeType !== 'all') params.orderType = activeType;
-      if (activeCategory !== 'all') params.orderCategory = activeCategory;
-      if (activeFrom) params.from = activeFrom;
-      if (activeTo) params.to = activeTo;
-      if (activeDeliveryStatus !== 'all') params.deliveryStatus = activeDeliveryStatus;
-
-      const soRes = await getSalesOrders(params);
-
-      if (soRes.success && Array.isArray(soRes.salesOrders)) {
-        setSalesOrders(soRes.salesOrders);
-        if (soRes.total !== undefined) setTotalRecords(soRes.total);
-      } else {
-        setError('Unexpected response format from server');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Sales Orders:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Debounce search term
   useEffect(() => {
-    fetchSalesOrdersData();
-    fetchDeliveryAlerts();
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deliveryStatusFilter, page]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const p = { page, limit };
+    if (debouncedSearch && debouncedSearch.trim()) p.search = debouncedSearch.trim();
+    if (clientFilter !== 'all') p.client = clientFilter;
+    if (statusFilter !== 'all') p.status = statusFilter;
+    if (typeFilter !== 'all') p.orderType = typeFilter;
+    if (categoryFilter !== 'all') p.orderCategory = categoryFilter;
+    if (fromDate) p.from = fromDate;
+    if (toDate) p.to = toDate;
+    if (deliveryStatusFilter !== 'all') p.deliveryStatus = deliveryStatusFilter;
+    return p;
+  }, [page, limit, debouncedSearch, clientFilter, statusFilter, typeFilter, categoryFilter, fromDate, toDate, deliveryStatusFilter]);
+
+  const {
+    data: soData,
+    isLoading: loading,
+    error: queryError,
+    refetch: refetchSalesOrders,
+  } = useGetSalesOrdersQuery(queryParams);
+
+  const {
+    data: alertsData,
+    refetch: refetchAlerts,
+  } = useGetSalesOrderDeliveryAlertsSummaryQuery();
+
+  const [updateStatusMutation] = useUpdateSalesOrderStatusMutation();
+  const [dismissAlertMutation] = useDismissSalesOrderDeliveryAlertMutation();
+  const [triggerGetClients] = useLazyGetClientsQuery();
+
+  const salesOrders = soData?.salesOrders || [];
+  const totalRecords = soData?.total || 0;
+
+  const deliverySummary = alertsData?.summary || {
+    overdueCount: 0,
+    dueTodayCount: 0,
+    upcomingCount: 0,
+    totalAlerts: 0,
+  };
+  const deliveryAlerts = alertsData?.alerts?.deliveryAlerts || [];
+  const error = customError || (queryError ? (queryError?.data?.message || 'Failed to load sales orders') : '');
+  const setError = setCustomError;
 
   const loadClientOptions = async (inputValue) => {
     try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
-      if (res.success && Array.isArray(res.clients)) {
-        return res.clients.map((c) => ({
-          value: c._id,
-          label: c.companyName,
-          secondaryLabel: c.clientCode,
-        }));
-      }
-      return [];
+      const res = await triggerGetClients({
+        search: inputValue,
+        limit: 15,
+        status: 'active',
+        approvalStatus: 'APPROVED',
+      }).unwrap();
+      const list = res?.clients || res?.data || (Array.isArray(res) ? res : []);
+      return list.map((c) => ({
+        value: c._id,
+        label: c.companyName,
+        secondaryLabel: c.clientCode,
+      }));
     } catch {
       return [];
     }
@@ -185,12 +164,13 @@ const SalesOrderList = () => {
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
+    setDebouncedSearch(searchTerm);
     setPage(1);
-    fetchSalesOrdersData({ page: 1 });
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setClientFilter('all');
     setStatusFilter('all');
     setTypeFilter('all');
@@ -199,44 +179,22 @@ const SalesOrderList = () => {
     setToDate('');
     setDeliveryStatusFilter('all');
     setPage(1);
-    fetchSalesOrdersData({
-      search: '',
-      client: 'all',
-      status: 'all',
-      orderType: 'all',
-      orderCategory: 'all',
-      from: '',
-      to: '',
-      deliveryStatus: 'all',
-      page: 1,
-    });
   };
 
   const handleKpiCardClick = (targetStatus) => {
     const nextVal = deliveryStatusFilter === targetStatus ? 'all' : targetStatus;
     setDeliveryStatusFilter(nextVal);
     setPage(1);
-    fetchSalesOrdersData({ page: 1, deliveryStatus: nextVal });
   };
 
   const handleSyncAlerts = async () => {
-    setSyncingAlerts(true);
-    try {
-      await Promise.all([fetchDeliveryAlerts(), fetchSalesOrdersData()]);
-    } finally {
-      setSyncingAlerts(false);
-    }
+    await Promise.all([refetchAlerts(), refetchSalesOrders()]);
   };
 
   const handleDismissAlert = async (salesOrderId) => {
     setDismissingId(salesOrderId);
     try {
-      await dismissSalesOrderDeliveryAlert(salesOrderId);
-      setDeliveryAlerts((prev) => prev.filter((a) => a.salesOrderId !== salesOrderId));
-      setDeliverySummary((prev) => ({
-        ...prev,
-        totalAlerts: Math.max(0, prev.totalAlerts - 1),
-      }));
+      await dismissAlertMutation(salesOrderId).unwrap();
     } catch (err) {
       console.error('Failed to dismiss delivery alert:', err);
     } finally {
@@ -245,7 +203,7 @@ const SalesOrderList = () => {
   };
 
   const hasActiveFilters =
-    searchTerm.trim() !== '' ||
+    debouncedSearch.trim() !== '' ||
     clientFilter !== 'all' ||
     statusFilter !== 'all' ||
     typeFilter !== 'all' ||
@@ -262,16 +220,13 @@ const SalesOrderList = () => {
 
     setActionLoading(so._id);
     try {
-      const res = await updateSalesOrderStatus(so._id, newStatus);
-      if (res.success) {
-        fetchSalesOrdersData();
-        fetchDeliveryAlerts();
-      } else {
+      const res = await updateStatusMutation({ id: so._id, status: newStatus }).unwrap();
+      if (!res.success && !res.salesOrder) {
         setError(res.message || 'Failed to update status');
       }
     } catch (err) {
       console.error('Failed to update status:', err);
-      setError(err.response?.data?.message || 'Error updating Sales Order status');
+      setError(err?.data?.message || err?.message || 'Error updating Sales Order status');
     } finally {
       setActionLoading(null);
     }
@@ -580,7 +535,10 @@ const SalesOrderList = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchSalesOrdersData}
+              onClick={() => {
+                refetchSalesOrders();
+                refetchAlerts();
+              }}
               disabled={loading}
             >
               <RefreshCw size={14} className={loading ? 'spin mr-1.5' : 'mr-1.5'} />
@@ -954,7 +912,8 @@ const SalesOrderList = () => {
           onClose={() => setIsCreateOpen(false)}
           onSuccess={() => {
             setIsCreateOpen(false);
-            fetchSalesOrdersData();
+            refetchSalesOrders();
+            refetchAlerts();
           }}
         />
       )}
@@ -975,7 +934,10 @@ const SalesOrderList = () => {
             setEditingSO(so);
             setIsEditOpen(true);
           }}
-          onStatusUpdated={fetchSalesOrdersData}
+          onStatusUpdated={() => {
+            refetchSalesOrders();
+            refetchAlerts();
+          }}
         />
       )}
 
@@ -991,7 +953,8 @@ const SalesOrderList = () => {
           onSuccess={() => {
             setIsEditOpen(false);
             setEditingSO(null);
-            fetchSalesOrdersData();
+            refetchSalesOrders();
+            refetchAlerts();
           }}
         />
       )}

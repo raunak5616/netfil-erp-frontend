@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { getWorkOrderById } from '../../services/workOrderService';
+import { useGetWorkOrderByIdQuery } from '../../features/workOrders/workOrdersApi';
 import { useAuth } from '../../context/AuthContext';
 import WorkOrderEditModal from './WorkOrderEditModal';
 import WorkOrderActionModal from './WorkOrderActionModal';
@@ -30,41 +30,24 @@ const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated
   const canComplete = hasPermission('WORK_ORDER_COMPLETE');
   const canCancel = hasPermission('WORK_ORDER_CANCEL');
 
-  const [workOrder, setWorkOrder] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Child Modals State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [actionType, setActionType] = useState(null);
 
-  const fetchDetail = async () => {
-    if (!workOrderId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getWorkOrderById(workOrderId);
-      if (res.success) {
-        setWorkOrder(res.workOrder);
-        setItems(res.items || []);
-      } else {
-        setError(res.message || 'Failed to fetch Work Order detail');
-      }
-    } catch (err) {
-      console.error('Fetch Work Order detail error:', err);
-      setError(err.response?.data?.message || 'Error connecting to server');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // RTK Query Hook
+  const {
+    data: detailData,
+    isLoading: loading,
+    error: queryError,
+    refetch: fetchDetail
+  } = useGetWorkOrderByIdQuery(workOrderId, {
+    skip: !isOpen || !workOrderId
+  });
 
-  useEffect(() => {
-    if (isOpen && workOrderId) {
-      fetchDetail();
-    }
-  }, [isOpen, workOrderId]);
+  const workOrder = detailData?.workOrder || null;
+  const items = detailData?.items || [];
+  const error = queryError ? (queryError.data?.message || queryError.message || 'Error connecting to server') : '';
 
   const handleOpenAction = (type) => {
     setActionType(type);

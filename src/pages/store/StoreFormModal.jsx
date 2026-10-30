@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField';
-import { createStore, updateStore } from '../../services/storeService';
+import { useCreateStoreMutation, useUpdateStoreMutation } from '../../features/stores/storesApi';
 import { Package } from 'lucide-react';
 
 const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
   const isEdit = !!store;
+  const [createStoreMutation] = useCreateStoreMutation();
+  const [updateStoreMutation] = useUpdateStoreMutation();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -62,15 +65,15 @@ const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEdit) {
-        await updateStore(store._id, formData);
+        await updateStoreMutation({ id: store._id, ...formData }).unwrap();
       } else {
-        await createStore(formData);
+        await createStoreMutation(formData).unwrap();
       }
-      onSuccess();
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
       console.error('Store form error:', err);
-      setError(err.response?.data?.message || 'Failed to save store record');
+      setError(err?.data?.message || err?.message || 'Failed to save store record');
     } finally {
       setLoading(false);
     }

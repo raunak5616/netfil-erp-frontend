@@ -4,13 +4,15 @@ import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import { 
-  getSalesOrderById, 
-  updateSalesOrderStatus, 
-  getSalesOrderReferences, 
   getSalesOrderItemDrawing, 
   getSalesOrderDrawings,
-  getSalesOrderAttachments 
 } from '../../services/salesOrderService';
+import {
+  useGetSalesOrderByIdQuery,
+  useGetSalesOrderReferencesQuery,
+  useGetSalesOrderAttachmentsQuery,
+  useUpdateSalesOrderStatusMutation,
+} from '../../features/salesOrders/salesOrdersApi';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
@@ -40,12 +42,6 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
 
-  const [loading, setLoading] = useState(true);
-  const [salesOrder, setSalesOrder] = useState(null);
-  const [items, setItems] = useState([]);
-  const [references, setReferences] = useState(null);
-  const [attachments, setAttachments] = useState([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab || 'details'); // 'details' | 'attachments' | 'traceability'
 
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
@@ -53,64 +49,46 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
   const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
   const [drawingWorkspaceInitialItemId, setDrawingWorkspaceInitialItemId] = useState(null);
 
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const fetchDetails = async () => {
-    if (!salesOrderId || !isOpen) return;
-    setLoading(true);
-    setError('');
-    try {
-      const [res, refRes, attRes] = await Promise.all([
-        getSalesOrderById(salesOrderId),
-        getSalesOrderReferences(salesOrderId).catch(() => ({ success: false })),
-        getSalesOrderAttachments(salesOrderId).catch(() => ({ success: false, attachments: [] }))
-      ]);
+  const {
+    data: soRes,
+    isLoading: loading,
+    error: soError,
+  } = useGetSalesOrderByIdQuery(salesOrderId, {
+    skip: !isOpen || !salesOrderId,
+  });
 
-      if (res.success && res.salesOrder) {
-        setSalesOrder(res.salesOrder);
-        setItems(res.items || []);
-      } else {
-        setError('Failed to load Sales Order details');
-      }
+  const {
+    data: refRes,
+  } = useGetSalesOrderReferencesQuery(salesOrderId, {
+    skip: !isOpen || !salesOrderId,
+  });
 
-      if (refRes.success && refRes.references) {
-        setReferences(refRes.references);
-      }
+  const {
+    data: attRes,
+    isLoading: attachmentsLoading,
+    refetch: refreshAttachments,
+  } = useGetSalesOrderAttachmentsQuery(
+    { id: salesOrderId },
+    { skip: !isOpen || !salesOrderId }
+  );
 
-      if (attRes.success && Array.isArray(attRes.attachments)) {
-        setAttachments(attRes.attachments);
-      }
-    } catch (err) {
-      console.error('Error fetching sales order details:', err);
-      setError(err.response?.data?.message || 'Server connection error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [updateStatusMutation, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
 
-  const refreshAttachments = async () => {
-    if (!salesOrderId) return;
-    setAttachmentsLoading(true);
-    try {
-      const res = await getSalesOrderAttachments(salesOrderId);
-      if (res.success && Array.isArray(res.attachments)) {
-        setAttachments(res.attachments);
-      }
-    } catch (err) {
-      console.error('Error refreshing attachments:', err);
-    } finally {
-      setAttachmentsLoading(false);
-    }
-  };
+  const salesOrder = soRes?.salesOrder || null;
+  const items = soRes?.items || [];
+  const references = refRes?.references || null;
+  const attachments = attRes?.attachments || [];
+  const error = actionError || (soError ? (soError?.data?.message || 'Failed to load Sales Order details') : '');
+  const setError = setActionError;
 
   useEffect(() => {
-    if (isOpen) {
-      if (initialTab) setActiveTab(initialTab);
-      fetchDetails();
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
     }
-  }, [salesOrderId, isOpen, initialTab]);
+  }, [isOpen, initialTab]);
 
   const handleStatusTransition = async (targetStatus) => {
     if (!salesOrder) return;
@@ -123,23 +101,19 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
 
     if (!window.confirm(confirmText)) return;
 
-    setStatusLoading(true);
     setError('');
     setSuccessMsg('');
     try {
-      const res = await updateSalesOrderStatus(salesOrderId, targetStatus);
-      if (res.success) {
+      const res = await updateStatusMutation({ id: salesOrderId, status: targetStatus }).unwrap();
+      if (res.success || res.salesOrder) {
         setSuccessMsg(res.message || `Status updated to ${targetStatus}`);
-        setSalesOrder(res.salesOrder);
         if (onStatusUpdated) onStatusUpdated();
       } else {
         setError(res.message || 'Failed to update status');
       }
     } catch (err) {
       console.error('Status transition error:', err);
-      setError(err.response?.data?.message || 'Failed to change status');
-    } finally {
-      setStatusLoading(false);
+      setError(err?.data?.message || err?.message || 'Failed to change status');
     }
   };
 

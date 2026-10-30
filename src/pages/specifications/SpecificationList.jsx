@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getSpecifications, updateSpecificationStatus } from '../../services/specificationService';
+import React, { useState, useMemo } from 'react';
+import { useGetSpecificationsQuery, useUpdateSpecificationStatusMutation } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -25,8 +25,9 @@ const SpecificationList = () => {
   const canCreate = hasPermission('SPECIFICATION_CREATE');
   const canEdit = hasPermission('SPECIFICATION_EDIT');
 
-  const [specifications, setSpecifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: specsData, isLoading: loading, error: queryError, refetch } = useGetSpecificationsQuery();
+  const [updateSpecificationStatusMutation] = useUpdateSpecificationStatusMutation();
+
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -41,27 +42,9 @@ const SpecificationList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedSpec, setSelectedSpec] = useState(null);
 
-  const fetchSpecificationData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getSpecifications();
-      if (data.success && Array.isArray(data.specifications)) {
-        setSpecifications(data.specifications);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch Specifications:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSpecificationData();
-  }, []);
+  const specifications = useMemo(() => {
+    return specsData?.specifications || (Array.isArray(specsData) ? specsData : []);
+  }, [specsData]);
 
   const handleStatusToggle = async (spec) => {
     const nextStatus = spec.status === 'active' ? 'inactive' : 'active';
@@ -70,15 +53,10 @@ const SpecificationList = () => {
 
     setActionLoading(spec._id);
     try {
-      const res = await updateSpecificationStatus(spec._id, nextStatus);
-      if (res.success) {
-        setSpecifications((prev) =>
-          prev.map((s) => (s._id === spec._id ? { ...s, status: nextStatus } : s))
-        );
-      }
+      await updateSpecificationStatusMutation({ id: spec._id, status: nextStatus }).unwrap();
     } catch (err) {
       console.error("Failed to update specification status:", err);
-      setError(err.response?.data?.message || 'Failed to update specification status');
+      setError(err?.data?.message || err?.message || 'Failed to update specification status');
     } finally {
       setActionLoading(null);
     }
@@ -274,7 +252,7 @@ const SpecificationList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchSpecificationData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -293,7 +271,13 @@ const SpecificationList = () => {
         }
       />
 
-      {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {(error || queryError) && (
+        <Alert
+          type="danger"
+          message={error || queryError?.data?.message || 'Error loading specifications'}
+          onClose={() => setError('')}
+        />
+      )}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
@@ -359,7 +343,7 @@ const SpecificationList = () => {
         specification={editingSpec}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchSpecificationData}
+        onSuccess={refetch}
       />
 
       <SpecificationDetailModal

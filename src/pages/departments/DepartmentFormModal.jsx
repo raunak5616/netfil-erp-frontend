@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { createDepartment, updateDepartment } from '../../services/departmentService';
+import {
+  useCreateDepartmentMutation,
+  useUpdateDepartmentMutation,
+} from '../../features/departments/departmentsApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -14,7 +17,10 @@ const DepartmentFormModal = ({ department, isOpen, onClose, onSuccess }) => {
     status: 'active',
   });
 
-  const [submitting, setSubmitting] = useState(false);
+  const [createDepartment, { isLoading: isCreating }] = useCreateDepartmentMutation();
+  const [updateDepartment, { isLoading: isUpdating }] = useUpdateDepartmentMutation();
+  const submitting = isCreating || isUpdating;
+
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -64,35 +70,35 @@ const DepartmentFormModal = ({ department, isOpen, onClose, onSuccess }) => {
       return;
     }
 
-    setSubmitting(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
       if (isEditMode) {
-        const res = await updateDepartment(department._id, formData);
+        const res = await updateDepartment({
+          id: department._id,
+          ...formData,
+        }).unwrap();
         if (res.success) {
           setSuccessMessage('Department updated successfully!');
           setTimeout(() => {
-            onSuccess();
+            onSuccess?.();
             onClose();
-          }, 800);
+          }, 600);
         }
       } else {
-        const res = await createDepartment(formData);
+        const res = await createDepartment(formData).unwrap();
         if (res.success) {
           setSuccessMessage('Department created successfully!');
           setTimeout(() => {
-            onSuccess();
+            onSuccess?.();
             onClose();
-          }, 800);
+          }, 600);
         }
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save department.';
+      const apiMsg = err.data?.message || err.message || 'Failed to save department.';
       setErrorMessage(apiMsg);
-    } finally {
-      setSubmitting(false);
     }
   };
 

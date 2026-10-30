@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createUOM, updateUOM } from '../../services/uomService';
+import { useCreateUOMMutation, useUpdateUOMMutation } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -7,6 +7,9 @@ import { FormField, Input, Select } from '../../components/ui/FormField';
 
 const UOMFormModal = ({ uom, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!uom;
+
+  const [createUOMMutation] = useCreateUOMMutation();
+  const [updateUOMMutation] = useUpdateUOMMutation();
 
   const [formData, setFormData] = useState({
     uomCode: '',
@@ -79,26 +82,22 @@ const UOMFormModal = ({ uom, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEditMode) {
-        const res = await updateUOM(uom._id, formData);
-        if (res.success) {
-          setSuccessMessage('UOM record updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await updateUOMMutation({ id: uom._id, ...formData }).unwrap();
+        setSuccessMessage('UOM record updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createUOM(formData);
-        if (res.success) {
-          setSuccessMessage('UOM record created successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await createUOMMutation(formData).unwrap();
+        setSuccessMessage('UOM record created successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save UOM record.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save UOM record.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

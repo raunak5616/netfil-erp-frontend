@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  getQuotations,
-  updateQuotationStatus,
-  releaseQuotation,
-  printQuotationPdf,
-  getQuotationRemindersSummary,
-  dismissQuotationReminder,
-  syncQuotationReminders,
-} from '../../services/quotationService';
-import { getClients } from '../../services/clientService';
+  useGetQuotationsQuery,
+  useGetQuotationRemindersSummaryQuery,
+  useUpdateQuotationStatusMutation,
+  useReleaseQuotationMutation,
+  useDismissQuotationReminderMutation,
+  useSyncQuotationRemindersMutation,
+} from '../../features/quotations/quotationsApi';
+import { useLazyGetClientsQuery } from '../../features/masterData/masterDataApi';
+import { printQuotationPdf } from '../../services/quotationService';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -62,30 +62,9 @@ const QuotationList = () => {
   const canRelease = hasPermission('QUOTATION_RELEASE');
   const canAmend = hasPermission('QUOTATION_AMEND');
 
-  const [quotations, setQuotations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionLoading, setActionLoading] = useState(null);
-
-  // In-Page Reminders & Summary State
-  const [remindersSummary, setRemindersSummary] = useState({
-    overdueCount: 0,
-    dueTodayCount: 0,
-    dueNext4DaysCount: 0,
-    upcomingFollowUpsCount: 0,
-  });
-  const [deadlineAlerts, setDeadlineAlerts] = useState([]);
-  const [followUpReminders, setFollowUpReminders] = useState([]);
-  const [activeAlertTab, setActiveAlertTab] = useState('deadlines');
-  const [isActionCenterExpanded, setIsActionCenterExpanded] = useState(true);
-  const [dismissingId, setDismissingId] = useState(null);
-  const [syncingReminders, setSyncingReminders] = useState(false);
-
   // Pagination States (Fixed at 25 records per page)
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 25;
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,9 +87,91 @@ const QuotationList = () => {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
+      setPage(1);
     }, 350);
     return () => clearTimeout(handler);
   }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const p = {
+      page,
+      limit: pageSize,
+    };
+    if (debouncedSearch && debouncedSearch.trim()) p.search = debouncedSearch.trim();
+    if (clientFilter !== 'all') p.client = clientFilter;
+    if (statusFilter !== 'all') p.status = statusFilter;
+    if (typeFilter !== 'all') p.quotationType = typeFilter;
+    if (categoryFilter !== 'all') p.quotationCategory = categoryFilter;
+    if (fromDate) p.from = fromDate;
+    if (toDate) p.to = toDate;
+    if (followUpFrom) p.followUpFrom = followUpFrom;
+    if (followUpTo) p.followUpTo = followUpTo;
+    if (deadlineFrom) p.deadlineFrom = deadlineFrom;
+    if (deadlineTo) p.deadlineTo = deadlineTo;
+    if (deadlineStatus !== 'all') p.deadlineStatus = deadlineStatus;
+    if (hasPendingFollowUp !== 'all') p.hasPendingFollowUp = hasPendingFollowUp;
+    if (sortBy) p.sortBy = sortBy;
+    return p;
+  }, [
+    page,
+    pageSize,
+    debouncedSearch,
+    clientFilter,
+    statusFilter,
+    typeFilter,
+    categoryFilter,
+    fromDate,
+    toDate,
+    followUpFrom,
+    followUpTo,
+    deadlineFrom,
+    deadlineTo,
+    deadlineStatus,
+    hasPendingFollowUp,
+    sortBy,
+  ]);
+
+  const {
+    data: quotationsData,
+    isLoading: loading,
+    error: queryError,
+    refetch: refetchQuotations,
+  } = useGetQuotationsQuery(queryParams);
+
+  const {
+    data: remindersData,
+    refetch: refetchReminders,
+  } = useGetQuotationRemindersSummaryQuery();
+
+  const [updateQuotationStatusMutation] = useUpdateQuotationStatusMutation();
+  const [releaseQuotationMutation] = useReleaseQuotationMutation();
+  const [dismissQuotationReminderMutation] = useDismissQuotationReminderMutation();
+  const [syncQuotationRemindersMutation] = useSyncQuotationRemindersMutation();
+  const [triggerGetClients] = useLazyGetClientsQuery();
+
+  const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(null);
+
+  // In-Page Reminders & Alerts State
+  const remindersSummary = remindersData?.summary || {
+    overdueCount: 0,
+    dueTodayCount: 0,
+    dueNext4DaysCount: 0,
+    upcomingFollowUpsCount: 0,
+  };
+  const deadlineAlerts = remindersData?.alerts?.deadlineAlerts || [];
+  const followUpReminders = remindersData?.alerts?.followUpReminders || [];
+  const [activeAlertTab, setActiveAlertTab] = useState('deadlines');
+  const [isActionCenterExpanded, setIsActionCenterExpanded] = useState(true);
+  const [dismissingId, setDismissingId] = useState(null);
+  const [syncingReminders, setSyncingReminders] = useState(false);
+
+  const quotations = useMemo(() => {
+    return quotationsData?.quotations || (Array.isArray(quotationsData) ? quotationsData : []);
+  }, [quotationsData]);
+
+  const totalRecords = quotationsData?.total ?? quotationsData?.count ?? quotations.length;
+  const totalPages = quotationsData?.totalPages ?? (Math.ceil(totalRecords / pageSize) || 1);
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -124,98 +185,9 @@ const QuotationList = () => {
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [followUpTargetQuotation, setFollowUpTargetQuotation] = useState(null);
 
-  const fetchRemindersSummary = async () => {
-    try {
-      const res = await getQuotationRemindersSummary();
-      if (res.success) {
-        setRemindersSummary(res.summary || {
-          overdueCount: 0,
-          dueTodayCount: 0,
-          dueNext4DaysCount: 0,
-          upcomingFollowUpsCount: 0,
-        });
-        setDeadlineAlerts(res.alerts?.deadlineAlerts || []);
-        setFollowUpReminders(res.alerts?.followUpReminders || []);
-      }
-    } catch (err) {
-      console.error('Failed to load quotation reminders:', err);
-    }
-  };
-
-  const fetchQuotationsData = async (overrides = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
-      const activeClient = overrides.client !== undefined ? overrides.client : clientFilter;
-      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
-      const activeType = overrides.quotationType !== undefined ? overrides.quotationType : typeFilter;
-      const activeCategory = overrides.quotationCategory !== undefined ? overrides.quotationCategory : categoryFilter;
-      const activeFrom = overrides.from !== undefined ? overrides.from : fromDate;
-      const activeTo = overrides.to !== undefined ? overrides.to : toDate;
-      const activeFuFrom = overrides.followUpFrom !== undefined ? overrides.followUpFrom : followUpFrom;
-      const activeFuTo = overrides.followUpTo !== undefined ? overrides.followUpTo : followUpTo;
-      const activeDlFrom = overrides.deadlineFrom !== undefined ? overrides.deadlineFrom : deadlineFrom;
-      const activeDlTo = overrides.deadlineTo !== undefined ? overrides.deadlineTo : deadlineTo;
-      const activeDlStatus = overrides.deadlineStatus !== undefined ? overrides.deadlineStatus : deadlineStatus;
-      const activeHasPendingFu = overrides.hasPendingFollowUp !== undefined ? overrides.hasPendingFollowUp : hasPendingFollowUp;
-      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
-      const activePage = overrides.page !== undefined ? overrides.page : page;
-
-      const params = {
-        page: activePage,
-        limit: pageSize,
-      };
-
-      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
-      if (activeClient !== 'all') params.client = activeClient;
-      if (activeStatus !== 'all') params.status = activeStatus;
-      if (activeType !== 'all') params.quotationType = activeType;
-      if (activeCategory !== 'all') params.quotationCategory = activeCategory;
-      if (activeFrom) params.from = activeFrom;
-      if (activeTo) params.to = activeTo;
-      if (activeFuFrom) params.followUpFrom = activeFuFrom;
-      if (activeFuTo) params.followUpTo = activeFuTo;
-      if (activeDlFrom) params.deadlineFrom = activeDlFrom;
-      if (activeDlTo) params.deadlineTo = activeDlTo;
-      if (activeDlStatus !== 'all') params.deadlineStatus = activeDlStatus;
-      if (activeHasPendingFu !== 'all') params.hasPendingFollowUp = activeHasPendingFu;
-      if (activeSortBy) params.sortBy = activeSortBy;
-
-      const qRes = await getQuotations(params);
-
-      if (qRes.success && Array.isArray(qRes.quotations)) {
-        setQuotations(qRes.quotations);
-        const total = typeof qRes.total === 'number' ? qRes.total : (qRes.count || 0);
-        setTotalRecords(total);
-        setTotalPages(qRes.totalPages || Math.ceil(total / pageSize) || 1);
-        if (qRes.page) setPage(qRes.page);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Quotations:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load reminders summary once on mount
-  useEffect(() => {
-    fetchRemindersSummary();
-  }, []);
-
-  // Fetch quotations and reset to page 1 whenever filters, search, or sorting change
-  useEffect(() => {
-    setPage(1);
-    fetchQuotationsData({ page: 1, search: debouncedSearch });
-  }, [clientFilter, statusFilter, typeFilter, categoryFilter, deadlineStatus, hasPendingFollowUp, sortBy, debouncedSearch]);
-
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
     setPage(newPage);
-    fetchQuotationsData({ page: newPage });
   };
 
   const handleClearDateFilters = () => {
@@ -228,23 +200,12 @@ const QuotationList = () => {
     setDeadlineStatus('all');
     setHasPendingFollowUp('all');
     setPage(1);
-    fetchQuotationsData({
-      page: 1,
-      from: '',
-      to: '',
-      followUpFrom: '',
-      followUpTo: '',
-      deadlineFrom: '',
-      deadlineTo: '',
-      deadlineStatus: 'all',
-      hasPendingFollowUp: 'all',
-    });
   };
 
   const loadClientOptions = async (inputValue) => {
     try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
-      if (res.success && Array.isArray(res.clients)) {
+      const res = await triggerGetClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' }).unwrap();
+      if (res?.success && Array.isArray(res.clients)) {
         return res.clients.map((c) => ({
           value: c._id,
           label: c.companyName,
@@ -259,39 +220,27 @@ const QuotationList = () => {
 
   const handleApplySearch = (e) => {
     if (e) e.preventDefault();
+    setDebouncedSearch(searchTerm);
     setPage(1);
-    fetchQuotationsData({ page: 1, search: searchTerm });
   };
 
   const handleKpiCardClick = (type) => {
     setPage(1);
     if (type === 'overdue') {
-      const nextVal = deadlineStatus === 'overdue' ? 'all' : 'overdue';
-      setDeadlineStatus(nextVal);
-      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
+      setDeadlineStatus((prev) => (prev === 'overdue' ? 'all' : 'overdue'));
     } else if (type === 'due_today') {
-      const nextVal = deadlineStatus === 'due_today' ? 'all' : 'due_today';
-      setDeadlineStatus(nextVal);
-      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
+      setDeadlineStatus((prev) => (prev === 'due_today' ? 'all' : 'due_today'));
     } else if (type === 'due_next_4_days') {
-      const nextVal = deadlineStatus === 'due_next_4_days' ? 'all' : 'due_next_4_days';
-      setDeadlineStatus(nextVal);
-      fetchQuotationsData({ page: 1, deadlineStatus: nextVal });
+      setDeadlineStatus((prev) => (prev === 'due_next_4_days' ? 'all' : 'due_next_4_days'));
     } else if (type === 'upcoming_followups') {
-      const nextVal = hasPendingFollowUp === 'true' ? 'all' : 'true';
-      setHasPendingFollowUp(nextVal);
-      fetchQuotationsData({ page: 1, hasPendingFollowUp: nextVal });
+      setHasPendingFollowUp((prev) => (prev === 'true' ? 'all' : 'true'));
     }
   };
 
   const handleDismissReminder = async (reminderId) => {
     setDismissingId(reminderId);
     try {
-      const res = await dismissQuotationReminder(reminderId);
-      if (res.success) {
-        setDeadlineAlerts((prev) => prev.filter((a) => a._id !== reminderId));
-        setFollowUpReminders((prev) => prev.filter((r) => r._id !== reminderId));
-      }
+      await dismissQuotationReminderMutation(reminderId).unwrap();
     } catch (err) {
       console.error('Failed to dismiss reminder:', err);
     } finally {
@@ -302,12 +251,7 @@ const QuotationList = () => {
   const handleSyncReminders = async () => {
     setSyncingReminders(true);
     try {
-      const res = await syncQuotationReminders();
-      if (res.success) {
-        setRemindersSummary(res.summary || {});
-        setDeadlineAlerts(res.alerts?.deadlineAlerts || []);
-        setFollowUpReminders(res.alerts?.followUpReminders || []);
-      }
+      await syncQuotationRemindersMutation().unwrap();
     } catch (err) {
       console.error('Failed to sync reminders:', err);
     } finally {
@@ -323,16 +267,10 @@ const QuotationList = () => {
 
     setActionLoading(quotation._id);
     try {
-      const res = await updateQuotationStatus(quotation._id, newStatus);
-      if (res.success) {
-        setQuotations((prev) =>
-          prev.map((q) => (q._id === quotation._id ? { ...q, status: newStatus } : q))
-        );
-        fetchRemindersSummary();
-      }
+      await updateQuotationStatusMutation({ id: quotation._id, status: newStatus }).unwrap();
     } catch (err) {
       console.error('Failed to update quotation status:', err);
-      setError(err.response?.data?.message || 'Failed to update quotation status');
+      setError(err?.data?.message || err?.message || 'Failed to update quotation status');
     } finally {
       setActionLoading(null);
     }
@@ -344,15 +282,10 @@ const QuotationList = () => {
 
     setActionLoading(quotation._id);
     try {
-      const res = await releaseQuotation(quotation._id);
-      if (res.success) {
-        setQuotations((prev) =>
-          prev.map((q) => (q._id === quotation._id ? { ...q, status: 'released' } : q))
-        );
-      }
+      await releaseQuotationMutation(quotation._id).unwrap();
     } catch (err) {
       console.error('Failed to release quotation:', err);
-      setError(err.response?.data?.message || 'Failed to release quotation');
+      setError(err?.data?.message || err?.message || 'Failed to release quotation');
     } finally {
       setActionLoading(null);
     }
@@ -696,8 +629,8 @@ const QuotationList = () => {
               variant="outline"
               size="sm"
               onClick={() => {
-                fetchQuotationsData();
-                fetchRemindersSummary();
+                refetchQuotations();
+                refetchReminders();
               }}
               disabled={loading}
             >
@@ -1248,8 +1181,8 @@ const QuotationList = () => {
           onSuccess={() => {
             setIsFormOpen(false);
             setEditingQuotation(null);
-            fetchQuotationsData();
-            fetchRemindersSummary();
+            refetchQuotations();
+            refetchReminders();
           }}
         />
       )}
@@ -1269,8 +1202,8 @@ const QuotationList = () => {
             setIsFormOpen(true);
           }}
           onRelease={() => {
-            fetchQuotationsData();
-            fetchRemindersSummary();
+            refetchQuotations();
+            refetchReminders();
           }}
           canEdit={canEdit}
           canRelease={canRelease}
@@ -1290,8 +1223,8 @@ const QuotationList = () => {
           onSuccess={() => {
             setIsAmendmentOpen(false);
             setAmendmentTargetQuotation(null);
-            fetchQuotationsData();
-            fetchRemindersSummary();
+            refetchQuotations();
+            refetchReminders();
           }}
         />
       )}
@@ -1308,8 +1241,8 @@ const QuotationList = () => {
           onSuccess={() => {
             setIsLostOpen(false);
             setLostTargetQuotation(null);
-            fetchQuotationsData();
-            fetchRemindersSummary();
+            refetchQuotations();
+            refetchReminders();
           }}
         />
       )}
@@ -1326,8 +1259,8 @@ const QuotationList = () => {
           onSuccess={() => {
             setIsFollowUpOpen(false);
             setFollowUpTargetQuotation(null);
-            fetchQuotationsData();
-            fetchRemindersSummary();
+            refetchQuotations();
+            refetchReminders();
           }}
         />
       )}

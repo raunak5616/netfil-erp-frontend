@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { getItems, deleteItem, uploadItemImage, removeItemImage } from '../../services/itemService';
-import { getItemGroups } from '../../services/itemGroupService';
-import { getItemCategories } from '../../services/itemCategoryService';
+import {
+  useGetItemsQuery,
+  useDeleteItemMutation,
+  useUploadItemImageMutation,
+  useRemoveItemImageMutation
+} from '../../features/products/productsApi';
+import {
+  useGetItemGroupsQuery,
+  useGetItemCategoriesQuery
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -40,11 +47,7 @@ const ItemList = () => {
   const canEdit = hasPermission('ITEM_EDIT');
   const canDelete = hasPermission('ITEM_DELETE') || hasPermission('ITEM_EDIT');
 
-  const [items, setItems] = useState([]);
-  const [itemGroups, setItemGroups] = useState([]);
-  const [itemCategories, setItemCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   // Delete modal state
@@ -55,8 +58,6 @@ const ItemList = () => {
   // Pagination states (25 records per page)
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Filter & sort states
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +67,80 @@ const ItemList = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('code_asc');
+
+  // Debounce search input (350ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, productTypeFilter, groupFilter, categoryFilter, statusFilter, sortBy]);
+
+  // RTK Query parameters
+  const queryArgs = useMemo(() => {
+    const params = {
+      typeFilter: 'MASTER',
+      page,
+      limit: pageSize,
+    };
+    if (debouncedSearch && debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (productTypeFilter !== 'all') params.productType = productTypeFilter;
+    if (groupFilter !== 'all') params.itemGroup = groupFilter;
+    if (categoryFilter !== 'all') params.itemCategory = categoryFilter;
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (sortBy) params.sortBy = sortBy;
+    return params;
+  }, [page, pageSize, debouncedSearch, productTypeFilter, groupFilter, categoryFilter, statusFilter, sortBy]);
+
+  // RTK Query Hooks
+  const {
+    data: itemsData,
+    isLoading: loadingItems,
+    isFetching: fetchingItems,
+    error: itemsQueryError,
+    refetch: fetchItemData
+  } = useGetItemsQuery(queryArgs);
+
+  const { data: groupsData } = useGetItemGroupsQuery({ typeFilter: 'MASTER' });
+  const { data: categoriesData } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' });
+
+  const [deleteItemMutation] = useDeleteItemMutation();
+  const [uploadItemImageMutation] = useUploadItemImageMutation();
+  const [removeItemImageMutation] = useRemoveItemImageMutation();
+
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return (
+      u.startsWith('CAT-WO-') ||
+      u === 'CAT-INV' ||
+      u === 'CAT-OBOM' ||
+      u.startsWith('GP-WO-') ||
+      u === 'GP-INV' ||
+      u === 'GP-OBOM'
+    );
+  };
+
+  const itemGroups = useMemo(() => {
+    const arr = groupsData?.itemGroups || groupsData?.groups || [];
+    return Array.isArray(arr) ? arr.filter((g) => !isSystemCode(g.groupCode)) : [];
+  }, [groupsData]);
+
+  const itemCategories = useMemo(() => {
+    const arr = categoriesData?.itemCategories || categoriesData?.categories || [];
+    return Array.isArray(arr) ? arr.filter((cat) => !isSystemCode(cat.categoryCode)) : [];
+  }, [categoriesData]);
+
+  const items = useMemo(() => itemsData?.items || [], [itemsData]);
+  const totalRecords = typeof itemsData?.total === 'number' ? itemsData.total : (itemsData?.count || 0);
+  const totalPages = itemsData?.totalPages || Math.ceil(totalRecords / pageSize) || 1;
+  const loading = loadingItems || fetchingItems;
+  const error = localError || (itemsQueryError ? (itemsQueryError.data?.message || itemsQueryError.message || 'Failed to connect to server') : '');
 
   // Modal states
   const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
@@ -114,24 +189,20 @@ const ItemList = () => {
       const uploadData = new FormData();
       uploadData.append('image', file);
 
-      const res = await uploadItemImage(uploadData, imageModalItem._id);
-      if (res.success && res.imageUrl) {
-        const updated = {
-          ...imageModalItem,
+      const res = await uploadItemImageMutation({ id: imageModalItem._id, formData: uploadData }).unwrap();
+      if (res.success || res.imageUrl) {
+        setImageModalItem(prev => ({
+          ...prev,
           imageUrl: res.imageUrl,
           imagePublicId: res.imagePublicId || '',
-        };
-        setImageModalItem(updated);
-        setItems((prev) =>
-          prev.map((it) => (it._id === imageModalItem._id ? { ...it, imageUrl: res.imageUrl, imagePublicId: res.imagePublicId || '' } : it))
-        );
+        }));
         setSuccessMessage(`Image updated successfully for ${imageModalItem.itemCode}`);
       } else {
         setImageModalError(res.message || 'Failed to replace image.');
       }
     } catch (err) {
       console.error('Failed to replace image:', err);
-      setImageModalError(err.response?.data?.message || err.message || 'Image replacement failed.');
+      setImageModalError(err.data?.message || err.message || 'Image replacement failed.');
     } finally {
       setImageUploading(false);
       if (listFileInputRef.current) listFileInputRef.current.value = '';
@@ -143,31 +214,27 @@ const ItemList = () => {
     setImageUploading(true);
     setImageModalError('');
     try {
-      const res = await removeItemImage(imageModalItem._id);
+      const res = await removeItemImageMutation(imageModalItem._id).unwrap();
       if (res.success) {
-        const updated = {
-          ...imageModalItem,
+        setImageModalItem(prev => ({
+          ...prev,
           imageUrl: '',
           imagePublicId: '',
-        };
-        setImageModalItem(updated);
-        setItems((prev) =>
-          prev.map((it) => (it._id === imageModalItem._id ? { ...it, imageUrl: '', imagePublicId: '' } : it))
-        );
+        }));
         setSuccessMessage(`Image removed for ${imageModalItem.itemCode}`);
       } else {
         setImageModalError(res.message || 'Failed to remove image.');
       }
     } catch (err) {
       console.error('Failed to remove image:', err);
-      setImageModalError(err.response?.data?.message || err.message || 'Image removal failed.');
+      setImageModalError(err.data?.message || err.message || 'Image removal failed.');
     } finally {
       setImageUploading(false);
     }
   };
 
   const handleDeleteClick = (item) => {
-    setError('');
+    setLocalError('');
     setSuccessMessage('');
     setItemToDelete(item);
     setIsDeleteDialogOpen(true);
@@ -176,22 +243,16 @@ const ItemList = () => {
   const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
     setDeleteLoading(true);
-    setError('');
+    setLocalError('');
     setSuccessMessage('');
     try {
-      const res = await deleteItem(itemToDelete._id);
-      if (res.success) {
-        setSuccessMessage(res.message || `Item "${itemToDelete.itemName}" (${itemToDelete.itemCode}) deleted successfully.`);
-        setIsDeleteDialogOpen(false);
-        setItemToDelete(null);
-        await fetchItemData();
-      } else {
-        setError(res.message || 'Failed to delete item');
-        setIsDeleteDialogOpen(false);
-      }
+      const res = await deleteItemMutation(itemToDelete._id).unwrap();
+      setSuccessMessage(res.message || `Item "${itemToDelete.itemName}" (${itemToDelete.itemCode}) deleted successfully.`);
+      setIsDeleteDialogOpen(false);
+      setItemToDelete(null);
     } catch (err) {
       console.error("Failed to delete item:", err);
-      setError(err.response?.data?.message || err.message || 'Failed to delete item');
+      setLocalError(err.data?.message || err.message || 'Failed to delete item');
       setIsDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);
@@ -206,96 +267,9 @@ const ItemList = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Load groups & categories on mount for filter dropdowns
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      const isSystemCode = (code) => {
-        if (!code) return false;
-        const u = String(code).toUpperCase();
-        return (
-          u.startsWith('CAT-WO-') ||
-          u === 'CAT-INV' ||
-          u === 'CAT-OBOM' ||
-          u.startsWith('GP-WO-') ||
-          u === 'GP-INV' ||
-          u === 'GP-OBOM'
-        );
-      };
-
-      try {
-        const [groupRes, catRes] = await Promise.all([
-          getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemGroups: [] })),
-          getItemCategories({ typeFilter: 'MASTER' }).catch(() => ({ success: true, itemCategories: [] })),
-        ]);
-
-        const groupsArray = groupRes.itemGroups || groupRes.groups;
-        if (groupRes.success && Array.isArray(groupsArray)) {
-          setItemGroups(groupsArray.filter((g) => !isSystemCode(g.groupCode)));
-        }
-        const categoriesArray = catRes.itemCategories || catRes.categories;
-        if (catRes.success && Array.isArray(categoriesArray)) {
-          setItemCategories(categoriesArray.filter((cat) => !isSystemCode(cat.categoryCode)));
-        }
-      } catch (err) {
-        console.warn('Failed to load item groups/categories for filters:', err);
-      }
-    };
-    loadFilterOptions();
-  }, []);
-
-  const fetchItemData = async (overrides = {}) => {
-    setLoading(true);
-    setError('');
-    try {
-      const activeSearch = overrides.search !== undefined ? overrides.search : debouncedSearch;
-      const activeProductType = overrides.productType !== undefined ? overrides.productType : productTypeFilter;
-      const activeGroup = overrides.group !== undefined ? overrides.group : groupFilter;
-      const activeCategory = overrides.category !== undefined ? overrides.category : categoryFilter;
-      const activeStatus = overrides.status !== undefined ? overrides.status : statusFilter;
-      const activeSortBy = overrides.sortBy !== undefined ? overrides.sortBy : sortBy;
-      const activePage = overrides.page !== undefined ? overrides.page : page;
-
-      const params = {
-        typeFilter: 'MASTER',
-        page: activePage,
-        limit: pageSize,
-      };
-
-      if (activeSearch && activeSearch.trim()) params.search = activeSearch.trim();
-      if (activeProductType !== 'all') params.productType = activeProductType;
-      if (activeGroup !== 'all') params.itemGroup = activeGroup;
-      if (activeCategory !== 'all') params.itemCategory = activeCategory;
-      if (activeStatus !== 'all') params.status = activeStatus;
-      if (activeSortBy) params.sortBy = activeSortBy;
-
-      const res = await getItems(params);
-      if (res.success && Array.isArray(res.items)) {
-        setItems(res.items);
-        const total = typeof res.total === 'number' ? res.total : (res.count || 0);
-        setTotalRecords(total);
-        setTotalPages(res.totalPages || Math.ceil(total / pageSize) || 1);
-        if (res.page) setPage(res.page);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch Items:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Re-fetch from page 1 whenever filters, search, or sorting change
-  useEffect(() => {
-    setPage(1);
-    fetchItemData({ page: 1, search: debouncedSearch });
-  }, [debouncedSearch, productTypeFilter, groupFilter, categoryFilter, statusFilter, sortBy]);
-
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
     setPage(newPage);
-    fetchItemData({ page: newPage });
   };
 
   const handleClearFilters = () => {

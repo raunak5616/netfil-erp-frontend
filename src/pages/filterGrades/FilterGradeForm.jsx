@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createFilterGrade, updateFilterGrade } from '../../services/filterGradeService';
+import { useCreateFilterGradeMutation, useUpdateFilterGradeMutation } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -8,6 +8,9 @@ import { Layers, Plus, Trash2 } from 'lucide-react';
 
 const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
   const isEdit = !!gradeData;
+
+  const [createFilterGradeMutation] = useCreateFilterGradeMutation();
+  const [updateFilterGradeMutation] = useUpdateFilterGradeMutation();
 
   const initialVariant = {
     filterClass: '',
@@ -110,14 +113,14 @@ const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEdit) {
-        await updateFilterGrade(gradeData._id, formData);
+        await updateFilterGradeMutation({ id: gradeData._id, ...formData }).unwrap();
       } else {
-        await createFilterGrade(formData);
+        await createFilterGradeMutation(formData).unwrap();
       }
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save Filter Grade');
+      setError(err?.data?.message || err?.message || 'Failed to save Filter Grade');
     } finally {
       setLoading(false);
     }

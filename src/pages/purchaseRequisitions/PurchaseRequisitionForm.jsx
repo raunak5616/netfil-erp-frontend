@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getPurchaseRequisitionById,
-  createPurchaseRequisition,
-  updatePurchaseRequisition
-} from '../../services/purchaseRequisitionService';
-import { getDepartments } from '../../services/departmentService';
-import { getEmployees } from '../../services/employeeService';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
+  useGetPurchaseRequisitionByIdQuery,
+  useCreatePurchaseRequisitionMutation,
+  useUpdatePurchaseRequisitionMutation,
+} from '../../features/purchase/purchaseApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
+import { useGetItemsQuery } from '../../features/products/productsApi';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -34,16 +34,46 @@ const PurchaseRequisitionForm = () => {
 
   const { user } = useAuth();
 
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Master Data Dropdowns
-  const [employees, setEmployees] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [itemsList, setItemsList] = useState([]);
-  const [uomsList, setUomsList] = useState([]);
+  // Master Data Dropdowns via RTK Query
+  const { data: empRes } = useGetEmployeesQuery({ limit: 1000 });
+  const { data: deptRes } = useGetDepartmentsQuery();
+  const { data: itemRes } = useGetItemsQuery({ limit: 1000 });
+  const { data: uomRes } = useGetUOMsQuery();
+
+  const employees = useMemo(() => {
+    const raw = empRes?.employees || [];
+    return Array.isArray(raw) ? raw.filter((e) => e.status === 'active') : [];
+  }, [empRes]);
+
+  const departments = useMemo(() => {
+    const raw = deptRes?.departments || [];
+    return Array.isArray(raw) ? raw.filter((d) => d.status === 'active') : [];
+  }, [deptRes]);
+
+  const itemsList = useMemo(() => {
+    const raw = itemRes?.items || [];
+    return Array.isArray(raw) ? raw.filter((i) => i.status === 'active') : [];
+  }, [itemRes]);
+
+  const uomsList = useMemo(() => {
+    const raw = uomRes?.uoms || [];
+    return Array.isArray(raw) ? raw.filter((u) => u.status === 'active') : [];
+  }, [uomRes]);
+
+  // Existing PR via RTK Query
+  const {
+    data: existingPrRes,
+    isLoading: initialLoading,
+    error: loadError,
+  } = useGetPurchaseRequisitionByIdQuery(id, { skip: !isEditMode });
+
+  const [createPurchaseRequisitionMutation, { isLoading: isCreating }] = useCreatePurchaseRequisitionMutation();
+  const [updatePurchaseRequisitionMutation, { isLoading: isUpdating }] = useUpdatePurchaseRequisitionMutation();
+  const loading = submitting || isCreating || isUpdating;
 
   // Form Header State
   const [requestingEmployee, setRequestingEmployee] = useState('');
@@ -75,93 +105,42 @@ const PurchaseRequisitionForm = () => {
     }
   ]);
 
-  // Load Master Data
-  const loadMasterData = async () => {
-    try {
-      const [empRes, deptRes, itemRes, uomRes] = await Promise.all([
-        getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
-        getDepartments().catch(() => ({ success: false, departments: [] })),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
-        getUOMs().catch(() => ({ success: false, uoms: [] }))
-      ]);
-
-      if (empRes.success && Array.isArray(empRes.employees)) {
-        setEmployees(empRes.employees.filter((e) => e.status === 'active'));
-      }
-      if (deptRes.success && Array.isArray(deptRes.departments)) {
-        setDepartments(deptRes.departments.filter((d) => d.status === 'active'));
-      }
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setItemsList(itemRes.items.filter((i) => i.status === 'active'));
-      }
-      if (uomRes.success && Array.isArray(uomRes.uoms)) {
-        setUomsList(uomRes.uoms.filter((u) => u.status === 'active'));
-      }
-    } catch (err) {
-      console.error('Failed to load master data:', err);
-      setError('Failed to load required master data.');
-    }
-  };
-
-  // Load Existing PR for Edit
-  const loadExistingPR = async () => {
-    if (!id) return;
-    setInitialLoading(true);
-    setError('');
-    try {
-      const res = await getPurchaseRequisitionById(id);
-      if (res.success && res.purchaseRequisition) {
-        const pr = res.purchaseRequisition;
-        setPrStatus(pr.status);
-
-        if (pr.status !== 'DRAFT') {
-          setError(`Purchase Requisition "${pr.prNumber}" is in status '${pr.status}' and cannot be edited. Only DRAFT requisitions can be updated.`);
-        }
-
-        setRequestingEmployee(pr.requestingEmployee?._id || pr.requestingEmployee || '');
-        setDepartment(pr.department?._id || pr.department || '');
-        setPurpose(pr.purpose || '');
-        setPriority(pr.priority || 'MEDIUM');
-        setRequiredDate(pr.requiredDate ? new Date(pr.requiredDate).toISOString().split('T')[0] : '');
-        setReferenceType(pr.referenceType || 'MANUAL');
-        setReferenceId(pr.referenceId || '');
-        setRemarks(pr.remarks || '');
-
-        if (Array.isArray(pr.items) && pr.items.length > 0) {
-          setLineItems(
-            pr.items.map((i) => ({
-              item: i.item?._id || i.item || '',
-              itemCode: i.itemCode || i.item?.itemCode || '',
-              itemName: i.itemName || i.item?.itemName || '',
-              requestedQuantity: i.requestedQuantity || 1,
-              uom: i.uom?._id || i.uom || '',
-              uomCode: i.uomCode || i.uom?.uomCode || '',
-              requiredDate: i.requiredDate ? new Date(i.requiredDate).toISOString().split('T')[0] : '',
-              specification: i.specification || '',
-              remarks: i.remarks || ''
-            }))
-          );
-        }
-      } else {
-        setError('Purchase Requisition not found');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Purchase Requisition:', err);
-      setError(err.response?.data?.message || 'Error loading Purchase Requisition details');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
-
+  // Populate Existing PR when loaded
   useEffect(() => {
-    const init = async () => {
-      await loadMasterData();
-      if (isEditMode) {
-        await loadExistingPR();
+    if (existingPrRes?.purchaseRequisition) {
+      const pr = existingPrRes.purchaseRequisition;
+      setPrStatus(pr.status);
+
+      if (pr.status !== 'DRAFT') {
+        setError(`Purchase Requisition "${pr.prNumber}" is in status '${pr.status}' and cannot be edited. Only DRAFT requisitions can be updated.`);
       }
-    };
-    init();
-  }, [id]);
+
+      setRequestingEmployee(pr.requestingEmployee?._id || pr.requestingEmployee || '');
+      setDepartment(pr.department?._id || pr.department || '');
+      setPurpose(pr.purpose || '');
+      setPriority(pr.priority || 'MEDIUM');
+      setRequiredDate(pr.requiredDate ? new Date(pr.requiredDate).toISOString().split('T')[0] : '');
+      setReferenceType(pr.referenceType || 'MANUAL');
+      setReferenceId(pr.referenceId || '');
+      setRemarks(pr.remarks || '');
+
+      if (Array.isArray(pr.items) && pr.items.length > 0) {
+        setLineItems(
+          pr.items.map((i) => ({
+            item: i.item?._id || i.item || '',
+            itemCode: i.itemCode || i.item?.itemCode || '',
+            itemName: i.itemName || i.item?.itemName || '',
+            requestedQuantity: i.requestedQuantity || 1,
+            uom: i.uom?._id || i.uom || '',
+            uomCode: i.uomCode || i.uom?.uomCode || '',
+            requiredDate: i.requiredDate ? new Date(i.requiredDate).toISOString().split('T')[0] : '',
+            specification: i.specification || '',
+            remarks: i.remarks || ''
+          }))
+        );
+      }
+    }
+  }, [existingPrRes]);
 
   // Handle Employee selection change (auto-select department if available)
   const handleEmployeeChange = (empId) => {
@@ -326,28 +305,25 @@ const PurchaseRequisitionForm = () => {
       }))
     };
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       let res;
       if (isEditMode) {
-        res = await updatePurchaseRequisition(id, payload);
+        res = await updatePurchaseRequisitionMutation({ id, ...payload }).unwrap();
       } else {
-        res = await createPurchaseRequisition(payload);
+        res = await createPurchaseRequisitionMutation(payload).unwrap();
       }
 
-      if (res.success && res.purchaseRequisition) {
-        setSuccess(res.message || 'Purchase Requisition saved successfully.');
-        setTimeout(() => {
-          navigate(`/purchase-requisitions/${res.purchaseRequisition._id}`);
-        }, 800);
-      } else {
-        setError(res.message || 'Failed to save Purchase Requisition.');
-      }
+      const savedPR = res?.purchaseRequisition || res;
+      setSuccess(res?.message || 'Purchase Requisition saved successfully.');
+      setTimeout(() => {
+        navigate(`/purchase-requisitions/${savedPR._id || id}`);
+      }, 800);
     } catch (err) {
       console.error('Save Purchase Requisition Error:', err);
-      setError(err.response?.data?.message || 'Error saving Purchase Requisition. Please check form inputs.');
+      setError(err?.data?.message || err.message || 'Error saving Purchase Requisition. Please check form inputs.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 

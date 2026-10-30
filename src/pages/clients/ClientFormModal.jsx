@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createClient, updateClient } from '../../services/clientService';
+import { useCreateClientMutation, useUpdateClientMutation } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -8,6 +8,9 @@ import { COUNTRIES } from '../../constants/countries';
 
 const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!client;
+
+  const [createClientMutation] = useCreateClientMutation();
+  const [updateClientMutation] = useUpdateClientMutation();
 
   const [formData, setFormData] = useState({
     clientCode: '',
@@ -137,26 +140,22 @@ const ClientFormModal = ({ client, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEditMode) {
-        const res = await updateClient(client._id, formData);
-        if (res.success) {
-          setSuccessMessage('Party record updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await updateClientMutation({ id: client._id, ...formData }).unwrap();
+        setSuccessMessage('Party record updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createClient(formData);
-        if (res.success) {
-          setSuccessMessage('Party record created successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await createClientMutation(formData).unwrap();
+        setSuccessMessage('Party record created successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save party record.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save party record.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

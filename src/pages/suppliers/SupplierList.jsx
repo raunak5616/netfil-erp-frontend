@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSuppliers, updateSupplierStatus, approveOrRejectSupplier } from '../../services/supplierService';
+import { 
+  useGetSuppliersQuery, 
+  useUpdateSupplierStatusMutation, 
+  useApproveOrRejectSupplierMutation 
+} from '../../features/suppliers/suppliersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -29,8 +33,12 @@ const SupplierList = () => {
   const canCreate = hasPermission('SUPPLIER_CREATE') || hasPermission('PARTY_CREATE');
   const canEdit = hasPermission('SUPPLIER_EDIT') || hasPermission('PARTY_EDIT');
 
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: suppliersData, isLoading: loading, error: queryError, refetch } = useGetSuppliersQuery({ approvalStatus: 'all', limit: 200 });
+  const [updateSupplierStatusMutation] = useUpdateSupplierStatusMutation();
+  const [approveOrRejectMutation] = useApproveOrRejectSupplierMutation();
+
+  const suppliers = suppliersData?.suppliers || [];
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
@@ -45,28 +53,6 @@ const SupplierList = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
-  const fetchSupplierData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getSuppliers({ approvalStatus: 'all', limit: 200 });
-      if (data.success && Array.isArray(data.suppliers)) {
-        setSuppliers(data.suppliers);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Suppliers:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSupplierData();
-  }, []);
-
   const handleStatusToggle = async (supplier) => {
     const nextStatus = supplier.status === 'active' ? 'inactive' : 'active';
     const confirmMessage = `Are you sure you want to mark supplier "${supplier.supplierName}" (${supplier.supplierCode}) as ${nextStatus}?`;
@@ -76,16 +62,11 @@ const SupplierList = () => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await updateSupplierStatus(supplier._id, nextStatus);
-      if (res.success) {
-        setSuppliers((prev) =>
-          prev.map((s) => (s._id === supplier._id ? { ...s, status: nextStatus } : s))
-        );
-        setSuccessMsg(`Supplier "${supplier.supplierName}" status updated to ${nextStatus}.`);
-      }
+      await updateSupplierStatusMutation({ id: supplier._id, status: nextStatus }).unwrap();
+      setSuccessMsg(`Supplier "${supplier.supplierName}" status updated to ${nextStatus}.`);
     } catch (err) {
       console.error('Failed to update supplier status:', err);
-      setError(err.response?.data?.message || 'Failed to update supplier status');
+      setError(err?.data?.message || err?.message || 'Failed to update supplier status');
     } finally {
       setActionLoading(null);
     }
@@ -99,14 +80,11 @@ const SupplierList = () => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await approveOrRejectSupplier(supplier._id, { action: 'APPROVE' });
-      if (res.success) {
-        setSuppliers((prev) => prev.map((s) => (s._id === supplier._id ? res.supplier : s)));
-        setSuccessMsg(`Supplier "${supplier.supplierName}" (${supplier.supplierCode}) approved successfully.`);
-      }
+      await approveOrRejectMutation({ id: supplier._id, action: 'APPROVE' }).unwrap();
+      setSuccessMsg(`Supplier "${supplier.supplierName}" (${supplier.supplierCode}) approved successfully.`);
     } catch (err) {
       console.error('Approval failed:', err);
-      setError(err.response?.data?.message || 'Failed to approve supplier');
+      setError(err?.data?.message || err?.message || 'Failed to approve supplier');
     } finally {
       setActionLoading(null);
     }
@@ -128,22 +106,18 @@ const SupplierList = () => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await approveOrRejectSupplier(rejectingSupplier._id, {
+      await approveOrRejectMutation({
+        id: rejectingSupplier._id,
         action: 'REJECT',
         rejectionReason: rejectionReason.trim(),
-      });
-      if (res.success) {
-        setSuppliers((prev) =>
-          prev.map((s) => (s._id === rejectingSupplier._id ? res.supplier : s))
-        );
-        setSuccessMsg(`Supplier "${rejectingSupplier.supplierName}" (${rejectingSupplier.supplierCode}) has been rejected.`);
-        setIsRejectModalOpen(false);
-        setRejectingSupplier(null);
-        setRejectionReason('');
-      }
+      }).unwrap();
+      setSuccessMsg(`Supplier "${rejectingSupplier.supplierName}" (${rejectingSupplier.supplierCode}) has been rejected.`);
+      setIsRejectModalOpen(false);
+      setRejectingSupplier(null);
+      setRejectionReason('');
     } catch (err) {
       console.error('Rejection failed:', err);
-      setError(err.response?.data?.message || 'Failed to reject supplier');
+      setError(err?.data?.message || err?.message || 'Failed to reject supplier');
     } finally {
       setActionLoading(null);
     }
@@ -437,7 +411,7 @@ const SupplierList = () => {
               size="sm"
               icon={RefreshCw}
               loading={loading}
-              onClick={fetchSupplierData}
+              onClick={refetch}
             >
               Refresh
             </Button>

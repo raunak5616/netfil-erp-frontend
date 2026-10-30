@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import StatusBadge from '../../components/ui/StatusBadge';
 import {
-  getSalesOrderDrawingsConfig,
-  updateSalesOrderItemDrawingConfig,
   getSalesOrderItemDrawing,
   getSalesOrderDrawings
 } from '../../services/salesOrderService';
+import {
+  useGetSalesOrderDrawingsConfigQuery,
+  useUpdateSalesOrderItemDrawingConfigMutation,
+} from '../../features/salesOrders/salesOrdersApi';
+import {
+  useGetHoleImagesQuery,
+  useGetHoleConfigurationsQuery
+} from '../../features/drawingMaster/drawingMasterApi';
 import { getVersionedImageUrl } from '../../services/drawingMasterService';
 import {
   Printer,
@@ -262,10 +268,8 @@ const SalesOrderDrawingWorkspaceModal = ({
   onClose,
   initialItemId = null
 }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [customError, setCustomError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [configData, setConfigData] = useState(null);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'holes' | 'templates'
 
@@ -280,7 +284,6 @@ const SalesOrderDrawingWorkspaceModal = ({
     flangeHoleConfig: 'HOLE-12H',
     tolerance: '± 2 mm'
   });
-  const [savingHoles, setSavingHoles] = useState(false);
 
   // PDF Preview states
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
@@ -288,56 +291,176 @@ const SalesOrderDrawingWorkspaceModal = ({
   const [actionLoading, setActionLoading] = useState(false);
   const [inspectDrawingModal, setInspectDrawingModal] = useState(null); // { url, code, name }
 
-  // Load configuration
-  const loadWorkspaceConfig = async (preferredItemId = null) => {
-    if (!salesOrderId || !isOpen) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getSalesOrderDrawingsConfig(salesOrderId);
-      if (res.success) {
-        setConfigData(res);
-        const items = res.items || [];
-        if (items.length > 0) {
-          const targetItem = preferredItemId
-            ? items.find(it => String(it._id) === String(preferredItemId)) || items[0]
-            : (selectedItemId ? items.find(it => String(it._id) === String(selectedItemId)) || items[0] : items[0]);
+  const {
+    data: configData,
+    isLoading: loading,
+    error: configError,
+  } = useGetSalesOrderDrawingsConfigQuery(salesOrderId, {
+    skip: !isOpen || !salesOrderId,
+  });
 
-          setSelectedItemId(targetItem._id);
-          populateHoleForm(targetItem);
+  const {
+    data: holeImagesData,
+    isLoading: loadingHoleImages,
+  } = useGetHoleImagesQuery(undefined, {
+    skip: !isOpen,
+  });
+
+  const {
+    data: holeConfigData,
+  } = useGetHoleConfigurationsQuery(undefined, {
+    skip: !isOpen,
+  });
+
+  const [updateDrawingConfigMutation, { isLoading: savingHoles }] = useUpdateSalesOrderItemDrawingConfigMutation();
+
+  // Combine hole patterns from backend Drawing Master Hole Tab
+  const drawingMasterHolePatterns = useMemo(() => {
+    const list = [];
+    const seenCodes = new Set();
+
+    // 1. Hole patterns from Drawing Master Hole Tab (GET /api/drawings/hole-images)
+    if (holeImagesData?.holeImages && Array.isArray(holeImagesData.holeImages)) {
+      for (const item of holeImagesData.holeImages) {
+        const code = (item.drawingCode || `HOLE-${item.holes}H`).toUpperCase();
+        if (!seenCodes.has(code)) {
+          seenCodes.add(code);
+          list.push({
+            _id: item.drawingId,
+            drawingCode: item.drawingCode || code,
+            drawingName: item.drawingName || `Flange ${item.holes} Holes Mounting Drawing`,
+            holes: Number(item.holes),
+            holeConfig: item.holeConfig || `${item.holes} Holes`,
+            fileUrl: item.imageUrl || '',
+            holeImageUrl: item.imageUrl || '',
+            description: item.description || '',
+            updatedAt: item.updatedAt
+          });
         }
-      } else {
-        setError(res.message || 'Failed to load drawing workspace configuration');
       }
-    } catch (err) {
-      console.error('Error loading drawing workspace:', err);
-      setError(err.response?.data?.message || err.message || 'Server error loading drawings');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // 2. Active hole configurations from Sales Order drawing config
+    if (configData?.availableHoleConfigurations && Array.isArray(configData.availableHoleConfigurations)) {
+      for (const item of configData.availableHoleConfigurations) {
+        const code = (item.drawingCode || `HOLE-${item.holes}H`).toUpperCase();
+        const existingIdx = list.findIndex(p => p.drawingCode?.toUpperCase() === code);
+        if (existingIdx >= 0) {
+          list[existingIdx] = {
+            ...item,
+            ...list[existingIdx],
+            fileUrl: list[existingIdx].fileUrl || item.fileUrl || item.holeImageUrl || '',
+            holeImageUrl: list[existingIdx].holeImageUrl || item.holeImageUrl || item.fileUrl || '',
+          };
+        } else {
+          seenCodes.add(code);
+          list.push(item);
+        }
+      }
+    }
+
+    // 3. Fallback hole configurations from GET /api/drawings/hole-configurations
+    if (holeConfigData?.holeConfigurations && Array.isArray(holeConfigData.holeConfigurations)) {
+      for (const item of holeConfigData.holeConfigurations) {
+        const code = (item.drawingCode || `HOLE-${item.holes}H`).toUpperCase();
+        if (!seenCodes.has(code)) {
+          seenCodes.add(code);
+          list.push({
+            _id: item.id,
+            drawingCode: item.drawingCode || code,
+            drawingName: item.name || `Flange ${item.holes} Holes Mounting Drawing`,
+            holes: Number(item.holes),
+            holeConfig: item.simpleName || `${item.holes} Holes`,
+            fileUrl: '',
+            holeImageUrl: '',
+            description: item.description || ''
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [holeImagesData, configData, holeConfigData]);
+
+  // Dynamically derive supported hole count numbers from backend Drawing Master Hole Tab
+  const availableHoleCounts = useMemo(() => {
+    const counts = new Set();
+
+    // 1. From supportedHoleCounts returned by getHoleImages backend
+    if (holeImagesData?.supportedHoleCounts && Array.isArray(holeImagesData.supportedHoleCounts)) {
+      holeImagesData.supportedHoleCounts.forEach(c => {
+        const num = Number(c);
+        if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+      });
+    }
+
+    // 2. From all hole pattern records in drawingMasterHolePatterns
+    drawingMasterHolePatterns.forEach(p => {
+      const num = Number(p.holes);
+      if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+    });
+
+    // 3. From hole configurations options
+    if (holeConfigData?.holeConfigurations && Array.isArray(holeConfigData.holeConfigurations)) {
+      holeConfigData.holeConfigurations.forEach(c => {
+        const num = Number(c.holes);
+        if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+      });
+    }
+
+    // 4. Fallback baseline (4, 8, 12) if backend returned empty
+    if (counts.size === 0) {
+      [4, 8, 12].forEach(c => counts.add(c));
+    }
+
+    // 5. Ensure current item's holeCount is included if present (excluding 16)
+    if (holeForm.holeCount) {
+      const currentNum = Number(holeForm.holeCount);
+      if (!isNaN(currentNum) && currentNum > 0 && currentNum !== 16) counts.add(currentNum);
+    }
+
+    counts.delete(16);
+
+    return Array.from(counts).sort((a, b) => a - b);
+  }, [holeImagesData, drawingMasterHolePatterns, holeConfigData, holeForm.holeCount]);
+
+  const error = customError || (configError ? (configError?.data?.message || 'Server error loading drawings') : '');
+  const setError = setCustomError;
+
+  // Initialize selected item when configData loads
+  useEffect(() => {
+    if (configData?.items && configData.items.length > 0) {
+      const items = configData.items;
+      const targetItem = initialItemId
+        ? items.find(it => String(it._id) === String(initialItemId)) || items[0]
+        : (selectedItemId ? items.find(it => String(it._id) === String(selectedItemId)) || items[0] : items[0]);
+
+      if (targetItem && targetItem._id !== selectedItemId) {
+        setSelectedItemId(targetItem._id);
+        populateHoleForm(targetItem);
+      }
+    }
+  }, [configData, initialItemId]);
 
   useEffect(() => {
-    if (isOpen) {
-      loadWorkspaceConfig(initialItemId);
-    } else {
-      // Clean up blob URL on close
-      if (pdfBlobUrl) {
-        window.URL.revokeObjectURL(pdfBlobUrl);
-        setPdfBlobUrl(null);
-      }
+    if (!isOpen && pdfBlobUrl) {
+      window.URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
     }
-  }, [isOpen, salesOrderId, initialItemId]);
+  }, [isOpen]);
 
   // Populate hole form when active item changes
   const populateHoleForm = (item) => {
     if (!item) return;
     const confirmed = item.confirmedHoleDetails || {};
-    const count = (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount)))
+    const rawCount = (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount)))
       ? Number(item.holeCount)
       : (item.flangeHoleConfig ? parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10) : 12) || 12;
 
-    const identifier = item.flangeHoleConfig || `HOLE-${count}H`;
+    const count = rawCount === 16 ? 12 : rawCount;
+    const identifier = (item.flangeHoleConfig && !item.flangeHoleConfig.includes('16'))
+      ? item.flangeHoleConfig
+      : `HOLE-${count}H`;
 
     setHoleForm({
       L: confirmed.L !== undefined && confirmed.L !== null ? confirmed.L : 100,
@@ -391,7 +514,6 @@ const SalesOrderDrawingWorkspaceModal = ({
     if (e) e.preventDefault();
     if (!activeItem) return;
 
-    setSavingHoles(true);
     setError('');
     setSuccessMsg('');
 
@@ -410,14 +532,15 @@ const SalesOrderDrawingWorkspaceModal = ({
         drawingStatus: 'READY_FOR_PREVIEW'
       };
 
-      const res = await updateSalesOrderItemDrawingConfig(salesOrderId, activeItem._id, payload);
-      if (res.success) {
+      const res = await updateDrawingConfigMutation({
+        id: salesOrderId,
+        itemId: activeItem._id,
+        data: payload,
+      }).unwrap();
+
+      if (res.success || res.config || res.items) {
         setSuccessMsg(`Hole details confirmed for Item #${activeItem.lineNumber || activeItem.itemNumber || 1}!`);
-        // Refresh workspace data to update statuses
-        await loadWorkspaceConfig(activeItem._id);
-        // Switch to preview tab to see updated drawing
         setActiveTab('preview');
-        // Reload preview with saved values
         if (pdfBlobUrl) {
           window.URL.revokeObjectURL(pdfBlobUrl);
           setPdfBlobUrl(null);
@@ -428,9 +551,7 @@ const SalesOrderDrawingWorkspaceModal = ({
       }
     } catch (err) {
       console.error('Error saving hole details:', err);
-      setError(err.response?.data?.message || 'Validation error saving hole details');
-    } finally {
-      setSavingHoles(false);
+      setError(err?.data?.message || err?.message || 'Validation error saving hole details');
     }
   };
 
@@ -438,16 +559,17 @@ const SalesOrderDrawingWorkspaceModal = ({
   const handleSelectTemplate = async (templateId) => {
     if (!activeItem) return;
     try {
-      const res = await updateSalesOrderItemDrawingConfig(salesOrderId, activeItem._id, {
-        drawingId: templateId
-      });
-      if (res.success) {
+      const res = await updateDrawingConfigMutation({
+        id: salesOrderId,
+        itemId: activeItem._id,
+        data: { drawingId: templateId }
+      }).unwrap();
+      if (res.success || res.config) {
         setSuccessMsg('Drawing template updated successfully!');
-        await loadWorkspaceConfig(activeItem._id);
         setActiveTab('preview');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update template');
+      setError(err?.data?.message || err?.message || 'Failed to update template');
     }
   };
 
@@ -868,13 +990,21 @@ const SalesOrderDrawingWorkspaceModal = ({
 
                         {/* Hole Count Selector */}
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Hole Count
-                          </label>
-                          <div className="grid grid-cols-4 gap-2">
-                            {[4, 8, 12, 16].map((cnt) => {
-                              const matchingPattern = (configData?.availableHoleConfigurations || []).find(p => p.holes === cnt);
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Hole Count
+                            </label>
+                            {loadingHoleImages && (
+                              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <RefreshCw size={10} className="animate-spin" /> Fetching from Drawing Master...
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {availableHoleCounts.map((cnt) => {
+                              const matchingPattern = drawingMasterHolePatterns.find(p => Number(p.holes) === Number(cnt));
                               const targetCode = matchingPattern?.drawingCode || `HOLE-${cnt}H`;
+                              const isSelected = Number(holeForm.holeCount) === cnt;
                               return (
                                 <button
                                   key={cnt}
@@ -884,10 +1014,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                                     holeCount: cnt,
                                     flangeHoleConfig: targetCode
                                   }))}
-                                  className={`py-1.5 px-3 rounded-lg text-xs font-bold border transition-all ${
-                                    Number(holeForm.holeCount) === cnt
+                                  className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                    isSelected
                                       ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
-                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                                   }`}
                                 >
                                   {cnt} Holes
@@ -895,6 +1025,39 @@ const SalesOrderDrawingWorkspaceModal = ({
                               );
                             })}
                           </div>
+
+                          {/* Pattern Variant selector if multiple variants exist in Drawing Master for this hole count */}
+                          {(() => {
+                            const variantsForCount = drawingMasterHolePatterns.filter(
+                              p => Number(p.holes) === Number(holeForm.holeCount)
+                            );
+                            if (variantsForCount.length <= 1) return null;
+
+                            return (
+                              <div className="mt-2.5 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg">
+                                <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                                  Hole Pattern Variant for {holeForm.holeCount} Holes:
+                                </label>
+                                <select
+                                  value={holeForm.flangeHoleConfig}
+                                  onChange={(e) => {
+                                    const selectedCode = e.target.value;
+                                    setHoleForm(prev => ({
+                                      ...prev,
+                                      flangeHoleConfig: selectedCode
+                                    }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                  {variantsForCount.map(v => (
+                                    <option key={v.drawingCode} value={v.drawingCode}>
+                                      {v.drawingCode} {v.description ? `(${v.description})` : (v.drawingName ? `(${v.drawingName})` : '')}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* L, M, Ø Inputs */}
@@ -1032,7 +1195,11 @@ const SalesOrderDrawingWorkspaceModal = ({
                       {/* Right Side: Actual Uploaded Flange Drawing Preview */}
                       <div>
                         {(() => {
-                          const matchingHolePattern = (configData?.availableHoleConfigurations || []).find(
+                          const matchingHolePattern = drawingMasterHolePatterns.find(
+                            p => p.drawingCode === holeForm.flangeHoleConfig
+                          ) || drawingMasterHolePatterns.find(
+                            p => Number(p.holes) === Number(holeForm.holeCount)
+                          ) || (configData?.availableHoleConfigurations || []).find(
                             p => p.drawingCode === holeForm.flangeHoleConfig || Number(p.holes) === Number(holeForm.holeCount)
                           ) || activeItem?.holePattern;
 

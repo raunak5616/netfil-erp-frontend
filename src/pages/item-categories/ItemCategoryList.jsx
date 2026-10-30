@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getItemCategories, updateItemCategoryStatus, deleteItemCategory } from '../../services/itemCategoryService';
-import { getItemGroups } from '../../services/itemGroupService';
+import React, { useState, useMemo } from 'react';
+import {
+  useGetItemCategoriesQuery,
+  useUpdateItemCategoryStatusMutation,
+  useDeleteItemCategoryMutation,
+  useGetItemGroupsQuery,
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -39,9 +43,21 @@ const ItemCategoryList = () => {
   );
   const canDelete = isAdmin && !hasDenyOverride;
 
-  const [itemCategories, setItemCategories] = useState([]);
-  const [itemGroups, setItemGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+    refetch: refetchCategories,
+  } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' });
+
+  const {
+    data: groupsData,
+    isLoading: groupsLoading,
+  } = useGetItemGroupsQuery({ typeFilter: 'MASTER' });
+
+  const [updateItemCategoryStatusMutation] = useUpdateItemCategoryStatusMutation();
+  const [deleteItemCategoryMutation] = useDeleteItemCategoryMutation();
+
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
@@ -63,48 +79,30 @@ const ItemCategoryList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  const fetchCategoryData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const isSystemCode = (code) => {
-        if (!code) return false;
-        const u = String(code).toUpperCase();
-        return (
-          u.startsWith('CAT-WO-') ||
-          u === 'CAT-INV' ||
-          u === 'CAT-OBOM' ||
-          u.startsWith('GP-WO-') ||
-          u === 'GP-INV' ||
-          u === 'GP-OBOM'
-        );
-      };
-
-      const [catRes, groupRes] = await Promise.all([
-        getItemCategories({ typeFilter: 'MASTER' }),
-        getItemGroups({ typeFilter: 'MASTER' }).catch(() => ({ success: false, itemGroups: [] })),
-      ]);
-
-      if (catRes.success && Array.isArray(catRes.itemCategories)) {
-        setItemCategories(catRes.itemCategories.filter((c) => !isSystemCode(c.categoryCode)));
-      } else {
-        setError('Unexpected API response format');
-      }
-
-      if (groupRes.success && Array.isArray(groupRes.itemGroups)) {
-        setItemGroups(groupRes.itemGroups.filter((g) => !isSystemCode(g.groupCode)));
-      }
-    } catch (err) {
-      console.error("Failed to fetch Item Categories:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return (
+      u.startsWith('CAT-WO-') ||
+      u === 'CAT-INV' ||
+      u === 'CAT-OBOM' ||
+      u.startsWith('GP-WO-') ||
+      u === 'GP-INV' ||
+      u === 'GP-OBOM'
+    );
   };
 
-  useEffect(() => {
-    fetchCategoryData();
-  }, []);
+  const itemCategories = useMemo(() => {
+    const list = categoriesData?.itemCategories || categoriesData?.categories || (Array.isArray(categoriesData) ? categoriesData : []);
+    return list.filter((c) => !isSystemCode(c.categoryCode));
+  }, [categoriesData]);
+
+  const itemGroups = useMemo(() => {
+    const list = groupsData?.itemGroups || groupsData?.groups || (Array.isArray(groupsData) ? groupsData : []);
+    return list.filter((g) => !isSystemCode(g.groupCode));
+  }, [groupsData]);
+
+  const loading = categoriesLoading || groupsLoading;
 
   const handleStatusToggle = async (category) => {
     const nextStatus = category.status === 'active' ? 'inactive' : 'active';
@@ -113,15 +111,10 @@ const ItemCategoryList = () => {
 
     setActionLoading(category._id);
     try {
-      const res = await updateItemCategoryStatus(category._id, nextStatus);
-      if (res.success) {
-        setItemCategories((prev) =>
-          prev.map((c) => (c._id === category._id ? { ...c, status: nextStatus } : c))
-        );
-      }
+      await updateItemCategoryStatusMutation({ id: category._id, status: nextStatus }).unwrap();
     } catch (err) {
       console.error("Failed to update category status:", err);
-      setError(err.response?.data?.message || 'Failed to update category status');
+      setError(err?.data?.message || err?.message || 'Failed to update category status');
     } finally {
       setActionLoading(null);
     }
@@ -142,20 +135,14 @@ const ItemCategoryList = () => {
     setError('');
     setSuccessMessage('');
     try {
-      const res = await deleteItemCategory(target._id);
-      if (res.success) {
-        setSuccessMessage(res.message || `Item category "${target.categoryName}" deleted successfully.`);
-        setIsDeleteDialogOpen(false);
-        setCategoryToDelete(null);
-        setDeactivateCandidate(null);
-        await fetchCategoryData();
-      } else {
-        setError(res.message || 'Failed to delete category');
-        setIsDeleteDialogOpen(false);
-      }
+      const res = await deleteItemCategoryMutation(target._id).unwrap();
+      setSuccessMessage(res?.message || `Item category "${target.categoryName}" deleted successfully.`);
+      setIsDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setDeactivateCandidate(null);
     } catch (err) {
       console.error("Failed to delete item category:", err);
-      const errMsg = err.response?.data?.message || err.message || 'Failed to delete category';
+      const errMsg = err?.data?.message || err?.message || 'Failed to delete category';
       setError(errMsg);
       setDeactivateCandidate(target);
       setIsDeleteDialogOpen(false);
@@ -338,7 +325,7 @@ const ItemCategoryList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchCategoryData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetchCategories}>
               Refresh
             </Button>
             {canCreate && (
@@ -455,7 +442,7 @@ const ItemCategoryList = () => {
         category={editingCategory}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchCategoryData}
+        onSuccess={refetchCategories}
         initialItemGroups={itemGroups}
       />
 

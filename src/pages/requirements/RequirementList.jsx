@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getRequirements, updateRequirementStatus } from '../../services/requirementService';
-import { getClients } from '../../services/clientService';
+import React, { useState, useMemo } from 'react';
+import { useGetRequirementsQuery, useUpdateRequirementStatusMutation } from '../../features/requirements/requirementsApi';
+import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -34,9 +34,11 @@ const RequirementList = () => {
   const canCreate = hasPermission('REQUIREMENT_CREATE');
   const canEdit = hasPermission('REQUIREMENT_EDIT');
 
-  const [requirements, setRequirements] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: reqsData, isLoading: reqsLoading, error: reqsError, refetch: refetchReqs } = useGetRequirementsQuery();
+  const { data: clientsData, isLoading: clientsLoading } = useGetClientsQuery();
+  const [updateRequirementStatusMutation] = useUpdateRequirementStatusMutation();
+
+  const loading = reqsLoading || clientsLoading;
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -56,28 +58,13 @@ const RequirementList = () => {
   const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
   const [quotationRequirement, setQuotationRequirement] = useState(null);
 
-  const fetchRequirementsData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const reqRes = await getRequirements();
+  const requirements = useMemo(() => {
+    return reqsData?.requirements || (Array.isArray(reqsData) ? reqsData : []);
+  }, [reqsData]);
 
-      if (reqRes.success && Array.isArray(reqRes.requirements)) {
-        setRequirements(reqRes.requirements);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Requirements:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRequirementsData();
-  }, []);
+  const clients = useMemo(() => {
+    return clientsData?.clients || (Array.isArray(clientsData) ? clientsData : []);
+  }, [clientsData]);
 
   const handleStatusChange = async (requirement, newStatus) => {
     if (requirement.status === newStatus) return;
@@ -87,15 +74,10 @@ const RequirementList = () => {
 
     setActionLoading(requirement._id);
     try {
-      const res = await updateRequirementStatus(requirement._id, newStatus);
-      if (res.success) {
-        setRequirements((prev) =>
-          prev.map((r) => (r._id === requirement._id ? { ...r, status: newStatus } : r))
-        );
-      }
+      await updateRequirementStatusMutation({ id: requirement._id, status: newStatus }).unwrap();
     } catch (err) {
       console.error('Failed to update status:', err);
-      setError(err.response?.data?.message || 'Failed to update requirement status');
+      setError(err?.data?.message || err?.message || 'Failed to update requirement status');
     } finally {
       setActionLoading(null);
     }
@@ -394,7 +376,7 @@ const RequirementList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchRequirementsData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetchReqs}>
               Refresh
             </Button>
             {canCreate && (
@@ -502,7 +484,7 @@ const RequirementList = () => {
         requirement={editingRequirement}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchRequirementsData}
+        onSuccess={refetchReqs}
       />
 
       <RequirementDetailModal
@@ -531,7 +513,7 @@ const RequirementList = () => {
           onSuccess={() => {
             setIsQuotationFormOpen(false);
             setQuotationRequirement(null);
-            fetchRequirementsData();
+            refetchReqs();
           }}
         />
       )}

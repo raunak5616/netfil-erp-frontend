@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { createRequirement, updateRequirement } from '../../services/requirementService';
-import { getClients } from '../../services/clientService';
-import { getItems } from '../../services/itemService';
-import { getItemCategories } from '../../services/itemCategoryService';
-import { getUOMs } from '../../services/uomService';
-import { getEmployees } from '../../services/employeeService';
-import { getFlangeDesigns } from '../../services/flangeDesignService';
-import { getFilterGrades } from '../../services/filterGradeService';
-import { getHoleConfigurations } from '../../services/drawingMasterService';
+import { useCreateRequirementMutation, useUpdateRequirementMutation } from '../../features/requirements/requirementsApi';
+import {
+  useGetClientsQuery,
+  useGetItemCategoriesQuery,
+  useGetUOMsQuery,
+  useGetFlangeDesignsQuery,
+  useGetFilterGradesQuery,
+} from '../../features/masterData/masterDataApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
+import { useGetItemsQuery } from '../../features/products/productsApi';
+import { useGetHoleConfigurationsQuery } from '../../features/drawingMaster/drawingMasterApi';
 import DrawingSelector from '../../components/drawing/DrawingSelector';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -175,16 +177,89 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const { hasPermission } = useAuth();
   const canCreateItem = typeof hasPermission === 'function' ? hasPermission('ITEM_CREATE') : false;
 
-  // Master options state
-  const [clients, setClients] = useState([]);
-  const [items, setItems] = useState([]);
-  const [itemCategories, setItemCategories] = useState([]);
-  const [uoms, setUoms] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [flangeDesigns, setFlangeDesigns] = useState([]);
-  const [filterGrades, setFilterGrades] = useState([]);
-  const [holeOptions, setHoleOptions] = useState(['4 Holes', '8 Holes', '12 Holes']);
-  const [loadingMasters, setLoadingMasters] = useState(false);
+  const [createRequirementMutation] = useCreateRequirementMutation();
+  const [updateRequirementMutation] = useUpdateRequirementMutation();
+
+  // RTK Query Master Data Hooks
+  const { data: clientsData, isLoading: loadingClients } = useGetClientsQuery(
+    { typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' },
+    { skip: !isOpen }
+  );
+  const { data: itemsData, isLoading: loadingItems } = useGetItemsQuery(
+    { typeFilter: 'MASTER', all: true },
+    { skip: !isOpen }
+  );
+  const { data: catData, isLoading: loadingCats } = useGetItemCategoriesQuery(
+    { typeFilter: 'MASTER' },
+    { skip: !isOpen }
+  );
+  const { data: uomData, isLoading: loadingUoms } = useGetUOMsQuery(undefined, { skip: !isOpen });
+  const { data: empData, isLoading: loadingEmps } = useGetEmployeesQuery({ all: true }, { skip: !isOpen });
+  const { data: flangeData, isLoading: loadingFlanges } = useGetFlangeDesignsQuery({ status: 'active' }, { skip: !isOpen });
+  const { data: filterGradesData, isLoading: loadingGrades } = useGetFilterGradesQuery(undefined, { skip: !isOpen });
+  const { data: holeConfigData } = useGetHoleConfigurationsQuery(undefined, { skip: !isOpen });
+
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return (
+      u.startsWith('CAT-WO-') ||
+      u === 'CAT-INV' ||
+      u === 'CAT-OBOM' ||
+      u.startsWith('GP-WO-') ||
+      u === 'GP-INV' ||
+      u === 'GP-OBOM' ||
+      u.startsWith('CL-WO-') ||
+      u.startsWith('CL-INV-') ||
+      u.startsWith('CL-OBOM') ||
+      u.startsWith('ITEM-WO-') ||
+      u.startsWith('ITEM-INV-') ||
+      u.startsWith('ITEM-OBOM-')
+    );
+  };
+
+  const clients = useMemo(() => {
+    const list = clientsData?.clients || [];
+    return list.filter((c) => c.status === 'active' && !isSystemCode(c.clientCode));
+  }, [clientsData]);
+
+  const items = useMemo(() => {
+    const list = itemsData?.items || [];
+    return list.filter((i) => i.status === 'active' && !isSystemCode(i.itemCode));
+  }, [itemsData]);
+
+  const itemCategories = useMemo(() => {
+    const list = catData?.itemCategories || catData?.categories || [];
+    return list.filter((cat) => cat.status === 'active' && !isSystemCode(cat.categoryCode));
+  }, [catData]);
+
+  const uoms = useMemo(() => {
+    const list = uomData?.uoms || [];
+    return list.filter((u) => u.status === 'active');
+  }, [uomData]);
+
+  const employees = useMemo(() => {
+    const list = empData?.employees || [];
+    return list.filter((e) => e.status === 'active');
+  }, [empData]);
+
+  const flangeDesigns = useMemo(() => {
+    const list = flangeData?.flangeDesigns || [];
+    return list.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001');
+  }, [flangeData]);
+
+  const filterGrades = useMemo(() => {
+    const list = filterGradesData?.filterGrades || [];
+    return list.filter((g) => g.status === 'active');
+  }, [filterGradesData]);
+
+  const holeOptions = useMemo(() => {
+    return (holeConfigData?.options && holeConfigData.options.length > 0)
+      ? holeConfigData.options
+      : ['4 Holes', '8 Holes', '12 Holes'];
+  }, [holeConfigData]);
+
+  const loadingMasters = loadingClients || loadingItems || loadingCats || loadingUoms || loadingEmps || loadingFlanges || loadingGrades;
 
   // Default active FLANGE construction design ID
   const defaultFlangeId = useMemo(() => {
@@ -226,79 +301,6 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Fetch all reference master data
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchMasterData = async () => {
-      setLoadingMasters(true);
-      try {
-        const isSystemCode = (code) => {
-          if (!code) return false;
-          const u = String(code).toUpperCase();
-          return (
-            u.startsWith('CAT-WO-') ||
-            u === 'CAT-INV' ||
-            u === 'CAT-OBOM' ||
-            u.startsWith('GP-WO-') ||
-            u === 'GP-INV' ||
-            u === 'GP-OBOM' ||
-            u.startsWith('CL-WO-') ||
-            u.startsWith('CL-INV-') ||
-            u.startsWith('CL-OBOM') ||
-            u.startsWith('ITEM-WO-') ||
-            u.startsWith('ITEM-INV-') ||
-            u.startsWith('ITEM-OBOM-')
-          );
-        };
-
-        const [cRes, iRes, catRes, uRes, eRes, fRes, fgRes, hRes] = await Promise.all([
-          getClients({ typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' }),
-          getItems({ typeFilter: 'MASTER', all: true }),
-          getItemCategories({ typeFilter: 'MASTER' }),
-          getUOMs(),
-          getEmployees({ all: true }),
-          getFlangeDesigns({ status: 'active' }),
-          getFilterGrades().catch(() => ({ success: false, filterGrades: [] })),
-          getHoleConfigurations().catch(() => ({ success: false, options: ['4 Holes', '8 Holes', '12 Holes'] }))
-        ]);
-
-        if (cRes.success && Array.isArray(cRes.clients)) {
-          setClients(cRes.clients.filter((c) => c.status === 'active' && !isSystemCode(c.clientCode)));
-        }
-        if (iRes.success && Array.isArray(iRes.items)) {
-          setItems(iRes.items.filter((i) => i.status === 'active' && !isSystemCode(i.itemCode)));
-        }
-        const categoriesArray = catRes.itemCategories || catRes.categories;
-        if (catRes.success && Array.isArray(categoriesArray)) {
-          setItemCategories(categoriesArray.filter((cat) => cat.status === 'active' && !isSystemCode(cat.categoryCode)));
-        }
-        if (uRes.success && Array.isArray(uRes.uoms)) {
-          setUoms(uRes.uoms.filter((u) => u.status === 'active'));
-        }
-        if (eRes.success && Array.isArray(eRes.employees)) {
-          setEmployees(eRes.employees.filter((e) => e.status === 'active'));
-        }
-        if (fRes.success && Array.isArray(fRes.flangeDesigns)) {
-          setFlangeDesigns(fRes.flangeDesigns.filter((f) => f.status === 'active' && f.constructionType === 'FLANGE' && f.designCode !== 'BOX-001'));
-        }
-        if (fgRes && fgRes.success && Array.isArray(fgRes.filterGrades)) {
-          setFilterGrades(fgRes.filterGrades.filter((g) => g.status === 'active'));
-        }
-        if (hRes && hRes.success && Array.isArray(hRes.options) && hRes.options.length > 0) {
-          setHoleOptions(hRes.options);
-        }
-      } catch (err) {
-        console.error('Failed to load master references:', err);
-        setErrorMessage('Failed to load master lookup options.');
-      } finally {
-        setLoadingMasters(false);
-      }
-    };
-
-    fetchMasterData();
-  }, [isOpen]);
 
   // Populate form data when editing or creating
   useEffect(() => {
@@ -994,27 +996,23 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEditMode) {
-        const res = await updateRequirement(requirement._id, payload);
-        if (res.success) {
-          setSuccessMessage('Requirement updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        const res = await updateRequirementMutation({ id: requirement._id, data: payload }).unwrap();
+        setSuccessMessage('Requirement updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createRequirement(payload);
-        if (res.success) {
-          setSuccessMessage(`Requirement created successfully (${res.requirement?.requirementNo || ''})`);
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        const res = await createRequirementMutation(payload).unwrap();
+        setSuccessMessage(`Requirement created successfully (${res.requirement?.requirementNo || ''})`);
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
       console.error('Save requirement error:', err);
-      setErrorMessage(err.response?.data?.message || 'Failed to save Requirement record.');
+      setErrorMessage(err?.data?.message || err?.message || 'Failed to save Requirement record.');
     } finally {
       setSubmitting(false);
     }

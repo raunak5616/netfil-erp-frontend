@@ -25,8 +25,8 @@ import {
 import {
   downloadSalesOrderAttachment,
   previewSalesOrderAttachment,
-  deleteSalesOrderAttachment
 } from '../../../services/salesOrderService';
+import { useDeleteSalesOrderAttachmentMutation } from '../../../features/salesOrders/salesOrdersApi';
 
 import SalesOrderAttachmentUploadModal from './SalesOrderAttachmentUploadModal';
 import SalesOrderAttachmentPreviewModal from './SalesOrderAttachmentPreviewModal';
@@ -65,6 +65,8 @@ const SalesOrderAttachmentsSection = ({
   const [expandedHistories, setExpandedHistories] = useState({});
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+
+  const [deleteAttachmentMutation] = useDeleteSalesOrderAttachmentMutation();
 
   // Modals state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -157,8 +159,8 @@ const SalesOrderAttachmentsSection = ({
     setActionError('');
     setActionSuccess('');
     try {
-      const res = await deleteSalesOrderAttachment(salesOrderId, attachment._id);
-      if (res.success) {
+      const res = await deleteAttachmentMutation({ id: salesOrderId, attachmentId: attachment._id }).unwrap();
+      if (res.success || !res.error) {
         setActionSuccess('Attachment deleted successfully');
         if (onRefresh) onRefresh();
       } else {
@@ -166,7 +168,7 @@ const SalesOrderAttachmentsSection = ({
       }
     } catch (err) {
       console.error('Delete error:', err);
-      setActionError(err.response?.data?.message || err.message || 'Failed to delete attachment');
+      setActionError(err?.data?.message || err?.message || 'Failed to delete attachment');
     }
   };
 

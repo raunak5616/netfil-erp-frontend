@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getPurchaseEnquiryById,
-  createPurchaseEnquiry,
-  updatePurchaseEnquiry
-} from '../../services/purchaseEnquiryService';
-import { getPurchaseRequisitions, getPurchaseRequisitionById } from '../../services/purchaseRequisitionService';
-import { getClients } from '../../services/clientService';
-import { getDepartments } from '../../services/departmentService';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
+  useGetPurchaseEnquiryByIdQuery,
+  useCreatePurchaseEnquiryMutation,
+  useUpdatePurchaseEnquiryMutation,
+  useGetPurchaseRequisitionsQuery,
+  useLazyGetPurchaseRequisitionByIdQuery,
+} from '../../features/purchase/purchaseApi';
+import { useGetClientsQuery, useGetUOMsQuery } from '../../features/masterData/masterDataApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
+import { useGetItemsQuery } from '../../features/products/productsApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -34,17 +34,54 @@ const PurchaseEnquiryForm = () => {
   const { id } = useParams();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const { user } = useAuth();
+
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Master Data Dropdowns
-  const [approvedPrs, setApprovedPrs] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [itemsList, setItemsList] = useState([]);
-  const [uomsList, setUomsList] = useState([]);
+  // Master Data Dropdowns via RTK Query
+  const { data: prRes } = useGetPurchaseRequisitionsQuery({ status: 'APPROVED', limit: 100 });
+  const [getPRById] = useLazyGetPurchaseRequisitionByIdQuery();
+  const { data: supplierRes } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' });
+  const { data: deptRes } = useGetDepartmentsQuery();
+  const { data: itemRes } = useGetItemsQuery({ limit: 1000 });
+  const { data: uomRes } = useGetUOMsQuery();
+
+  const approvedPrs = useMemo(() => {
+    return prRes?.purchaseRequisitions || prRes?.requisitions || [];
+  }, [prRes]);
+
+  const suppliers = useMemo(() => {
+    const raw = supplierRes?.clients || supplierRes?.parties || [];
+    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
+  }, [supplierRes]);
+
+  const departments = useMemo(() => {
+    const raw = deptRes?.departments || [];
+    return Array.isArray(raw) ? raw.filter((d) => d.status === 'active') : [];
+  }, [deptRes]);
+
+  const itemsList = useMemo(() => {
+    const raw = itemRes?.items || [];
+    return Array.isArray(raw) ? raw.filter((i) => i.status === 'active') : [];
+  }, [itemRes]);
+
+  const uomsList = useMemo(() => {
+    const raw = uomRes?.uoms || [];
+    return Array.isArray(raw) ? raw.filter((u) => u.status === 'active') : [];
+  }, [uomRes]);
+
+  // Existing PE via RTK Query
+  const {
+    data: existingPeRes,
+    isLoading: initialLoading,
+    error: loadError,
+  } = useGetPurchaseEnquiryByIdQuery(id, { skip: !isEditMode });
+
+  const [createPurchaseEnquiryMutation, { isLoading: isCreating }] = useCreatePurchaseEnquiryMutation();
+  const [updatePurchaseEnquiryMutation, { isLoading: isUpdating }] = useUpdatePurchaseEnquiryMutation();
+  const loading = submitting || isCreating || isUpdating;
 
   // Form Header State
   const [purchaseRequisition, setPurchaseRequisition] = useState('');
@@ -83,101 +120,45 @@ const PurchaseEnquiryForm = () => {
     }
   ]);
 
-  // Load Master Data
-  const loadMasterData = async () => {
-    try {
-      const [prRes, supplierRes, deptRes, itemRes, uomRes] = await Promise.all([
-        getPurchaseRequisitions({ status: 'APPROVED', limit: 100 }).catch(() => ({ success: false, purchaseRequisitions: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] })),
-        getDepartments().catch(() => ({ success: false, departments: [] })),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
-        getUOMs().catch(() => ({ success: false, uoms: [] }))
-      ]);
-
-      if (prRes.success && Array.isArray(prRes.purchaseRequisitions)) {
-        setApprovedPrs(prRes.purchaseRequisitions);
-      }
-      const rawSuppliers = supplierRes.clients || supplierRes.parties || [];
-      if (Array.isArray(rawSuppliers)) {
-        setSuppliers(rawSuppliers.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)));
-      }
-      if (deptRes.success && Array.isArray(deptRes.departments)) {
-        setDepartments(deptRes.departments.filter((d) => d.status === 'active'));
-      }
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setItemsList(itemRes.items.filter((i) => i.status === 'active'));
-      }
-      if (uomRes.success && Array.isArray(uomRes.uoms)) {
-        setUomsList(uomRes.uoms.filter((u) => u.status === 'active'));
-      }
-    } catch (err) {
-      console.error('Failed to load PE master data:', err);
-      setError('Failed to load required master data.');
-    }
-  };
-
-  // Load Existing PE for Edit
-  const loadExistingPE = async () => {
-    if (!id) return;
-    setInitialLoading(true);
-    setError('');
-    try {
-      const res = await getPurchaseEnquiryById(id);
-      if (res.success && res.purchaseEnquiry) {
-        const pe = res.purchaseEnquiry;
-        setPeStatus(pe.status);
-
-        if (pe.status !== 'DRAFT') {
-          setError(`Purchase Enquiry "${pe.enquiryNumber}" is in status '${pe.status}' and cannot be edited. Only DRAFT enquiries can be updated.`);
-        }
-
-        setPurchaseRequisition(pe.purchaseRequisition?._id || pe.purchaseRequisition || '');
-        setPrNumber(pe.prNumber || pe.purchaseRequisition?.prNumber || '');
-        setSupplier(pe.supplier?._id || pe.supplier || '');
-        setDepartment(pe.department?._id || pe.department || '');
-        setEnquiryDate(pe.enquiryDate ? new Date(pe.enquiryDate).toISOString().split('T')[0] : '');
-        setExpectedResponseDate(pe.expectedResponseDate ? new Date(pe.expectedResponseDate).toISOString().split('T')[0] : '');
-        setValidityDate(pe.validityDate ? new Date(pe.validityDate).toISOString().split('T')[0] : '');
-        setDeliveryRequirements(pe.deliveryRequirements || '');
-        setPaymentTerms(pe.paymentTerms || '');
-        setDeliveryTerms(pe.deliveryTerms || '');
-        setRemarks(pe.remarks || '');
-
-        if (Array.isArray(pe.items) && pe.items.length > 0) {
-          setLineItems(
-            pe.items.map((i) => ({
-              item: i.item?._id || i.item || '',
-              itemCode: i.itemCode || i.item?.itemCode || '',
-              itemName: i.itemName || i.item?.itemName || '',
-              requestedQuantity: i.requestedQuantity || 1,
-              uom: i.uom?._id || i.uom || '',
-              uomCode: i.uomCode || i.uom?.uomCode || '',
-              requiredDate: i.requiredDate ? new Date(i.requiredDate).toISOString().split('T')[0] : '',
-              specification: i.specification || '',
-              remarks: i.remarks || ''
-            }))
-          );
-        }
-      } else {
-        setError('Purchase Enquiry not found.');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Purchase Enquiry:', err);
-      setError(err.response?.data?.message || 'Error loading Purchase Enquiry details');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
-
+  // Populate Existing PE when loaded
   useEffect(() => {
-    const init = async () => {
-      await loadMasterData();
-      if (isEditMode) {
-        await loadExistingPE();
+    if (existingPeRes?.purchaseEnquiry) {
+      const pe = existingPeRes.purchaseEnquiry;
+      setPeStatus(pe.status);
+
+      if (pe.status !== 'DRAFT') {
+        setError(`Purchase Enquiry "${pe.enquiryNumber}" is in status '${pe.status}' and cannot be edited. Only DRAFT enquiries can be updated.`);
       }
-    };
-    init();
-  }, [id]);
+
+      setPurchaseRequisition(pe.purchaseRequisition?._id || pe.purchaseRequisition || '');
+      setPrNumber(pe.prNumber || pe.purchaseRequisition?.prNumber || '');
+      setSupplier(pe.supplier?._id || pe.supplier || '');
+      setDepartment(pe.department?._id || pe.department || '');
+      setEnquiryDate(pe.enquiryDate ? new Date(pe.enquiryDate).toISOString().split('T')[0] : '');
+      setExpectedResponseDate(pe.expectedResponseDate ? new Date(pe.expectedResponseDate).toISOString().split('T')[0] : '');
+      setValidityDate(pe.validityDate ? new Date(pe.validityDate).toISOString().split('T')[0] : '');
+      setDeliveryRequirements(pe.deliveryRequirements || '');
+      setPaymentTerms(pe.paymentTerms || '');
+      setDeliveryTerms(pe.deliveryTerms || '');
+      setRemarks(pe.remarks || '');
+
+      if (Array.isArray(pe.items) && pe.items.length > 0) {
+        setLineItems(
+          pe.items.map((i) => ({
+            item: i.item?._id || i.item || '',
+            itemCode: i.itemCode || i.item?.itemCode || '',
+            itemName: i.itemName || i.item?.itemName || '',
+            requestedQuantity: i.requestedQuantity || 1,
+            uom: i.uom?._id || i.uom || '',
+            uomCode: i.uomCode || i.uom?.uomCode || '',
+            requiredDate: i.requiredDate ? new Date(i.requiredDate).toISOString().split('T')[0] : '',
+            specification: i.specification || '',
+            remarks: i.remarks || ''
+          }))
+        );
+      }
+    }
+  }, [existingPeRes]);
 
   // Handle Approved Purchase Requisition Selection
   const handlePRChange = async (prId) => {
@@ -193,8 +174,8 @@ const PurchaseEnquiryForm = () => {
 
       // Fetch full PR details if items aren't completely populated
       if (!targetPR || !targetPR.items || targetPR.items.length === 0) {
-        const res = await getPurchaseRequisitionById(prId);
-        if (res.success && res.purchaseRequisition) {
+        const res = await getPRById(prId).unwrap();
+        if (res?.purchaseRequisition) {
           fullPR = res.purchaseRequisition;
         }
       }
@@ -384,28 +365,25 @@ const PurchaseEnquiryForm = () => {
       }))
     };
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       let res;
       if (isEditMode) {
-        res = await updatePurchaseEnquiry(id, payload);
+        res = await updatePurchaseEnquiryMutation({ id, ...payload }).unwrap();
       } else {
-        res = await createPurchaseEnquiry(payload);
+        res = await createPurchaseEnquiryMutation(payload).unwrap();
       }
 
-      if (res.success && res.purchaseEnquiry) {
-        setSuccess(res.message || 'Purchase Enquiry saved successfully.');
-        setTimeout(() => {
-          navigate(`/purchase-enquiries/${res.purchaseEnquiry._id}`);
-        }, 800);
-      } else {
-        setError(res.message || 'Failed to save Purchase Enquiry.');
-      }
+      const savedPE = res?.purchaseEnquiry || res;
+      setSuccess(res?.message || 'Purchase Enquiry saved successfully.');
+      setTimeout(() => {
+        navigate(`/purchase-enquiries/${savedPE._id || id}`);
+      }, 800);
     } catch (err) {
       console.error('Save Purchase Enquiry Error:', err);
-      setError(err.response?.data?.message || 'Error saving Purchase Enquiry. Please check form inputs.');
+      setError(err?.data?.message || err.message || 'Error saving Purchase Enquiry. Please check form inputs.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 

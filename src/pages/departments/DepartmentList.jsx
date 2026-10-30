@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getDepartments } from '../../services/departmentService';
+import React, { useState, useMemo } from 'react';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -25,9 +25,18 @@ const DepartmentList = () => {
   const canCreate = hasPermission('DEPARTMENT_CREATE');
   const canEdit = hasPermission('DEPARTMENT_EDIT');
 
-  const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Redux Toolkit Query - automated caching and deduplication
+  const {
+    data: deptData,
+    isLoading: loading,
+    isFetching,
+    error: apiError,
+    refetch,
+  } = useGetDepartmentsQuery();
+
+  const departments = useMemo(() => {
+    return Array.isArray(deptData?.departments) ? deptData.departments : [];
+  }, [deptData]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,28 +47,6 @@ const DepartmentList = () => {
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
-
-  const fetchDepartmentData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getDepartments();
-      if (data.success && Array.isArray(data.departments)) {
-        setDepartments(data.departments);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch departments:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDepartmentData();
-  }, []);
 
   const filteredDepartments = useMemo(() => {
     return departments.filter((dept) => {
@@ -148,6 +135,8 @@ const DepartmentList = () => {
     },
   ];
 
+  const errorMessage = apiError ? (apiError.data?.message || 'Failed to load departments') : '';
+
   return (
     <div>
       <PageHeader
@@ -160,7 +149,7 @@ const DepartmentList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchDepartmentData}>
+            <Button variant="secondary" icon={RefreshCw} loading={isFetching} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -179,14 +168,15 @@ const DepartmentList = () => {
         }
       />
 
-      {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {errorMessage && <Alert type="danger" message={errorMessage} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-[220px]">
             <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
+            <Input
+              className="pl-8"
               placeholder="Search by department code or name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -232,7 +222,7 @@ const DepartmentList = () => {
         department={editingDepartment}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchDepartmentData}
+        onSuccess={refetch}
       />
 
       <DepartmentDetailModal

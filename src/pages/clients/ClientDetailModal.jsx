@@ -4,7 +4,7 @@ import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import { useAuth } from '../../context/AuthContext';
-import { approveOrRejectClient } from '../../services/clientService';
+import { useApproveOrRejectClientMutation } from '../../features/masterData/masterDataApi';
 import { 
   Edit, 
   Phone, 
@@ -21,6 +21,7 @@ import {
 
 const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit, onStatusUpdate }) => {
   const { isAdmin } = useAuth();
+  const [approveOrRejectMutation] = useApproveOrRejectClientMutation();
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
@@ -59,13 +60,11 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit, onStatusU
     setActionLoading(true);
     setErrorMsg('');
     try {
-      const res = await approveOrRejectClient(client._id, { action: 'APPROVE' });
-      if (res.success) {
-        if (onStatusUpdate) onStatusUpdate(res.client);
-        onClose();
-      }
+      const res = await approveOrRejectMutation({ id: client._id, action: 'APPROVE' }).unwrap();
+      if (onStatusUpdate) onStatusUpdate(res.client || res);
+      onClose();
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || 'Failed to approve party');
+      setErrorMsg(err?.data?.message || err?.message || 'Failed to approve party');
     } finally {
       setActionLoading(false);
     }
@@ -80,18 +79,17 @@ const ClientDetailModal = ({ client, isOpen, onClose, onEdit, canEdit, onStatusU
     setActionLoading(true);
     setErrorMsg('');
     try {
-      const res = await approveOrRejectClient(client._id, { 
+      const res = await approveOrRejectMutation({ 
+        id: client._id, 
         action: 'REJECT',
         rejectionReason: rejectionReason.trim()
-      });
-      if (res.success) {
-        setIsRejecting(false);
-        setRejectionReason('');
-        if (onStatusUpdate) onStatusUpdate(res.client);
-        onClose();
-      }
+      }).unwrap();
+      setIsRejecting(false);
+      setRejectionReason('');
+      if (onStatusUpdate) onStatusUpdate(res.client || res);
+      onClose();
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || 'Failed to reject party');
+      setErrorMsg(err?.data?.message || err?.message || 'Failed to reject party');
     } finally {
       setActionLoading(false);
     }

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getSupplierById,
-  createSupplier,
-  updateSupplier
-} from '../../services/supplierService';
+  useGetSupplierByIdQuery,
+  useCreateSupplierMutation,
+  useUpdateSupplierMutation
+} from '../../features/suppliers/suppliersApi';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -25,8 +25,11 @@ const SupplierForm = () => {
   const { id } = useParams();
   const isEditMode = !!id;
 
+  const { data: supplierData, isLoading: initialLoading } = useGetSupplierByIdQuery(id, { skip: !id });
+  const [createSupplierMutation] = useCreateSupplierMutation();
+  const [updateSupplierMutation] = useUpdateSupplierMutation();
+
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -54,47 +57,31 @@ const SupplierForm = () => {
   const [remarks, setRemarks] = useState('');
 
   useEffect(() => {
-    if (!id) return;
-    const fetchSupplier = async () => {
-      setInitialLoading(true);
-      setError('');
-      try {
-        const res = await getSupplierById(id);
-        if (res.success && res.supplier) {
-          const s = res.supplier;
-          setSupplierCode(s.supplierCode || '');
-          setSupplierName(s.supplierName || '');
-          setLegalName(s.legalName || '');
-          setContactPerson(s.contactPerson || '');
-          setEmail(s.email || '');
-          setPhone(s.phone || '');
-          setAlternatePhone(s.alternatePhone || '');
-          setAddress(s.address || '');
-          setCity(s.city || '');
-          setState(s.state || '');
-          setCountry(s.country || 'India');
-          setPincode(s.pincode || '');
-          setGstin(s.gstin || '');
-          setPan(s.pan || '');
-          setPaymentTerms(s.paymentTerms || '');
-          setCreditDays(s.creditDays || 0);
-          setBankName(s.bankName || '');
-          setAccountNumber(s.accountNumber || '');
-          setIfsc(s.ifsc || '');
-          setStatus(s.status || 'active');
-          setRemarks(s.remarks || '');
-        } else {
-          setError('Supplier document not found');
-        }
-      } catch (err) {
-        console.error('Failed to load supplier details:', err);
-        setError(err.response?.data?.message || 'Error loading supplier data');
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-    fetchSupplier();
-  }, [id]);
+    if (supplierData?.supplier) {
+      const s = supplierData.supplier;
+      setSupplierCode(s.supplierCode || '');
+      setSupplierName(s.supplierName || '');
+      setLegalName(s.legalName || '');
+      setContactPerson(s.contactPerson || '');
+      setEmail(s.email || '');
+      setPhone(s.phone || '');
+      setAlternatePhone(s.alternatePhone || '');
+      setAddress(s.address || '');
+      setCity(s.city || '');
+      setState(s.state || '');
+      setCountry(s.country || 'India');
+      setPincode(s.pincode || '');
+      setGstin(s.gstin || '');
+      setPan(s.pan || '');
+      setPaymentTerms(s.paymentTerms || '');
+      setCreditDays(s.creditDays || 0);
+      setBankName(s.bankName || '');
+      setAccountNumber(s.accountNumber || '');
+      setIfsc(s.ifsc || '');
+      setStatus(s.status || 'active');
+      setRemarks(s.remarks || '');
+    }
+  }, [supplierData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -139,22 +126,19 @@ const SupplierForm = () => {
     try {
       let res;
       if (isEditMode) {
-        res = await updateSupplier(id, payload);
+        res = await updateSupplierMutation({ id, ...payload }).unwrap();
       } else {
-        res = await createSupplier(payload);
+        res = await createSupplierMutation(payload).unwrap();
       }
 
-      if (res.success && res.supplier) {
-        setSuccess(res.message || 'Supplier record saved successfully.');
-        setTimeout(() => {
-          navigate(`/suppliers/${res.supplier._id}`);
-        }, 600);
-      } else {
-        setError(res.message || 'Failed to save supplier record.');
-      }
+      const savedSupplier = res.supplier || res;
+      setSuccess(res.message || 'Supplier record saved successfully.');
+      setTimeout(() => {
+        navigate(`/suppliers/${savedSupplier._id || id}`);
+      }, 600);
     } catch (err) {
       console.error('Save supplier error:', err);
-      setError(err.response?.data?.message || 'Error saving supplier. Please check inputs.');
+      setError(err?.data?.message || err?.message || 'Error saving supplier. Please check inputs.');
     } finally {
       setLoading(false);
     }

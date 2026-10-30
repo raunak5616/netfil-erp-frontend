@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getOrderBOMs } from '../../services/orderBomService';
-import { getSalesOrders } from '../../services/salesOrderService';
-import { getItems } from '../../services/itemService';
+import React, { useState, useMemo } from 'react';
+import { useGetOrderBOMsQuery } from '../../features/boms/bomsApi';
+import { useGetSalesOrdersQuery } from '../../features/salesOrders/salesOrdersApi';
+import { useGetProductsQuery } from '../../features/products/productsApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -32,12 +32,6 @@ const OrderBOMList = () => {
   const canRouteStore = hasPermission('ORDER_BOM_ROUTE_STORE');
   const canRouteFactory = hasPermission('ORDER_BOM_ROUTE_FACTORY');
 
-  const [orderBOMs, setOrderBOMs] = useState([]);
-  const [salesOrders, setSalesOrders] = useState([]);
-  const [parentItems, setParentItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -47,7 +41,35 @@ const OrderBOMList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
+
+  const queryArgs = useMemo(() => {
+    const params = { page, limit };
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (salesOrderFilter !== 'all') params.salesOrder = salesOrderFilter;
+    if (parentItemFilter !== 'all') params.parentItem = parentItemFilter;
+    if (searchTerm.trim()) params.search = searchTerm.trim();
+    return params;
+  }, [page, limit, statusFilter, salesOrderFilter, parentItemFilter, searchTerm]);
+
+  // RTK Query Hooks
+  const {
+    data: obomData,
+    isLoading: loadingOBOM,
+    isFetching: fetchingOBOM,
+    error: obomQueryError,
+    refetch: fetchOrderBOMsData
+  } = useGetOrderBOMsQuery(queryArgs);
+
+  const { data: soData } = useGetSalesOrdersQuery({ limit: 100 });
+  const { data: prodData } = useGetProductsQuery({ all: true });
+
+  const orderBOMs = useMemo(() => obomData?.orderBOMs || [], [obomData]);
+  const totalRecords = obomData?.total || 0;
+  const salesOrders = useMemo(() => soData?.salesOrders || [], [soData]);
+  const parentItems = useMemo(() => prodData?.items || prodData?.products || [], [prodData]);
+
+  const loading = loadingOBOM || fetchingOBOM;
+  const error = obomQueryError ? (obomQueryError.data?.message || obomQueryError.message || 'Failed to load Order BOMs') : '';
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -58,48 +80,6 @@ const OrderBOMList = () => {
   const [isRouteOpen, setIsRouteOpen] = useState(false);
   const [routeActionType, setRouteActionType] = useState(null);
   const [selectedOrderBOM, setSelectedOrderBOM] = useState(null);
-
-  const fetchOrderBOMsData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (salesOrderFilter !== 'all') params.salesOrder = salesOrderFilter;
-      if (parentItemFilter !== 'all') params.parentItem = parentItemFilter;
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-
-      const [obomRes, soRes, itemRes] = await Promise.all([
-        getOrderBOMs(params),
-        getSalesOrders({ limit: 100 }).catch(() => ({ success: false, salesOrders: [] })),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] }))
-      ]);
-
-      if (obomRes.success && Array.isArray(obomRes.orderBOMs)) {
-        setOrderBOMs(obomRes.orderBOMs);
-        if (obomRes.total !== undefined) setTotalRecords(obomRes.total);
-      } else {
-        setError('Unexpected response format from server');
-      }
-
-      if (soRes.success && Array.isArray(soRes.salesOrders)) {
-        setSalesOrders(soRes.salesOrders);
-      }
-
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setParentItems(itemRes.items);
-      }
-    } catch (err) {
-      console.error('Failed to fetch Order BOMs:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrderBOMsData();
-  }, [statusFilter, salesOrderFilter, parentItemFilter, page, limit]);
 
   // Client-side search fallback/filtering
   const filteredOrderBOMs = useMemo(() => {

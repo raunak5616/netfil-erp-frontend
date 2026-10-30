@@ -3,25 +3,44 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Select, Textarea } from '../../components/ui/FormField';
-import { getStores } from '../../services/storeService';
-import { getPlants } from '../../services/plantService';
+import { useGetStoresQuery } from '../../features/stores/storesApi';
+import { useGetPlantsQuery } from '../../features/masterData/masterDataApi';
 import {
-  sendToStore,
-  receiveByStore,
-  sendToFactory,
-  receiveByFactory,
-  cancelOrderBOM
-} from '../../services/orderBomService';
+  useSendToStoreMutation,
+  useReceiveByStoreMutation,
+  useSendToFactoryMutation,
+  useReceiveByFactoryMutation,
+  useCancelOrderBOMMutation
+} from '../../features/boms/bomsApi';
 
 const OrderBOMRouteModal = ({ isOpen, actionType, orderBOM, onClose, onSuccess }) => {
-  const [stores, setStores] = useState([]);
-  const [plants, setPlants] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState('');
+
+  // RTK Query hooks
+  const { data: storeData, isLoading: loadingStores } = useGetStoresQuery(
+    { status: 'active' },
+    { skip: !isOpen || actionType !== 'SEND_TO_STORE' }
+  );
+
+  const { data: plantData, isLoading: loadingPlants } = useGetPlantsQuery(
+    { status: 'active' },
+    { skip: !isOpen || actionType !== 'SEND_TO_FACTORY' }
+  );
+
+  const [sendToStoreMutation, { isLoading: sendingStore }] = useSendToStoreMutation();
+  const [receiveByStoreMutation, { isLoading: receivingStore }] = useReceiveByStoreMutation();
+  const [sendToFactoryMutation, { isLoading: sendingFactory }] = useSendToFactoryMutation();
+  const [receiveByFactoryMutation, { isLoading: receivingFactory }] = useReceiveByFactoryMutation();
+  const [cancelOrderBOMMutation, { isLoading: cancellingBOM }] = useCancelOrderBOMMutation();
+
+  const loading = sendingStore || receivingStore || sendingFactory || receivingFactory || cancellingBOM;
+  const loadingOptions = loadingStores || loadingPlants;
+
+  const stores = storeData?.stores || [];
+  const plants = plantData?.plants || [];
 
   useEffect(() => {
     if (!isOpen || !actionType) return;
@@ -29,39 +48,19 @@ const OrderBOMRouteModal = ({ isOpen, actionType, orderBOM, onClose, onSuccess }
     setRemarks('');
     setSelectedStoreId(orderBOM?.store?._id || orderBOM?.store || '');
     setSelectedPlantId(orderBOM?.plant?._id || orderBOM?.plant || '');
-
-    if (actionType === 'SEND_TO_STORE') {
-      setLoadingOptions(true);
-      getStores({ status: 'active' })
-        .then((res) => {
-          if (res.success && Array.isArray(res.stores)) {
-            setStores(res.stores);
-            if (!selectedStoreId && res.stores.length > 0) {
-              setSelectedStoreId(res.stores[0]._id);
-            }
-          }
-        })
-        .catch((err) => {
-          console.warn('Could not load stores:', err);
-        })
-        .finally(() => setLoadingOptions(false));
-    } else if (actionType === 'SEND_TO_FACTORY') {
-      setLoadingOptions(true);
-      getPlants({ status: 'active' })
-        .then((res) => {
-          if (res.success && Array.isArray(res.plants)) {
-            setPlants(res.plants);
-            if (!selectedPlantId && res.plants.length > 0) {
-              setSelectedPlantId(res.plants[0]._id);
-            }
-          }
-        })
-        .catch((err) => {
-          console.warn('Could not load plants:', err);
-        })
-        .finally(() => setLoadingOptions(false));
-    }
   }, [isOpen, actionType, orderBOM]);
+
+  useEffect(() => {
+    if (actionType === 'SEND_TO_STORE' && stores.length > 0 && !selectedStoreId) {
+      setSelectedStoreId(stores[0]._id);
+    }
+  }, [actionType, stores, selectedStoreId]);
+
+  useEffect(() => {
+    if (actionType === 'SEND_TO_FACTORY' && plants.length > 0 && !selectedPlantId) {
+      setSelectedPlantId(plants[0]._id);
+    }
+  }, [actionType, plants, selectedPlantId]);
 
   const getModalConfig = () => {
     switch (actionType) {
@@ -125,31 +124,28 @@ const OrderBOMRouteModal = ({ isOpen, actionType, orderBOM, onClose, onSuccess }
       return;
     }
 
-    setLoading(true);
     try {
       let res;
       if (actionType === 'SEND_TO_STORE') {
-        res = await sendToStore(orderBOM._id, { storeId: selectedStoreId, remarks });
+        res = await sendToStoreMutation({ id: orderBOM._id, data: { storeId: selectedStoreId, remarks } }).unwrap();
       } else if (actionType === 'RECEIVE_BY_STORE') {
-        res = await receiveByStore(orderBOM._id, { remarks });
+        res = await receiveByStoreMutation({ id: orderBOM._id, data: { remarks } }).unwrap();
       } else if (actionType === 'SEND_TO_FACTORY') {
-        res = await sendToFactory(orderBOM._id, { plantId: selectedPlantId, remarks });
+        res = await sendToFactoryMutation({ id: orderBOM._id, data: { plantId: selectedPlantId, remarks } }).unwrap();
       } else if (actionType === 'RECEIVE_BY_FACTORY') {
-        res = await receiveByFactory(orderBOM._id, { remarks });
+        res = await receiveByFactoryMutation({ id: orderBOM._id, data: { remarks } }).unwrap();
       } else if (actionType === 'CANCEL') {
-        res = await cancelOrderBOM(orderBOM._id, { remarks });
+        res = await cancelOrderBOMMutation({ id: orderBOM._id, data: { remarks } }).unwrap();
       }
 
-      if (res && res.success) {
-        onSuccess(res.orderBOM || res.message);
+      if (res && (res.success || res.orderBOM || res.message)) {
+        onSuccess(res.orderBOM || res.message || res);
       } else {
         setError(res?.message || 'Failed to complete routing action');
       }
     } catch (err) {
       console.error('Order BOM routing error:', err);
-      setError(err.response?.data?.message || 'Error processing request');
-    } finally {
-      setLoading(false);
+      setError(err.data?.message || err.message || 'Error processing request');
     }
   };
 

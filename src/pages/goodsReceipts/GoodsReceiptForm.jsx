@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getGoodsReceiptById,
-  createGoodsReceipt,
-  updateGoodsReceipt,
-  getGoodsReceipts
-} from '../../services/goodsReceiptService';
-import { getPurchaseOrders, getPurchaseOrderById } from '../../services/purchaseOrderService';
-import { getPlants } from '../../services/plantService';
-import { getStores } from '../../services/storeService';
-import { getStorageLocations } from '../../services/storageLocationService';
-import { getBins } from '../../services/binService';
-import { getUOMs } from '../../services/uomService';
+  useGetPurchaseOrdersQuery,
+  useLazyGetPurchaseOrderByIdQuery,
+  useLazyGetGoodsReceiptsQuery,
+  useGetGoodsReceiptByIdQuery,
+  useCreateGoodsReceiptMutation,
+  useUpdateGoodsReceiptMutation,
+} from '../../features/purchase/purchaseApi';
+import {
+  useGetPlantsQuery,
+  useGetStoresQuery,
+  useLazyGetStorageLocationsQuery,
+  useLazyGetBinsQuery,
+} from '../../features/stores/storesApi';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -36,16 +39,42 @@ const GoodsReceiptForm = () => {
   const { id } = useParams();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [poActionLoading, setPoActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Dropdown Master RTK Queries
+  const { data: poData } = useGetPurchaseOrdersQuery({ status: 'RELEASED', limit: 100 });
+  const { data: plantData } = useGetPlantsQuery();
+  const { data: storeData } = useGetStoresQuery();
+  const { data: uomData } = useGetUOMsQuery();
+
+  // Edit Mode GRN Query
+  const { data: grnDetailData, isLoading: grnLoading } = useGetGoodsReceiptByIdQuery(id, { skip: !isEditMode });
+
+  // Lazy Queries & Mutations
+  const [getPurchaseOrderById] = useLazyGetPurchaseOrderByIdQuery();
+  const [getGoodsReceipts] = useLazyGetGoodsReceiptsQuery();
+  const [getStorageLocations] = useLazyGetStorageLocationsQuery();
+  const [getBins] = useLazyGetBinsQuery();
+  const [createGoodsReceipt, { isLoading: isCreating }] = useCreateGoodsReceiptMutation();
+  const [updateGoodsReceipt, { isLoading: isUpdating }] = useUpdateGoodsReceiptMutation();
+
   // Dropdown Master Collections
-  const [releasedPos, setReleasedPos] = useState([]);
-  const [plantsList, setPlantsList] = useState([]);
-  const [storesList, setStoresList] = useState([]);
-  const [uomsList, setUomsList] = useState([]);
+  const releasedPos = useMemo(() => poData?.purchaseOrders || [], [poData]);
+  const plantsList = useMemo(() => {
+    const list = plantData?.plants || plantData || [];
+    return Array.isArray(list) ? list.filter((p) => p.status === 'active') : [];
+  }, [plantData]);
+  const storesList = useMemo(() => {
+    const list = storeData?.stores || storeData || [];
+    return Array.isArray(list) ? list.filter((s) => s.status === 'active') : [];
+  }, [storeData]);
+  const uomsList = useMemo(() => {
+    const list = uomData?.uoms || uomData || [];
+    return Array.isArray(list) ? list.filter((u) => u.status === 'active') : [];
+  }, [uomData]);
 
   // Selected PO Details
   const [selectedPO, setSelectedPO] = useState(null);
@@ -65,93 +94,57 @@ const GoodsReceiptForm = () => {
   const [grnStatus, setGrnStatus] = useState('DRAFT');
 
   // Form Line Items State
-  // Each line item contains: poItem, item, itemCode, itemName, specification, poQuantity, previouslyReceived, remainingQuantity, receivedQuantity, uom, uomCode, plant, store, storageLocation, bin, availableLocations, availableBins, remarks
   const [lineItems, setLineItems] = useState([]);
 
-  // Load Master Options (Released POs, Plants, Stores, UOMs)
-  const loadMasterData = async () => {
-    try {
-      const [poRes, plantRes, storeRes, uomRes] = await Promise.all([
-        getPurchaseOrders({ status: 'RELEASED', limit: 100 }).catch(() => ({ success: false, purchaseOrders: [] })),
-        getPlants().catch(() => ({ success: false, plants: [] })),
-        getStores().catch(() => ({ success: false, stores: [] })),
-        getUOMs().catch(() => ({ success: false, uoms: [] }))
-      ]);
+  // Load Existing GRN for Edit when grnDetailData changes
+  useEffect(() => {
+    if (!isEditMode || !grnDetailData?.goodsReceipt) return;
 
-      if (poRes.success && Array.isArray(poRes.purchaseOrders)) {
-        setReleasedPos(poRes.purchaseOrders);
-      }
-      if (plantRes.success && Array.isArray(plantRes.plants)) {
-        setPlantsList(plantRes.plants.filter((p) => p.status === 'active'));
-      } else if (Array.isArray(plantRes)) {
-        setPlantsList(plantRes.filter((p) => p.status === 'active'));
+    let isSubscribed = true;
+
+    const populateFromGRN = async () => {
+      const grn = grnDetailData.goodsReceipt;
+      setGrnStatus(grn.status);
+
+      if (grn.status !== 'DRAFT') {
+        setError(`Goods Receipt "${grn.grnNumber}" is in status '${grn.status}' and cannot be edited. Only DRAFT records can be updated.`);
       }
 
-      if (storeRes.success && Array.isArray(storeRes.stores)) {
-        setStoresList(storeRes.stores.filter((s) => s.status === 'active'));
-      } else if (Array.isArray(storeRes)) {
-        setStoresList(storeRes.filter((s) => s.status === 'active'));
-      }
+      const poId = typeof grn.purchaseOrder === 'object' ? grn.purchaseOrder._id : grn.purchaseOrder;
+      setPurchaseOrder(poId || '');
+      if (typeof grn.purchaseOrder === 'object') setSelectedPO(grn.purchaseOrder);
 
-      if (uomRes.success && Array.isArray(uomRes.uoms)) {
-        setUomsList(uomRes.uoms.filter((u) => u.status === 'active'));
-      }
-    } catch (err) {
-      console.error('Failed to load GRN master data:', err);
-      setError('Failed to load required master data.');
-    }
-  };
+      setSupplierChallanNo(grn.supplierChallanNo || '');
+      setSupplierChallanDate(grn.supplierChallanDate ? new Date(grn.supplierChallanDate).toISOString().split('T')[0] : '');
+      setGateEntryNo(grn.gateEntryNo || '');
+      setGateEntryDate(grn.gateEntryDate ? new Date(grn.gateEntryDate).toISOString().split('T')[0] : '');
+      setLrNo(grn.lrNo || '');
+      setTransporterName(grn.transporterName || '');
+      setVehicleNo(grn.vehicleNo || '');
+      const plantId = typeof grn.plant === 'object' ? grn.plant._id : grn.plant;
+      const storeId = typeof grn.store === 'object' ? grn.store._id : grn.store;
+      setHeaderPlant(plantId || '');
+      setHeaderStore(storeId || '');
+      setRemarks(grn.remarks || '');
 
-  // Load Existing GRN for Edit
-  const loadExistingGRN = async () => {
-    if (!id) return;
-    setInitialLoading(true);
-    setError('');
-    try {
-      const res = await getGoodsReceiptById(id);
-      if (res.success && res.goodsReceipt) {
-        const grn = res.goodsReceipt;
-        setGrnStatus(grn.status);
+      let poItemsMap = new Map();
+      let prevReceivedMap = new Map();
 
-        if (grn.status !== 'DRAFT') {
-          setError(`Goods Receipt "${grn.grnNumber}" is in status '${grn.status}' and cannot be edited. Only DRAFT records can be updated.`);
-        }
-
-        const poId = typeof grn.purchaseOrder === 'object' ? grn.purchaseOrder._id : grn.purchaseOrder;
-        setPurchaseOrder(poId || '');
-        if (typeof grn.purchaseOrder === 'object') setSelectedPO(grn.purchaseOrder);
-
-        setSupplierChallanNo(grn.supplierChallanNo || '');
-        setSupplierChallanDate(grn.supplierChallanDate ? new Date(grn.supplierChallanDate).toISOString().split('T')[0] : '');
-        setGateEntryNo(grn.gateEntryNo || '');
-        setGateEntryDate(grn.gateEntryDate ? new Date(grn.gateEntryDate).toISOString().split('T')[0] : '');
-        setLrNo(grn.lrNo || '');
-        setTransporterName(grn.transporterName || '');
-        setVehicleNo(grn.vehicleNo || '');
-        const plantId = typeof grn.plant === 'object' ? grn.plant._id : grn.plant;
-        const storeId = typeof grn.store === 'object' ? grn.store._id : grn.store;
-        setHeaderPlant(plantId || '');
-        setHeaderStore(storeId || '');
-        setRemarks(grn.remarks || '');
-
-        // Fetch PO details & previously posted GRNs to compute accurate remaining quantities
-        let poItemsMap = new Map();
-        let prevReceivedMap = new Map();
-
-        if (poId) {
+      if (poId) {
+        try {
           const [poDetailRes, prevGrnRes] = await Promise.all([
-            getPurchaseOrderById(poId).catch(() => null),
-            getGoodsReceipts({ purchaseOrder: poId, status: 'POSTED', limit: 100 }).catch(() => null)
+            getPurchaseOrderById(poId).unwrap().catch(() => null),
+            getGoodsReceipts({ purchaseOrder: poId, status: 'POSTED', limit: 100 }).unwrap().catch(() => null)
           ]);
 
           if (poDetailRes && poDetailRes.success && poDetailRes.purchaseOrder) {
-            setSelectedPO(poDetailRes.purchaseOrder);
+            if (isSubscribed) setSelectedPO(poDetailRes.purchaseOrder);
             poDetailRes.purchaseOrder.items.forEach((pi) => poItemsMap.set(pi._id.toString(), pi));
           }
 
           if (prevGrnRes && prevGrnRes.success && Array.isArray(prevGrnRes.goodsReceipts)) {
             prevGrnRes.goodsReceipts.forEach((g) => {
-              if (g._id.toString() !== grn._id.toString()) { // Exclude current GRN if edited
+              if (g._id.toString() !== grn._id.toString()) {
                 g.items.forEach((item) => {
                   const key = item.poItem ? item.poItem.toString() : item.item?._id?.toString() || item.item?.toString();
                   if (key) prevReceivedMap.set(key, (prevReceivedMap.get(key) || 0) + (Number(item.receivedQuantity) || 0));
@@ -159,84 +152,72 @@ const GoodsReceiptForm = () => {
               }
             });
           }
+        } catch (fetchErr) {
+          console.error('Failed to load related PO/GRN in edit mode:', fetchErr);
         }
-
-        // Build item rows for edit mode
-        if (Array.isArray(grn.items) && grn.items.length > 0) {
-          const builtItems = await Promise.all(
-            grn.items.map(async (i) => {
-              const poItemRef = i.poItem ? i.poItem.toString() : null;
-              const itemRef = typeof i.item === 'object' ? i.item._id : i.item;
-              const poItemDoc = poItemRef ? poItemsMap.get(poItemRef) : null;
-              const poQty = poItemDoc ? poItemDoc.quantity : (i.poQuantity || 0);
-
-              const key = poItemRef || itemRef?.toString();
-              const prevRec = key ? (prevReceivedMap.get(key) || 0) : 0;
-              const remaining = Math.max(0, poQty - prevRec);
-
-              const iPlant = typeof i.plant === 'object' ? i.plant._id : (i.plant || plantId);
-              const iStore = typeof i.store === 'object' ? i.store._id : (i.store || storeId);
-              const iLoc = typeof i.storageLocation === 'object' ? i.storageLocation._id : i.storageLocation;
-              const iBin = typeof i.bin === 'object' ? i.bin._id : i.bin;
-
-              // Fetch locations for store
-              let locs = [];
-              if (iStore) {
-                const locRes = await getStorageLocations({ store: iStore }).catch(() => ({ storageLocations: [] }));
-                locs = locRes.storageLocations || locRes || [];
-              }
-
-              // Fetch bins for location
-              let bins = [];
-              if (iLoc) {
-                const binRes = await getBins({ storageLocation: iLoc }).catch(() => ({ bins: [] }));
-                bins = binRes.bins || binRes || [];
-              }
-
-              return {
-                poItem: poItemRef,
-                item: itemRef,
-                itemCode: i.itemCodeSnapshot || i.item?.itemCode || '',
-                itemName: i.itemNameSnapshot || i.item?.itemName || '',
-                specification: i.specification || poItemDoc?.specification || '',
-                poQuantity: poQty,
-                previouslyReceived: prevRec,
-                remainingQuantity: remaining,
-                receivedQuantity: i.receivedQuantity || 1,
-                uom: typeof i.uom === 'object' ? i.uom._id : i.uom,
-                uomCode: i.uomCodeSnapshot || i.uom?.uomCode || '',
-                plant: iPlant,
-                store: iStore,
-                storageLocation: iLoc || '',
-                bin: iBin || '',
-                availableLocations: locs,
-                availableBins: bins,
-                remarks: i.remarks || ''
-              };
-            })
-          );
-          setLineItems(builtItems);
-        }
-      } else {
-        setError('Goods Receipt record not found.');
       }
-    } catch (err) {
-      console.error('Failed to fetch Goods Receipt:', err);
-      setError(err.response?.data?.message || 'Error loading Goods Receipt details');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    const init = async () => {
-      await loadMasterData();
-      if (isEditMode) {
-        await loadExistingGRN();
+      if (Array.isArray(grn.items) && grn.items.length > 0) {
+        const builtItems = await Promise.all(
+          grn.items.map(async (i) => {
+            const poItemRef = i.poItem ? i.poItem.toString() : null;
+            const itemRef = typeof i.item === 'object' ? i.item._id : i.item;
+            const poItemDoc = poItemRef ? poItemsMap.get(poItemRef) : null;
+            const poQty = poItemDoc ? poItemDoc.quantity : (i.poQuantity || 0);
+
+            const key = poItemRef || itemRef?.toString();
+            const prevRec = key ? (prevReceivedMap.get(key) || 0) : 0;
+            const remaining = Math.max(0, poQty - prevRec);
+
+            const iPlant = typeof i.plant === 'object' ? i.plant._id : (i.plant || plantId);
+            const iStore = typeof i.store === 'object' ? i.store._id : (i.store || storeId);
+            const iLoc = typeof i.storageLocation === 'object' ? i.storageLocation._id : i.storageLocation;
+            const iBin = typeof i.bin === 'object' ? i.bin._id : i.bin;
+
+            let locs = [];
+            if (iStore) {
+              const locRes = await getStorageLocations({ store: iStore }).unwrap().catch(() => ({ storageLocations: [] }));
+              locs = locRes.storageLocations || locRes || [];
+            }
+
+            let bins = [];
+            if (iLoc) {
+              const binRes = await getBins({ storageLocation: iLoc }).unwrap().catch(() => ({ bins: [] }));
+              bins = binRes.bins || binRes || [];
+            }
+
+            return {
+              poItem: poItemRef,
+              item: itemRef,
+              itemCode: i.itemCodeSnapshot || i.item?.itemCode || '',
+              itemName: i.itemNameSnapshot || i.item?.itemName || '',
+              specification: i.specification || poItemDoc?.specification || '',
+              poQuantity: poQty,
+              previouslyReceived: prevRec,
+              remainingQuantity: remaining,
+              receivedQuantity: i.receivedQuantity || 1,
+              uom: typeof i.uom === 'object' ? i.uom._id : i.uom,
+              uomCode: i.uomCodeSnapshot || i.uom?.uomCode || '',
+              plant: iPlant,
+              store: iStore,
+              storageLocation: iLoc || '',
+              bin: iBin || '',
+              availableLocations: locs,
+              availableBins: bins,
+              remarks: i.remarks || ''
+            };
+          })
+        );
+        if (isSubscribed) setLineItems(builtItems);
       }
     };
-    init();
-  }, [id]);
+
+    populateFromGRN();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isEditMode, grnDetailData, getPurchaseOrderById, getGoodsReceipts, getStorageLocations, getBins]);
 
   // Filter stores by selected plant
   const filteredStoresForPlant = useMemo(() => {
@@ -256,12 +237,12 @@ const GoodsReceiptForm = () => {
       return;
     }
 
-    setLoading(true);
+    setPoActionLoading(true);
     setError('');
     try {
       const [poDetailRes, prevGrnRes] = await Promise.all([
-        getPurchaseOrderById(poId),
-        getGoodsReceipts({ purchaseOrder: poId, status: 'POSTED', limit: 100 }).catch(() => ({ goodsReceipts: [] }))
+        getPurchaseOrderById(poId).unwrap(),
+        getGoodsReceipts({ purchaseOrder: poId, status: 'POSTED', limit: 100 }).unwrap().catch(() => ({ goodsReceipts: [] }))
       ]);
 
       if (poDetailRes.success && poDetailRes.purchaseOrder) {
@@ -291,7 +272,7 @@ const GoodsReceiptForm = () => {
         // Fetch initial storage locations for default store
         let locs = [];
         if (defaultStoreId) {
-          const locRes = await getStorageLocations({ store: defaultStoreId }).catch(() => ({ storageLocations: [] }));
+          const locRes = await getStorageLocations({ store: defaultStoreId }).unwrap().catch(() => ({ storageLocations: [] }));
           locs = locRes.storageLocations || locRes || [];
         }
 
@@ -333,9 +314,9 @@ const GoodsReceiptForm = () => {
       }
     } catch (err) {
       console.error('PO selection error:', err);
-      setError(err.response?.data?.message || 'Error loading Purchase Order');
+      setError(err?.data?.message || err?.message || 'Error loading Purchase Order');
     } finally {
-      setLoading(false);
+      setPoActionLoading(false);
     }
   };
 
@@ -354,7 +335,7 @@ const GoodsReceiptForm = () => {
 
     if (storeId) {
       try {
-        const locRes = await getStorageLocations({ store: storeId });
+        const locRes = await getStorageLocations({ store: storeId }).unwrap();
         const locs = locRes.storageLocations || locRes || [];
         const latest = [...lineItems];
         latest[index].availableLocations = locs;
@@ -383,7 +364,7 @@ const GoodsReceiptForm = () => {
 
     if (locId) {
       try {
-        const binRes = await getBins({ storageLocation: locId });
+        const binRes = await getBins({ storageLocation: locId }).unwrap();
         const bins = binRes.bins || binRes || [];
         const latest = currentItemsState ? [...currentItemsState] : [...lineItems];
         latest[index].availableBins = bins;
@@ -522,13 +503,13 @@ const GoodsReceiptForm = () => {
       }))
     };
 
-    setLoading(true);
+    setFormSubmitting(true);
     try {
       let res;
       if (isEditMode) {
-        res = await updateGoodsReceipt(id, payload);
+        res = await updateGoodsReceipt({ id, ...payload }).unwrap();
       } else {
-        res = await createGoodsReceipt(payload);
+        res = await createGoodsReceipt(payload).unwrap();
       }
 
       if (res.success && res.goodsReceipt) {
@@ -541,13 +522,15 @@ const GoodsReceiptForm = () => {
       }
     } catch (err) {
       console.error('Save Goods Receipt Error:', err);
-      setError(err.response?.data?.message || 'Error saving Goods Receipt. Please check form inputs.');
+      setError(err?.data?.message || err?.message || 'Error saving Goods Receipt. Please check form inputs.');
     } finally {
-      setLoading(false);
+      setFormSubmitting(false);
     }
   };
 
-  if (initialLoading) {
+  const loading = formSubmitting || poActionLoading || isCreating || isUpdating;
+
+  if (isEditMode && grnLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />

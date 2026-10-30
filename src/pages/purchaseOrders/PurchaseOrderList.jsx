@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getPurchaseOrders,
-  deletePurchaseOrder,
-  updatePurchaseOrderStatus
-} from '../../services/purchaseOrderService';
-import { getDepartments } from '../../services/departmentService';
-import { getClients } from '../../services/clientService';
+  useGetPurchaseOrdersQuery,
+  useDeletePurchaseOrderMutation,
+  useUpdatePurchaseOrderStatusMutation,
+} from '../../features/purchase/purchaseApi';
+import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
+import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -70,16 +70,13 @@ const PurchaseOrderList = () => {
   const canCancel = hasPermission('PURCHASE_ORDER_CANCEL');
   const canAmend = hasPermission('PURCHASE_ORDER_AMENDMENT_CREATE');
 
-  const [orders, setOrders] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [poTypeFilter, setPoTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
@@ -90,8 +87,58 @@ const PurchaseOrderList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const params = { page, limit };
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (poTypeFilter !== 'all') params.poType = poTypeFilter;
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (supplierFilter !== 'all') params.supplier = supplierFilter;
+    if (departmentFilter !== 'all') params.department = departmentFilter;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return params;
+  }, [page, limit, debouncedSearch, poTypeFilter, statusFilter, supplierFilter, departmentFilter, startDate, endDate]);
+
+  const {
+    data: poData,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useGetPurchaseOrdersQuery(queryParams);
+
+  const { data: deptData } = useGetDepartmentsQuery();
+  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' });
+
+  const [deletePurchaseOrderMutation] = useDeletePurchaseOrderMutation();
+  const [updatePurchaseOrderStatusMutation] = useUpdatePurchaseOrderStatusMutation();
+
+  const orders = useMemo(() => {
+    return poData?.purchaseOrders || [];
+  }, [poData]);
+
+  const totalCount = poData?.pagination?.totalCount || 0;
+  const totalPages = poData?.pagination?.totalPages || 1;
+
+  const departments = useMemo(() => {
+    const raw = deptData?.departments || [];
+    return Array.isArray(raw) ? raw.filter((d) => d.status === 'active') : [];
+  }, [deptData]);
+
+  const suppliers = useMemo(() => {
+    const raw = clientData?.clients || clientData?.parties || [];
+    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
+  }, [clientData]);
 
   // Confirm Delete / Cancel Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -101,77 +148,15 @@ const PurchaseOrderList = () => {
   const [workflowAction, setWorkflowAction] = useState(null);
   const [workflowRemarks, setWorkflowRemarks] = useState('');
 
-  const fetchOrders = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (poTypeFilter !== 'all') params.poType = poTypeFilter;
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (supplierFilter !== 'all') params.supplier = supplierFilter;
-      if (departmentFilter !== 'all') params.department = departmentFilter;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      const res = await getPurchaseOrders(params);
-
-      if (res.success && Array.isArray(res.purchaseOrders)) {
-        setOrders(res.purchaseOrders);
-        if (res.pagination) {
-          setTotalCount(res.pagination.totalCount || 0);
-          setTotalPages(res.pagination.totalPages || 1);
-        }
-      } else {
-        setError('Unexpected response structure from server');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Purchase Orders:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMasterData = async () => {
-    try {
-      const [deptRes, supplierRes] = await Promise.all([
-        getDepartments().catch(() => ({ success: false, departments: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] }))
-      ]);
-
-      if (deptRes.success && Array.isArray(deptRes.departments)) {
-        setDepartments(deptRes.departments.filter((d) => d.status === 'active'));
-      }
-      const rawSuppliers = supplierRes.clients || supplierRes.parties || [];
-      if (Array.isArray(rawSuppliers)) {
-        setSuppliers(rawSuppliers.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)));
-      }
-    } catch (err) {
-      console.error('Failed to fetch PO master data:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchMasterData();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchOrders();
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, poTypeFilter, statusFilter, supplierFilter, departmentFilter, startDate, endDate, page, limit]);
-
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
+    setDebouncedSearch(searchTerm);
     setPage(1);
-    fetchOrders();
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setPoTypeFilter('all');
     setStatusFilter('all');
     setSupplierFilter('all');
@@ -187,16 +172,11 @@ const PurchaseOrderList = () => {
     setActionLoading(deleteTarget._id);
     setError('');
     try {
-      const res = await deletePurchaseOrder(deleteTarget._id);
-      if (res.success) {
-        setSuccessMessage(res.message || 'Purchase Order action completed');
-        fetchOrders();
-      } else {
-        setError(res.message || 'Failed to delete/cancel Purchase Order');
-      }
+      const res = await deletePurchaseOrderMutation(deleteTarget._id).unwrap();
+      setSuccessMessage(res?.message || 'Purchase Order action completed');
     } catch (err) {
       console.error('Delete/Cancel PO error:', err);
-      setError(err.response?.data?.message || 'Failed to perform action');
+      setError(err?.data?.message || err.message || 'Failed to perform action');
     } finally {
       setActionLoading(null);
       setDeleteTarget(null);
@@ -209,19 +189,18 @@ const PurchaseOrderList = () => {
     setActionLoading(workflowTarget._id);
     setError('');
     try {
-      const res = await updatePurchaseOrderStatus(workflowTarget._id, workflowAction, workflowRemarks);
-      if (res.success) {
-        setSuccessMessage(res.message || `Purchase Order status updated to ${res.purchaseOrder?.status || 'new status'}`);
-        fetchOrders();
-        setWorkflowTarget(null);
-        setWorkflowAction(null);
-        setWorkflowRemarks('');
-      } else {
-        setError(res.message || 'Workflow action failed');
-      }
+      const res = await updatePurchaseOrderStatusMutation({
+        id: workflowTarget._id,
+        action: workflowAction,
+        remarks: workflowRemarks,
+      }).unwrap();
+      setSuccessMessage(res?.message || `Purchase Order status updated to ${res?.purchaseOrder?.status || 'new status'}`);
+      setWorkflowTarget(null);
+      setWorkflowAction(null);
+      setWorkflowRemarks('');
     } catch (err) {
       console.error('PO Workflow error:', err);
-      setError(err.response?.data?.message || 'Failed to execute workflow action');
+      setError(err?.data?.message || err.message || 'Failed to execute workflow action');
     } finally {
       setActionLoading(null);
     }
@@ -463,10 +442,10 @@ const PurchaseOrderList = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={fetchOrders}
-              disabled={loading}
+              onClick={() => refetch()}
+              disabled={loading || isFetching}
             >
-              <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={14} className={`mr-1.5 ${loading || isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             {canCreate && (

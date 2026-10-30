@@ -3,16 +3,12 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Select, Input, Textarea } from '../../components/ui/FormField';
-import { getOrderBOMs, getOrderBOMById } from '../../services/orderBomService';
-import { getPlants } from '../../services/plantService';
-import { createWorkOrder } from '../../services/workOrderService';
+import { useGetOrderBOMsQuery, useGetOrderBOMByIdQuery } from '../../features/boms/bomsApi';
+import { useGetPlantsQuery } from '../../features/masterData/masterDataApi';
+import { useCreateWorkOrderMutation } from '../../features/workOrders/workOrdersApi';
 import { FileCheck, Wrench } from 'lucide-react';
 
 const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSuccess }) => {
-  // Option lists
-  const [orderBOMs, setOrderBOMs] = useState([]);
-  const [plants, setPlants] = useState([]);
-
   // Selections & Form fields
   const [selectedOrderBOMId, setSelectedOrderBOMId] = useState('');
   const [selectedOrderBOM, setSelectedOrderBOM] = useState(null);
@@ -23,18 +19,34 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
   const [plannedStartDate, setPlannedStartDate] = useState('');
   const [plannedEndDate, setPlannedEndDate] = useState('');
   const [remarks, setRemarks] = useState('');
-
-  // Statuses & Loading
-  const [loadingOBOMs, setLoadingOBOMs] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Initial load of eligible Order BOMs (RECEIVED_BY_FACTORY) and active Plants
+  // RTK Query Hooks
+  const { data: obomListData, isLoading: loadingOBOMs } = useGetOrderBOMsQuery(
+    { status: 'RECEIVED_BY_FACTORY', limit: 100 },
+    { skip: !isOpen }
+  );
+
+  const { data: plantListData } = useGetPlantsQuery(
+    { status: 'active' },
+    { skip: !isOpen }
+  );
+
+  const { data: selectedOBOMData, isFetching: loadingDetail } = useGetOrderBOMByIdQuery(
+    selectedOrderBOMId,
+    { skip: !selectedOrderBOMId || !isOpen }
+  );
+
+  const [createWorkOrder, { isLoading: submitting }] = useCreateWorkOrderMutation();
+
+  const orderBOMs = obomListData?.orderBOMs || [];
+  const plants = plantListData?.plants || [];
+
+  // 1. Initial reset & populate from initialOrderBOM if provided
   useEffect(() => {
     if (!isOpen) return;
     setError('');
-    setSelectedOrderBOMId('');
+    setSelectedOrderBOMId(initialOrderBOM?._id || '');
     setSelectedOrderBOM(null);
     setObomComponents([]);
     setProductionQuantity('');
@@ -42,33 +54,9 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
     setPlannedStartDate('');
     setPlannedEndDate('');
     setRemarks('');
-
-    setLoadingOBOMs(true);
-    Promise.all([
-      getOrderBOMs({ status: 'RECEIVED_BY_FACTORY', limit: 100 }),
-      getPlants({ status: 'active' }).catch(() => ({ plants: [] }))
-    ])
-      .then(([obomRes, plantRes]) => {
-        if (obomRes.success && Array.isArray(obomRes.orderBOMs)) {
-          setOrderBOMs(obomRes.orderBOMs);
-        }
-        if (plantRes.success && Array.isArray(plantRes.plants)) {
-          setPlants(plantRes.plants);
-        }
-
-        // If an initial Order BOM was passed (e.g. from Order BOM page)
-        if (initialOrderBOM && initialOrderBOM._id) {
-          setSelectedOrderBOMId(initialOrderBOM._id);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load eligible Order BOMs:', err);
-        setError('Failed to load Order BOMs from server');
-      })
-      .finally(() => setLoadingOBOMs(false));
   }, [isOpen, initialOrderBOM]);
 
-  // 2. When selected Order BOM changes, fetch its full detail & component snapshot
+  // 2. When selected Order BOM details arrive, populate state
   useEffect(() => {
     if (!selectedOrderBOMId) {
       setSelectedOrderBOM(null);
@@ -78,26 +66,16 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
       return;
     }
 
-    setLoadingDetail(true);
-    setError('');
-    getOrderBOMById(selectedOrderBOMId)
-      .then((res) => {
-        if (res.success && res.orderBOM) {
-          const obom = res.orderBOM;
-          setSelectedOrderBOM(obom);
-          setObomComponents(res.items || []);
-          setProductionQuantity(obom.orderQuantity || '');
-          if (obom.plant?._id || obom.plant) {
-            setSelectedPlantId(obom.plant._id || obom.plant);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load Order BOM details:', err);
-        setError(err.response?.data?.message || 'Failed to load details for selected Order BOM');
-      })
-      .finally(() => setLoadingDetail(false));
-  }, [selectedOrderBOMId]);
+    if (selectedOBOMData?.success && selectedOBOMData.orderBOM) {
+      const obom = selectedOBOMData.orderBOM;
+      setSelectedOrderBOM(obom);
+      setObomComponents(selectedOBOMData.items || []);
+      setProductionQuantity(obom.orderQuantity || '');
+      if (obom.plant?._id || obom.plant) {
+        setSelectedPlantId(obom.plant._id || obom.plant);
+      }
+    }
+  }, [selectedOrderBOMId, selectedOBOMData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -121,7 +99,6 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
       return;
     }
 
-    setSubmitting(true);
     setError('');
 
     const payload = {
@@ -136,21 +113,19 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
     };
 
     try {
-      const res = await createWorkOrder(payload);
-      if (res.success) {
-        onSuccess(res.workOrder);
+      const res = await createWorkOrder(payload).unwrap();
+      if (res.success || res.workOrder) {
+        onSuccess(res.workOrder || res);
       } else {
         setError(res.message || 'Failed to create Work Order');
       }
     } catch (err) {
       console.error('Create Work Order error:', err);
-      if (err.response?.status === 409) {
-        setError(err.response?.data?.message || `An active Work Order already exists for this Order BOM.`);
+      if (err.status === 409 || err.originalStatus === 409) {
+        setError(err.data?.message || `An active Work Order already exists for this Order BOM.`);
       } else {
-        setError(err.response?.data?.message || 'Server error creating Work Order');
+        setError(err.data?.message || 'Server error creating Work Order');
       }
-    } finally {
-      setSubmitting(false);
     }
   };
 

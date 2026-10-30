@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  createQuotation,
-  updateQuotation,
-  addQuotationItem,
-  updateQuotationItem,
-  deleteQuotationItem,
-  getQuotationById,
-} from '../../services/quotationService';
-import { getClients } from '../../services/clientService';
-import { getRequirements } from '../../services/requirementService';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
-import { getEmployees } from '../../services/employeeService';
-import { getTerms } from '../../services/termService';
+  useCreateQuotationMutation,
+  useUpdateQuotationMutation,
+  useAddQuotationItemMutation,
+  useUpdateQuotationItemMutation,
+  useDeleteQuotationItemMutation,
+  useGetQuotationByIdQuery,
+} from '../../features/quotations/quotationsApi';
+import { useLazyGetClientsQuery, useGetUOMsQuery, useGetTermsQuery } from '../../features/masterData/masterDataApi';
+import { useGetRequirementsQuery } from '../../features/requirements/requirementsApi';
+import { useGetProductsQuery } from '../../features/products/productsApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -24,19 +22,83 @@ import DrawingSelector from '../../components/drawing/DrawingSelector';
 const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, initialRequirement = null }) => {
   const isEdit = Boolean(quotation && quotation._id);
 
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [initialItemIds, setInitialItemIds] = useState([]);
 
-  // Master Data Options
-  const [clients, setClients] = useState([]);
-  const [requirements, setRequirements] = useState([]);
-  const [items, setItems] = useState([]);
-  const [uoms, setUoms] = useState([]);
-  const [salesPersons, setSalesPersons] = useState([]);
-  const [deliveryTermsList, setDeliveryTermsList] = useState([]);
-  const [paymentTermsList, setPaymentTermsList] = useState([]);
+  // RTK Query Master Data and Mutations
+  const { data: requirementsData, isLoading: loadingReqs } = useGetRequirementsQuery(
+    { all: true },
+    { skip: !isOpen }
+  );
+  const { data: itemsData, isLoading: loadingItems } = useGetProductsQuery(
+    { typeFilter: 'MASTER', all: true },
+    { skip: !isOpen }
+  );
+  const { data: uomsData, isLoading: loadingUoms } = useGetUOMsQuery(undefined, { skip: !isOpen });
+  const { data: employeesData, isLoading: loadingEmps } = useGetEmployeesQuery(
+    { all: true },
+    { skip: !isOpen }
+  );
+  const { data: termsData, isLoading: loadingTerms } = useGetTermsQuery(
+    { status: 'active' },
+    { skip: !isOpen }
+  );
+  const [triggerGetClients] = useLazyGetClientsQuery();
+
+  const { data: quotationDetailData, isLoading: loadingDetail } = useGetQuotationByIdQuery(quotation?._id, {
+    skip: !isOpen || !isEdit || !quotation?._id,
+  });
+
+  const [createQuotationMutation, { isLoading: creating }] = useCreateQuotationMutation();
+  const [updateQuotationMutation, { isLoading: updating }] = useUpdateQuotationMutation();
+  const [addQuotationItemMutation] = useAddQuotationItemMutation();
+  const [updateQuotationItemMutation] = useUpdateQuotationItemMutation();
+  const [deleteQuotationItemMutation] = useDeleteQuotationItemMutation();
+
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return u.startsWith('ITEM-WO-') || u.startsWith('ITEM-INV-') || u.startsWith('ITEM-OBOM-');
+  };
+
+  const requirements = useMemo(() => {
+    return (requirementsData?.requirements && Array.isArray(requirementsData.requirements))
+      ? requirementsData.requirements
+      : (Array.isArray(requirementsData) ? requirementsData : []);
+  }, [requirementsData]);
+
+  const items = useMemo(() => {
+    const list = (itemsData?.items && Array.isArray(itemsData.items))
+      ? itemsData.items
+      : (Array.isArray(itemsData?.data) ? itemsData.data : (Array.isArray(itemsData) ? itemsData : []));
+    return list.filter((i) => !isSystemCode(i.itemCode));
+  }, [itemsData]);
+
+  const uoms = useMemo(() => {
+    return (uomsData?.uoms && Array.isArray(uomsData.uoms))
+      ? uomsData.uoms
+      : (Array.isArray(uomsData?.data) ? uomsData.data : (Array.isArray(uomsData) ? uomsData : []));
+  }, [uomsData]);
+
+  const salesPersons = useMemo(() => {
+    return (employeesData?.employees && Array.isArray(employeesData.employees))
+      ? employeesData.employees
+      : (Array.isArray(employeesData?.data) ? employeesData.data : (Array.isArray(employeesData) ? employeesData : []));
+  }, [employeesData]);
+
+  const { deliveryTermsList, paymentTermsList } = useMemo(() => {
+    const allTerms = (termsData?.terms && Array.isArray(termsData.terms))
+      ? termsData.terms
+      : (Array.isArray(termsData?.data) ? termsData.data : (Array.isArray(termsData) ? termsData : []));
+    return {
+      deliveryTermsList: allTerms.filter((t) => t.termType === 'DELIVERY' && t.isActive !== false),
+      paymentTermsList: allTerms.filter((t) => t.termType === 'PAYMENT' && t.isActive !== false),
+    };
+  }, [termsData]);
+
+  const loading = loadingReqs || loadingItems || loadingUoms || loadingEmps || loadingTerms || (isEdit && loadingDetail);
+  const [customSubmitting, setCustomSubmitting] = useState(false);
+  const submitting = creating || updating || customSubmitting;
 
   // Initial Requirement Resolution
   const initialReqObj = typeof initialRequirement === 'object' ? initialRequirement : null;
@@ -246,182 +308,139 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     setLineItems(mappedLineItems);
   };
 
-  // Load Master Selectors on Mount
+  // Populate Edit Data or Default Terms
   useEffect(() => {
-    const loadMasters = async () => {
-      setLoading(true);
-      try {
-        const isSystemCode = (code) => {
-          if (!code) return false;
-          const u = String(code).toUpperCase();
-          return u.startsWith('ITEM-WO-') || u.startsWith('ITEM-INV-') || u.startsWith('ITEM-OBOM-');
-        };
+    if (!isOpen) return;
 
-        const [rRes, iRes, uRes, eRes, termsRes] = await Promise.all([
-          getRequirements().catch(() => ({ success: false, requirements: [] })),
-          getItems({ typeFilter: 'MASTER', all: true }).catch(() => ({ success: false, items: [] })),
-          getUOMs().catch(() => ({ success: false, uoms: [] })),
-          getEmployees({ all: true }).catch(() => ({ success: false, employees: [] })),
-          getTerms({ status: 'active' }).catch(() => ({ success: false, terms: [] })),
-        ]);
+    if (isEdit && quotationDetailData?.quotation) {
+      const q = quotationDetailData.quotation;
+      if (Array.isArray(quotationDetailData.items) && quotationDetailData.items.length > 0) {
+        setInitialItemIds(quotationDetailData.items.map((it) => it._id));
+        const loadedLineItems = quotationDetailData.items.map((it) => ({
+          _id: it._id,
+          item: it.item?._id || it.item || '',
+          itemCategory: it.itemCategory?._id || it.itemCategory || '',
+          description: it.description || '',
+          quantity: it.quantity || 1,
+          uom: it.uom?._id || it.uom || '',
+          unitPrice: it.unitPrice || 0,
+          hsnCode: it.hsnCode || '',
+          constructionType: it.constructionType || 'FLANGE',
+          flangeDesign: it.flangeDesign?._id || it.flangeDesign || null,
+          flangeDesignSnapshot: it.flangeDesignSnapshot || null,
+          filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
+          filterGradeName: it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.drawingSnapshot?.filterGradeName || '',
+          drawing: it.drawing?._id || it.drawing || null,
+          drawingSnapshot: it.drawingSnapshot || null,
+          dimensions: it.dimensions || {},
+          specifications: it.specifications || [],
+          faceVelocity: it.dimensions?.faceVelocity || '',
+          remarks: it.remarks || '',
+          guard: (it.guard || it.dimensions?.guard) ? {
+            hasGuard: Boolean(it.guard?.hasGuard ?? it.dimensions?.guard?.hasGuard ?? it.guard?.enabled ?? it.dimensions?.guard?.enabled),
+            material: it.guard?.material || it.dimensions?.guard?.material || 'SS304',
+            sides: it.guard?.sides || it.dimensions?.guard?.sides || 'One side',
+          } : {
+            hasGuard: false,
+            material: 'SS304',
+            sides: 'One side',
+          },
+        }));
+        setLineItems(loadedLineItems);
 
-        const reqsList = (rRes.success && Array.isArray(rRes.requirements)) ? rRes.requirements : [];
-        const itemsList = (iRes.success && Array.isArray(iRes.items)) ? iRes.items.filter((i) => !isSystemCode(i.itemCode)) : [];
-        const uomsList = (uRes.success && Array.isArray(uRes.uoms)) ? uRes.uoms : [];
-        const empList = (eRes.success && Array.isArray(eRes.employees)) ? eRes.employees : [];
+        const loadedSubtotal = loadedLineItems.reduce(
+          (sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+          0
+        );
+        const qDiscountAmount = q.discountAmount || 0;
+        const calcRate =
+          loadedSubtotal > 0 && qDiscountAmount > 0
+            ? Number(((qDiscountAmount / loadedSubtotal) * 100).toFixed(2))
+            : 0;
 
-        const allTerms = (termsRes.success && Array.isArray(termsRes.terms)) ? termsRes.terms : [];
-        const delivTerms = allTerms.filter((t) => t.termType === 'DELIVERY' && t.isActive !== false);
-        const payTerms = allTerms.filter((t) => t.termType === 'PAYMENT' && t.isActive !== false);
-
-        setRequirements(reqsList);
-        setItems(itemsList);
-        setUoms(uomsList);
-        setSalesPersons(empList);
-        setDeliveryTermsList(delivTerms);
-        setPaymentTermsList(payTerms);
-
-        // If Editing, load complete quotation detail with items
-        if (isEdit) {
-          const detailRes = await getQuotationById(quotation._id);
-          if (detailRes.success && detailRes.quotation) {
-            const q = detailRes.quotation;
-            if (Array.isArray(detailRes.items) && detailRes.items.length > 0) {
-              setInitialItemIds(detailRes.items.map((it) => it._id));
-              const loadedLineItems = detailRes.items.map((it) => ({
-                _id: it._id,
-                item: it.item?._id || it.item || '',
-                itemCategory: it.itemCategory?._id || it.itemCategory || '',
-                description: it.description || '',
-                quantity: it.quantity || 1,
-                uom: it.uom?._id || it.uom || '',
-                unitPrice: it.unitPrice || 0,
-                hsnCode: it.hsnCode || '',
-                constructionType: it.constructionType || 'FLANGE',
-                flangeDesign: it.flangeDesign?._id || it.flangeDesign || null,
-                flangeDesignSnapshot: it.flangeDesignSnapshot || null,
-                filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
-                filterGradeName: it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.drawingSnapshot?.filterGradeName || '',
-                drawing: it.drawing?._id || it.drawing || null,
-                drawingSnapshot: it.drawingSnapshot || null,
-                dimensions: it.dimensions || {},
-                specifications: it.specifications || [],
-                faceVelocity: it.dimensions?.faceVelocity || '',
-                remarks: it.remarks || '',
-                guard: (it.guard || it.dimensions?.guard) ? {
-                  hasGuard: Boolean(it.guard?.hasGuard ?? it.dimensions?.guard?.hasGuard ?? it.guard?.enabled ?? it.dimensions?.guard?.enabled),
-                  material: it.guard?.material || it.dimensions?.guard?.material || 'SS304',
-                  sides: it.guard?.sides || it.dimensions?.guard?.sides || 'One side',
-                } : {
-                  hasGuard: false,
-                  material: 'SS304',
-                  sides: 'One side',
-                },
-              }));
-              setLineItems(loadedLineItems);
-
-              const loadedSubtotal = loadedLineItems.reduce(
-                (sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
-                0
-              );
-              const qDiscountAmount = q.discountAmount || 0;
-              const calcRate =
-                loadedSubtotal > 0 && qDiscountAmount > 0
-                  ? Number(((qDiscountAmount / loadedSubtotal) * 100).toFixed(2))
-                  : 0;
-
-              setFormData({
-                client: q.client?._id || q.client || '',
-                clientName: q.client?.companyName || '',
-                clientCode: q.client?.clientCode || '',
-                requirement: q.requirement?._id || q.requirement || '',
-                quotationType: q.quotationType || 'domestic',
-                quotationCategory: q.quotationCategory || 'product',
-                attentionPerson: q.attentionPerson || '',
-                salesPerson: q.salesPerson?._id || q.salesPerson || '',
-                quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
-                validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
-                deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
-                nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
-                currency: q.currency || 'INR',
-                pfAmount: q.pfAmount || 0,
-                freightAmount: q.freightAmount || 0,
-                discountRate: calcRate,
-                taxName: q.taxName || 'GST',
-                taxRate: q.taxRate || 0,
-                paymentTerms: q.paymentTerms || '',
-                deliveryTerms: q.deliveryTerms || '',
-                generalTerms: q.generalTerms || '',
-                remarks: q.remarks || '',
-              });
-            } else {
-              setFormData({
-                client: q.client?._id || q.client || '',
-                clientName: q.client?.companyName || '',
-                clientCode: q.client?.clientCode || '',
-                requirement: q.requirement?._id || q.requirement || '',
-                quotationType: q.quotationType || 'domestic',
-                quotationCategory: q.quotationCategory || 'product',
-                attentionPerson: q.attentionPerson || '',
-                salesPerson: q.salesPerson?._id || q.salesPerson || '',
-                quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
-                validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
-                deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
-                nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
-                currency: q.currency || 'INR',
-                pfAmount: q.pfAmount || 0,
-                freightAmount: q.freightAmount || 0,
-                discountRate: 0,
-                taxName: q.taxName || 'GST',
-                taxRate: q.taxRate || 0,
-                paymentTerms: q.paymentTerms || '',
-                deliveryTerms: q.deliveryTerms || '',
-                generalTerms: q.generalTerms || '',
-                remarks: q.remarks || '',
-              });
-            }
-          }
-        } else {
-          // If creating a new quotation with a pre-selected requirement or initialRequirement
-          const targetReqId = initialReqId || formData.requirement;
-          const matchedReq = initialReqObj || reqsList.find((r) => r._id === targetReqId);
-          if (matchedReq) {
-            populateLineItemsFromRequirement(matchedReq, itemsList, uomsList);
-          }
-
-          // Automatically default terms from Terms Master if creating a new quotation
-          setFormData((prev) => ({
-            ...prev,
-            paymentTerms: prev.paymentTerms || (payTerms[0] ? (payTerms[0].description ? `${payTerms[0].termName} - ${payTerms[0].description}` : payTerms[0].termName) : ''),
-            deliveryTerms: prev.deliveryTerms || (delivTerms[0] ? (delivTerms[0].description ? `${delivTerms[0].termName} - ${delivTerms[0].description}` : delivTerms[0].termName) : ''),
-          }));
-        }
-      } catch (err) {
-        console.error('Failed to load master options for Quotation form:', err);
-        setError('Failed to load required master data');
-      } finally {
-        setLoading(false);
+        setFormData({
+          client: q.client?._id || q.client || '',
+          clientName: q.client?.companyName || '',
+          clientCode: q.client?.clientCode || '',
+          requirement: q.requirement?._id || q.requirement || '',
+          quotationType: q.quotationType || 'domestic',
+          quotationCategory: q.quotationCategory || 'product',
+          attentionPerson: q.attentionPerson || '',
+          salesPerson: q.salesPerson?._id || q.salesPerson || '',
+          quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
+          validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+          deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
+          nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
+          currency: q.currency || 'INR',
+          pfAmount: q.pfAmount || 0,
+          freightAmount: q.freightAmount || 0,
+          discountRate: calcRate,
+          taxName: q.taxName || 'GST',
+          taxRate: q.taxRate || 0,
+          paymentTerms: q.paymentTerms || '',
+          deliveryTerms: q.deliveryTerms || '',
+          generalTerms: q.generalTerms || '',
+          remarks: q.remarks || '',
+        });
+      } else {
+        setFormData({
+          client: q.client?._id || q.client || '',
+          clientName: q.client?.companyName || '',
+          clientCode: q.client?.clientCode || '',
+          requirement: q.requirement?._id || q.requirement || '',
+          quotationType: q.quotationType || 'domestic',
+          quotationCategory: q.quotationCategory || 'product',
+          attentionPerson: q.attentionPerson || '',
+          salesPerson: q.salesPerson?._id || q.salesPerson || '',
+          quotationDate: q.quotationDate ? new Date(q.quotationDate).toISOString().split('T')[0] : '',
+          validTill: q.validTill ? new Date(q.validTill).toISOString().split('T')[0] : '',
+          deadline: (q.deadline || q.validTill) ? new Date(q.deadline || q.validTill).toISOString().split('T')[0] : '',
+          nextFollowUpDate: (q.nextFollowUpDate || q.requirement?.followUpDate) ? new Date(q.nextFollowUpDate || q.requirement?.followUpDate).toISOString().split('T')[0] : '',
+          currency: q.currency || 'INR',
+          pfAmount: q.pfAmount || 0,
+          freightAmount: q.freightAmount || 0,
+          discountRate: 0,
+          taxName: q.taxName || 'GST',
+          taxRate: q.taxRate || 0,
+          paymentTerms: q.paymentTerms || '',
+          deliveryTerms: q.deliveryTerms || '',
+          generalTerms: q.generalTerms || '',
+          remarks: q.remarks || '',
+        });
       }
-    };
+    } else if (!isEdit) {
+      // If creating a new quotation with a pre-selected requirement or initialRequirement
+      const targetReqId = initialReqId || formData.requirement;
+      const matchedReq = initialReqObj || requirements.find((r) => r._id === targetReqId);
+      if (matchedReq) {
+        populateLineItemsFromRequirement(matchedReq, items, uoms);
+      }
 
-    if (isOpen) {
-      loadMasters();
+      // Automatically default terms from Terms Master if creating a new quotation
+      setFormData((prev) => ({
+        ...prev,
+        paymentTerms: prev.paymentTerms || (paymentTermsList[0] ? (paymentTermsList[0].description ? `${paymentTermsList[0].termName} - ${paymentTermsList[0].description}` : paymentTermsList[0].termName) : ''),
+        deliveryTerms: prev.deliveryTerms || (deliveryTermsList[0] ? (deliveryTermsList[0].description ? `${deliveryTermsList[0].termName} - ${deliveryTermsList[0].description}` : deliveryTermsList[0].termName) : ''),
+      }));
     }
-  }, [isOpen, isEdit, quotation?._id]);
+  }, [isOpen, isEdit, quotationDetailData, requirements, items, uoms, paymentTermsList, deliveryTermsList]);
 
   // Client Selection Async Handler
   const loadClientOptions = async (inputValue) => {
     try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
-      if (res.success && Array.isArray(res.clients)) {
-        return res.clients.map((c) => ({
-          value: c._id,
-          label: c.companyName,
-          secondaryLabel: c.clientCode,
-          contactPerson: c.contactPerson,
-        }));
-      }
-      return [];
+      const res = await triggerGetClients({
+        search: inputValue,
+        limit: 15,
+        status: 'active',
+        approvalStatus: 'APPROVED',
+      }).unwrap();
+      const clientList = res?.clients || res?.data || (Array.isArray(res) ? res : []);
+      return clientList.map((c) => ({
+        value: c._id,
+        label: c.companyName,
+        secondaryLabel: c.clientCode,
+        contactPerson: c.contactPerson,
+      }));
     } catch {
       return [];
     }
@@ -692,7 +711,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       }
     }
 
-    setSubmitting(true);
+    setCustomSubmitting(true);
     try {
       const lineItemsPayload = lineItems.map((item) => ({
         _id: item._id || undefined,
@@ -754,7 +773,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
       if (isEdit) {
         savedQuotationId = quotation._id;
-        await updateQuotation(savedQuotationId, headerPayload);
+        await updateQuotationMutation({ id: savedQuotationId, data: headerPayload }).unwrap();
 
         // Delete items that were removed in the UI form
         const currentFormIds = new Set(
@@ -762,7 +781,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         );
         for (const oldId of initialItemIds) {
           if (!currentFormIds.has(String(oldId))) {
-            await deleteQuotationItem(savedQuotationId, oldId).catch((err) =>
+            await deleteQuotationItemMutation({ id: savedQuotationId, itemId: oldId }).catch((err) =>
               console.error('Failed to delete quotation item:', err)
             );
           }
@@ -771,15 +790,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
         // Update existing items or add new items
         for (const item of lineItemsPayload) {
           if (item._id) {
-            await updateQuotationItem(savedQuotationId, item._id, item);
+            await updateQuotationItemMutation({ id: savedQuotationId, itemId: item._id, data: item }).unwrap();
           } else {
-            await addQuotationItem(savedQuotationId, item);
+            await addQuotationItemMutation({ id: savedQuotationId, data: item }).unwrap();
           }
         }
       } else {
         // Create Header and Line Items atomically
-        const createRes = await createQuotation(headerPayload);
-        if (!createRes.success || !createRes.quotation) {
+        const createRes = await createQuotationMutation(headerPayload).unwrap();
+        if (!createRes.success && !createRes.quotation && !createRes._id) {
           throw new Error(createRes.message || 'Failed to create quotation header');
         }
       }
@@ -787,9 +806,9 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       onSuccess();
     } catch (err) {
       console.error('Failed to save Quotation:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to save quotation');
+      setError(err?.data?.message || err.message || 'Failed to save quotation');
     } finally {
-      setSubmitting(false);
+      setCustomSubmitting(false);
     }
   };
 

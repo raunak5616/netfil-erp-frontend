@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getClients, approveOrRejectClient } from '../../services/clientService';
-import { getSuppliers, approveOrRejectSupplier } from '../../services/supplierService';
+import React, { useState, useMemo } from 'react';
+import { useGetClientsQuery, useApproveOrRejectClientMutation } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery, useApproveOrRejectSupplierMutation } from '../../features/suppliers/suppliersApi';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
 import Tabs from '../../components/ui/Tabs';
@@ -25,12 +25,35 @@ import {
 
 const AdminApprovals = () => {
   const [activeTab, setActiveTab] = useState('pending-parties');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const [parties, setParties] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const {
+    data: clientsData,
+    isLoading: clientsLoading,
+    error: clientsError,
+    refetch: refetchClients,
+  } = useGetClientsQuery({ approvalStatus: 'all', limit: 200 });
+
+  const {
+    data: suppliersData,
+    isLoading: suppliersLoading,
+    error: suppliersError,
+    refetch: refetchSuppliers,
+  } = useGetSuppliersQuery({ approvalStatus: 'all', limit: 200 });
+
+  const [approveOrRejectClientMutation] = useApproveOrRejectClientMutation();
+  const [approveOrRejectSupplierMutation] = useApproveOrRejectSupplierMutation();
+
+  const loading = clientsLoading || suppliersLoading;
+
+  const parties = useMemo(() => {
+    return clientsData?.clients || (Array.isArray(clientsData) ? clientsData : []);
+  }, [clientsData]);
+
+  const suppliers = useMemo(() => {
+    return suppliersData?.suppliers || (Array.isArray(suppliersData) ? suppliersData : []);
+  }, [suppliersData]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [masterTypeFilter, setMasterTypeFilter] = useState('all'); // for approved/rejected tabs: 'all' | 'party' | 'supplier'
@@ -43,34 +66,6 @@ const AdminApprovals = () => {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-
-  // Fetch all parties and suppliers
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [partyRes, supplierRes] = await Promise.all([
-        getClients({ approvalStatus: 'all', limit: 200 }).catch(() => ({ success: false, clients: [] })),
-        getSuppliers({ approvalStatus: 'all', limit: 200 }).catch(() => ({ success: false, suppliers: [] }))
-      ]);
-
-      if (partyRes.success && Array.isArray(partyRes.clients)) {
-        setParties(partyRes.clients);
-      }
-      if (supplierRes.success && Array.isArray(supplierRes.suppliers)) {
-        setSuppliers(supplierRes.suppliers);
-      }
-    } catch (err) {
-      console.error('Failed to load approval items:', err);
-      setError(err.response?.data?.message || 'Failed to fetch master records');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   // Format date helper
   const formatDate = (dateStr) => {
@@ -113,27 +108,17 @@ const AdminApprovals = () => {
     setSuccessMsg('');
     try {
       if (selectedRecord.masterType === 'party') {
-        const res = await approveOrRejectClient(selectedRecord._id, { action: 'APPROVE' });
-        if (res.success) {
-          setParties((prev) =>
-            prev.map((p) => (p._id === selectedRecord._id ? res.client : p))
-          );
-          setSuccessMsg(`Party "${selectedRecord.companyName}" (${selectedRecord.clientCode}) approved successfully.`);
-        }
+        await approveOrRejectClientMutation({ id: selectedRecord._id, action: 'APPROVE' }).unwrap();
+        setSuccessMsg(`Party "${selectedRecord.companyName}" (${selectedRecord.clientCode}) approved successfully.`);
       } else {
-        const res = await approveOrRejectSupplier(selectedRecord._id, { action: 'APPROVE' });
-        if (res.success) {
-          setSuppliers((prev) =>
-            prev.map((s) => (s._id === selectedRecord._id ? res.supplier : s))
-          );
-          setSuccessMsg(`Supplier "${selectedRecord.supplierName}" (${selectedRecord.supplierCode}) approved successfully.`);
-        }
+        await approveOrRejectSupplierMutation({ id: selectedRecord._id, action: 'APPROVE' }).unwrap();
+        setSuccessMsg(`Supplier "${selectedRecord.supplierName}" (${selectedRecord.supplierCode}) approved successfully.`);
       }
       setIsApproveOpen(false);
       setIsDetailOpen(false);
     } catch (err) {
       console.error('Approval failed:', err);
-      setError(err.response?.data?.message || 'Failed to approve record');
+      setError(err?.data?.message || err?.message || 'Failed to approve record');
     } finally {
       setActionLoading(false);
     }
@@ -151,34 +136,26 @@ const AdminApprovals = () => {
     setSuccessMsg('');
     try {
       if (selectedRecord.masterType === 'party') {
-        const res = await approveOrRejectClient(selectedRecord._id, {
+        await approveOrRejectClientMutation({
+          id: selectedRecord._id,
           action: 'REJECT',
           rejectionReason: rejectionReason.trim(),
-        });
-        if (res.success) {
-          setParties((prev) =>
-            prev.map((p) => (p._id === selectedRecord._id ? res.client : p))
-          );
-          setSuccessMsg(`Party "${selectedRecord.companyName}" (${selectedRecord.clientCode}) rejected.`);
-        }
+        }).unwrap();
+        setSuccessMsg(`Party "${selectedRecord.companyName}" (${selectedRecord.clientCode}) rejected.`);
       } else {
-        const res = await approveOrRejectSupplier(selectedRecord._id, {
+        await approveOrRejectSupplierMutation({
+          id: selectedRecord._id,
           action: 'REJECT',
           rejectionReason: rejectionReason.trim(),
-        });
-        if (res.success) {
-          setSuppliers((prev) =>
-            prev.map((s) => (s._id === selectedRecord._id ? res.supplier : s))
-          );
-          setSuccessMsg(`Supplier "${selectedRecord.supplierName}" (${selectedRecord.supplierCode}) rejected.`);
-        }
+        }).unwrap();
+        setSuccessMsg(`Supplier "${selectedRecord.supplierName}" (${selectedRecord.supplierCode}) rejected.`);
       }
       setIsRejectOpen(false);
       setRejectionReason('');
       setIsDetailOpen(false);
     } catch (err) {
       console.error('Rejection failed:', err);
-      setError(err.response?.data?.message || 'Failed to reject record');
+      setError(err?.data?.message || err?.message || 'Failed to reject record');
     } finally {
       setActionLoading(false);
     }
@@ -387,7 +364,16 @@ const AdminApprovals = () => {
           { label: 'Admin Approvals' },
         ]}
         actions={
-          <Button variant="secondary" size="sm" icon={RefreshCw} loading={loading} onClick={fetchData}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            loading={loading}
+            onClick={() => {
+              refetchClients();
+              refetchSuppliers();
+            }}
+          >
             Refresh
           </Button>
         }

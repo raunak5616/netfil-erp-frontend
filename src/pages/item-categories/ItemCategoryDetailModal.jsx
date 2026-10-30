@@ -1,23 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import { FormField, Select, Input } from '../../components/ui/FormField';
 import {
-  getCategorySpecifications,
-  assignCategorySpecification,
-  updateCategorySpecification,
-  removeCategorySpecification
-} from '../../services/itemCategoryService';
-import { getSpecifications } from '../../services/specificationService';
+  useGetCategorySpecificationsQuery,
+  useGetSpecificationsQuery,
+  useAssignCategorySpecificationMutation,
+  useUpdateCategorySpecificationMutation,
+  useRemoveCategorySpecificationMutation,
+} from '../../features/masterData/masterDataApi';
 import { Edit, Layers, Plus, Trash2, CheckCircle, Sliders } from 'lucide-react';
 
 const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit }) => {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'specifications'
-  const [categorySpecs, setCategorySpecs] = useState([]);
-  const [loadingSpecs, setLoadingSpecs] = useState(false);
-  const [masterSpecs, setMasterSpecs] = useState([]);
+
+  const {
+    data: categorySpecsData,
+    isLoading: loadingSpecs,
+  } = useGetCategorySpecificationsQuery(category?._id, { skip: !isOpen || !category?._id });
+
+  const {
+    data: masterSpecsData,
+  } = useGetSpecificationsQuery(undefined, { skip: !isOpen });
+
+  const [assignCategorySpecificationMutation] = useAssignCategorySpecificationMutation();
+  const [updateCategorySpecificationMutation] = useUpdateCategorySpecificationMutation();
+  const [removeCategorySpecificationMutation] = useRemoveCategorySpecificationMutation();
+
+  const categorySpecs = useMemo(() => {
+    return categorySpecsData?.specifications || (Array.isArray(categorySpecsData) ? categorySpecsData : []);
+  }, [categorySpecsData]);
+
+  const masterSpecs = useMemo(() => {
+    const list = masterSpecsData?.specifications || (Array.isArray(masterSpecsData) ? masterSpecsData : []);
+    return list.filter((s) => s.status === 'active');
+  }, [masterSpecsData]);
 
   // Add specification form state
   const [selectedSpecId, setSelectedSpecId] = useState('');
@@ -26,21 +45,6 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
-  const fetchCategorySpecs = async () => {
-    if (!category?._id) return;
-    setLoadingSpecs(true);
-    try {
-      const res = await getCategorySpecifications(category._id);
-      if (res.success && Array.isArray(res.specifications)) {
-        setCategorySpecs(res.specifications);
-      }
-    } catch (err) {
-      console.error("Failed to load Category Specifications:", err);
-    } finally {
-      setLoadingSpecs(false);
-    }
-  };
 
   useEffect(() => {
     if (!isOpen || !category) return;
@@ -51,17 +55,6 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
     setSelectedSpecId('');
     setIsRequired(false);
     setDisplayOrder(0);
-
-    fetchCategorySpecs();
-
-    // Fetch master specifications for assignment dropdown
-    getSpecifications()
-      .then((res) => {
-        if (res.success && Array.isArray(res.specifications)) {
-          setMasterSpecs(res.specifications.filter((s) => s.status === 'active'));
-        }
-      })
-      .catch(console.error);
   }, [category, isOpen]);
 
   if (!isOpen || !category) return null;
@@ -96,24 +89,20 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
     setSuccessMessage('');
 
     try {
-      const res = await assignCategorySpecification(category._id, {
+      await assignCategorySpecificationMutation({
+        categoryId: category._id,
         specificationId: selectedSpecId,
         required: isRequired,
-        displayOrder: Number(displayOrder) || 0
-      });
+        displayOrder: Number(displayOrder) || 0,
+      }).unwrap();
 
-      if (res.success) {
-        setSuccessMessage('Specification assigned to category!');
-        setSelectedSpecId('');
-        setIsRequired(false);
-        setDisplayOrder(0);
-        fetchCategorySpecs();
-      } else {
-        setErrorMessage(res.message || 'Failed to assign specification.');
-      }
+      setSuccessMessage('Specification assigned to category!');
+      setSelectedSpecId('');
+      setIsRequired(false);
+      setDisplayOrder(0);
     } catch (err) {
       console.error("Assign Specification error:", err);
-      setErrorMessage(err.response?.data?.message || 'Error assigning specification');
+      setErrorMessage(err?.data?.message || err?.message || 'Error assigning specification');
     } finally {
       setSubmitting(false);
     }
@@ -125,13 +114,13 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
     setSubmitting(true);
     setErrorMessage('');
     try {
-      const res = await removeCategorySpecification(category._id, specId);
-      if (res.success) {
-        fetchCategorySpecs();
-      }
+      await removeCategorySpecificationMutation({
+        categoryId: category._id,
+        specificationId: specId,
+      }).unwrap();
     } catch (err) {
       console.error("Remove Specification error:", err);
-      setErrorMessage(err.response?.data?.message || 'Error removing specification');
+      setErrorMessage(err?.data?.message || err?.message || 'Error removing specification');
     } finally {
       setSubmitting(false);
     }
@@ -140,11 +129,12 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
   const handleUpdateRequirement = async (cs, requiredVal) => {
     const specId = cs.specification?._id || cs.specification;
     try {
-      await updateCategorySpecification(category._id, specId, {
+      await updateCategorySpecificationMutation({
+        categoryId: category._id,
+        specificationId: specId,
         required: requiredVal,
-        displayOrder: cs.displayOrder
-      });
-      fetchCategorySpecs();
+        displayOrder: cs.displayOrder,
+      }).unwrap();
     } catch (err) {
       console.error("Update requirement error:", err);
     }

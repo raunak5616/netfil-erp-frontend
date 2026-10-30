@@ -3,21 +3,13 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Select, Textarea } from '../../components/ui/FormField';
-import { getSalesOrders, getSalesOrderById } from '../../services/salesOrderService';
-import { getBOMs, getBOMById } from '../../services/masterBomService';
-import { getStores } from '../../services/storeService';
-import { getPlants } from '../../services/plantService';
-import { createOrderBOM } from '../../services/orderBomService';
+import { useGetSalesOrdersQuery, useGetSalesOrderByIdQuery } from '../../features/salesOrders/salesOrdersApi';
+import { useGetMasterBOMsQuery, useGetMasterBOMByIdQuery, useCreateOrderBOMMutation } from '../../features/boms/bomsApi';
+import { useGetStoresQuery } from '../../features/stores/storesApi';
+import { useGetPlantsQuery } from '../../features/masterData/masterDataApi';
 import { Layers, Package, ShoppingCart, CheckCircle2, AlertTriangle, FileCheck } from 'lucide-react';
 
 const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
-  // Option lists
-  const [salesOrders, setSalesOrders] = useState([]);
-  const [soItems, setSoItems] = useState([]);
-  const [releasedBOMs, setReleasedBOMs] = useState([]);
-  const [stores, setStores] = useState([]);
-  const [plants, setPlants] = useState([]);
-
   // Form selections
   const [selectedSOId, setSelectedSOId] = useState('');
   const [selectedSOItemId, setSelectedSOItemId] = useState('');
@@ -29,16 +21,53 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
   // Loaded objects for display/preview
   const [selectedSOObj, setSelectedSOObj] = useState(null);
   const [selectedSOItem, setSelectedSOItem] = useState(null);
-  const [previewBOM, setPreviewBOM] = useState(null);
-
-  // Statuses & Loading
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [loadingSOItems, setLoadingSOItems] = useState(false);
-  const [loadingBOMs, setLoadingBOMs] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [soItems, setSoItems] = useState([]);
   const [error, setError] = useState('');
 
-  // 1. Initial load of sales orders, stores, and plants
+  // RTK Query Hooks
+  const { data: soListData, isLoading: loadingOrders } = useGetSalesOrdersQuery(
+    { limit: 100 },
+    { skip: !isOpen }
+  );
+
+  const { data: storeListData } = useGetStoresQuery(
+    { status: 'active' },
+    { skip: !isOpen }
+  );
+
+  const { data: plantListData } = useGetPlantsQuery(
+    { status: 'active' },
+    { skip: !isOpen }
+  );
+
+  const { data: selectedSOData, isLoading: loadingSOItems } = useGetSalesOrderByIdQuery(
+    selectedSOId,
+    { skip: !selectedSOId || !isOpen }
+  );
+
+  const parentItemId = selectedSOItem?.item?._id || selectedSOItem?.item || '';
+
+  const { data: releasedBOMsData, isLoading: loadingBOMs } = useGetMasterBOMsQuery(
+    { parentItem: parentItemId, status: 'released' },
+    { skip: !parentItemId || !isOpen }
+  );
+
+  const { data: previewBOMData } = useGetMasterBOMByIdQuery(
+    selectedMasterBOMId,
+    { skip: !selectedMasterBOMId || !isOpen }
+  );
+
+  const [createOrderBOM, { isLoading: submitting }] = useCreateOrderBOMMutation();
+
+  const salesOrders = (soListData?.salesOrders || []).filter(
+    (s) => s.status !== 'cancelled' && s.status !== 'draft'
+  );
+  const stores = storeListData?.stores || [];
+  const plants = plantListData?.plants || [];
+  const releasedBOMs = releasedBOMsData?.boms || [];
+  const previewBOM = previewBOMData || null;
+
+  // 1. Initial reset on open
   useEffect(() => {
     if (!isOpen) return;
     setError('');
@@ -49,136 +78,50 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
     setSelectedPlantId('');
     setRemarks('');
     setSoItems([]);
-    setReleasedBOMs([]);
     setSelectedSOObj(null);
     setSelectedSOItem(null);
-    setPreviewBOM(null);
-
-    setLoadingOrders(true);
-    Promise.all([
-      getSalesOrders({ limit: 100 }),
-      getStores({ status: 'active' }).catch(() => ({ stores: [] })),
-      getPlants({ status: 'active' }).catch(() => ({ plants: [] }))
-    ])
-      .then(([soRes, storeRes, plantRes]) => {
-        if (soRes.success && Array.isArray(soRes.salesOrders)) {
-          // Filter active sales orders (confirmed or in_progress or approved)
-          const eligible = soRes.salesOrders.filter((s) => s.status !== 'cancelled' && s.status !== 'draft');
-          setSalesOrders(eligible.length > 0 ? eligible : soRes.salesOrders);
-        }
-        if (storeRes.success && Array.isArray(storeRes.stores)) {
-          setStores(storeRes.stores);
-        }
-        if (plantRes.success && Array.isArray(plantRes.plants)) {
-          setPlants(plantRes.plants);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load sales orders:', err);
-        setError('Failed to load Sales Orders from server');
-      })
-      .finally(() => setLoadingOrders(false));
   }, [isOpen]);
 
-  // 2. When Sales Order selection changes, fetch its line items
+  // 2. When Sales Order data arrives, set items
   useEffect(() => {
     if (!selectedSOId) {
       setSoItems([]);
       setSelectedSOItemId('');
       setSelectedSOObj(null);
       setSelectedSOItem(null);
-      setReleasedBOMs([]);
       setSelectedMasterBOMId('');
-      setPreviewBOM(null);
       return;
     }
 
-    setLoadingSOItems(true);
-    setError('');
-    getSalesOrderById(selectedSOId)
-      .then((res) => {
-        if (res.success && res.salesOrder) {
-          setSelectedSOObj(res.salesOrder);
-          const itemsList = res.salesOrder.items || res.items || [];
-          setSoItems(itemsList);
-          setSelectedSOItemId('');
-          setSelectedSOItem(null);
-          setReleasedBOMs([]);
-          setSelectedMasterBOMId('');
-          setPreviewBOM(null);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load Sales Order Items:', err);
-        setError(err.response?.data?.message || 'Failed to load items for selected Sales Order');
-      })
-      .finally(() => setLoadingSOItems(false));
-  }, [selectedSOId]);
+    if (selectedSOData?.success && selectedSOData.salesOrder) {
+      setSelectedSOObj(selectedSOData.salesOrder);
+      const itemsList = selectedSOData.salesOrder.items || selectedSOData.items || [];
+      setSoItems(itemsList);
+      setSelectedSOItemId('');
+      setSelectedSOItem(null);
+      setSelectedMasterBOMId('');
+    }
+  }, [selectedSOId, selectedSOData]);
 
-  // 3. When Sales Order Item changes, resolve parent item & released Master BOMs
+  // 3. When Sales Order Item changes, resolve selectedSOItem and auto-select released Master BOM
   useEffect(() => {
     if (!selectedSOItemId) {
       setSelectedSOItem(null);
-      setReleasedBOMs([]);
       setSelectedMasterBOMId('');
-      setPreviewBOM(null);
       return;
     }
 
     const itemObj = soItems.find((i) => i._id === selectedSOItemId);
     setSelectedSOItem(itemObj || null);
-
-    const parentItemId = itemObj?.item?._id || itemObj?.item;
-    if (!parentItemId) {
-      setError('Selected Sales Order Item has no associated parent Item ID');
-      setReleasedBOMs([]);
-      setSelectedMasterBOMId('');
-      setPreviewBOM(null);
-      return;
-    }
-
-    setLoadingBOMs(true);
-    setError('');
-    getBOMs({ parentItem: parentItemId, status: 'released' })
-      .then((res) => {
-        if (res.success && Array.isArray(res.boms)) {
-          setReleasedBOMs(res.boms);
-          if (res.boms.length > 0) {
-            // Auto-select latest released Master BOM
-            setSelectedMasterBOMId(res.boms[0]._id);
-          } else {
-            setSelectedMasterBOMId('');
-            setPreviewBOM(null);
-            setError('No released Master BOM found for this finished item. A released Master BOM is required to create an Order BOM.');
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load released Master BOMs:', err);
-        setError(err.response?.data?.message || 'Error fetching Master BOM for item');
-      })
-      .finally(() => setLoadingBOMs(false));
   }, [selectedSOItemId, soItems]);
 
-  // 4. When selected Master BOM changes, fetch preview component items
   useEffect(() => {
-    if (!selectedMasterBOMId) {
-      setPreviewBOM(null);
-      return;
+    if (releasedBOMs.length > 0) {
+      setSelectedMasterBOMId(releasedBOMs[0]._id);
+    } else if (parentItemId) {
+      setSelectedMasterBOMId('');
     }
-
-    getBOMById(selectedMasterBOMId)
-      .then((res) => {
-        if (res.success && res.bom) {
-          setPreviewBOM(res);
-        } else if (res.success) {
-          setPreviewBOM(res);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load Master BOM preview details:', err);
-      });
-  }, [selectedMasterBOMId]);
+  }, [releasedBOMs, parentItemId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -191,7 +134,6 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
       return;
     }
 
-    setSubmitting(true);
     setError('');
 
     const payload = {
@@ -204,21 +146,19 @@ const OrderBOMCreateModal = ({ isOpen, onClose, onSuccess }) => {
     };
 
     try {
-      const res = await createOrderBOM(payload);
-      if (res.success) {
-        onSuccess(res.orderBOM);
+      const res = await createOrderBOM(payload).unwrap();
+      if (res.success || res.orderBOM) {
+        onSuccess(res.orderBOM || res);
       } else {
         setError(res.message || 'Failed to create Order BOM');
       }
     } catch (err) {
       console.error('Create Order BOM error:', err);
-      if (err.response?.status === 409) {
-        setError(err.response?.data?.message || 'An active Order BOM already exists for this Sales Order item.');
+      if (err.status === 409 || err.originalStatus === 409) {
+        setError(err.data?.message || 'An active Order BOM already exists for this Sales Order item.');
       } else {
-        setError(err.response?.data?.message || 'Server error creating Order BOM');
+        setError(err.data?.message || 'Server error creating Order BOM');
       }
-    } finally {
-      setSubmitting(false);
     }
   };
 

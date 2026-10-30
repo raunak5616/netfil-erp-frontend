@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getFilterGrades, updateFilterGradeStatus, deleteFilterGrade } from '../../services/filterGradeService';
+import React, { useState, useMemo } from 'react';
+import { 
+  useGetFilterGradesQuery, 
+  useUpdateFilterGradeStatusMutation, 
+  useDeleteFilterGradeMutation 
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -30,8 +34,12 @@ const FilterGradeList = () => {
   const canChangeStatus = hasPermission('FILTER_GRADE_STATUS');
   const canDelete = hasPermission('FILTER_GRADE_DELETE') || hasPermission('FILTER_GRADE_EDIT');
 
-  const [grades, setGrades] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: gradesData, isLoading: loading, error: queryError, refetch } = useGetFilterGradesQuery();
+  const [updateFilterGradeStatusMutation] = useUpdateFilterGradeStatusMutation();
+  const [deleteFilterGradeMutation] = useDeleteFilterGradeMutation();
+
+  const grades = gradesData?.filterGrades || [];
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -48,28 +56,6 @@ const FilterGradeList = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [gradeToDelete, setGradeToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  const fetchGrades = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getFilterGrades();
-      if (data.success && Array.isArray(data.filterGrades)) {
-        setGrades(data.filterGrades);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch filter grades:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchGrades();
-  }, []);
 
   const filteredGrades = useMemo(() => {
     const list = grades.filter((grade) => {
@@ -95,10 +81,9 @@ const FilterGradeList = () => {
   const toggleStatus = async (grade) => {
     try {
       const newStatus = grade.status === 'active' ? 'inactive' : 'active';
-      await updateFilterGradeStatus(grade._id, newStatus);
-      fetchGrades();
+      await updateFilterGradeStatusMutation({ id: grade._id, status: newStatus }).unwrap();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update status');
+      setError(err?.data?.message || err?.message || 'Failed to update status');
     }
   };
 
@@ -115,19 +100,13 @@ const FilterGradeList = () => {
     setError('');
     setSuccessMessage('');
     try {
-      const res = await deleteFilterGrade(gradeToDelete._id);
-      if (res.success) {
-        setSuccessMessage(res.message || `Filter Grade "${gradeToDelete.filterGrade}" deleted successfully.`);
-        setIsDeleteDialogOpen(false);
-        setGradeToDelete(null);
-        await fetchGrades();
-      } else {
-        setError(res.message || 'Failed to delete filter grade');
-        setIsDeleteDialogOpen(false);
-      }
+      const res = await deleteFilterGradeMutation(gradeToDelete._id).unwrap();
+      setSuccessMessage(res?.message || `Filter Grade "${gradeToDelete.filterGrade}" deleted successfully.`);
+      setIsDeleteDialogOpen(false);
+      setGradeToDelete(null);
     } catch (err) {
       console.error("Failed to delete filter grade:", err);
-      setError(err.response?.data?.message || err.message || 'Failed to delete filter grade');
+      setError(err?.data?.message || err?.message || 'Failed to delete filter grade');
       setIsDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);
@@ -239,7 +218,7 @@ const FilterGradeList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchGrades}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -309,7 +288,7 @@ const FilterGradeList = () => {
         gradeData={editingGrade}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchGrades}
+        onSuccess={refetch}
       />
 
       <FilterGradeDetail
@@ -320,7 +299,7 @@ const FilterGradeList = () => {
           setEditingGrade(gd);
           setIsFormOpen(true);
         }}
-        onSuccess={fetchGrades}
+        onSuccess={refetch}
         canEdit={canEdit}
         canDelete={canDelete}
       />

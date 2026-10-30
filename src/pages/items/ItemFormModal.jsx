@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  createItem, 
-  updateItem, 
-  getItemSpecifications, 
-  assignItemSpecification, 
-  updateItemSpecification, 
-  removeItemSpecification,
-  uploadItemImage,
-  removeItemImage
-} from '../../services/itemService';
-import { getItemGroups } from '../../services/itemGroupService';
-import { getItemCategories, getCategorySpecifications } from '../../services/itemCategoryService';
-import { getFilterGrades } from '../../services/filterGradeService';
-import { getUOMs } from '../../services/uomService';
-import { getBins } from '../../services/binService';
+import {
+  useCreateItemMutation,
+  useUpdateItemMutation,
+  useGetItemSpecificationsQuery,
+  useAssignItemSpecificationMutation,
+  useUpdateItemSpecificationMutation,
+  useUploadItemImageMutation,
+  useRemoveItemImageMutation,
+} from '../../features/products/productsApi';
+import {
+  useGetItemGroupsQuery,
+  useGetItemCategoriesQuery,
+  useGetCategorySpecificationsQuery,
+  useGetUOMsQuery,
+  useGetFilterGradesQuery,
+} from '../../features/masterData/masterDataApi';
+import { useGetBinsQuery } from '../../features/stores/storesApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -118,77 +120,127 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   // Specification state: map of specId -> { value, isApply, isFix, existingSpecId }
   const [specsData, setSpecsData] = useState({});
 
-  // Options master data lists
-  const [itemGroups, setItemGroups] = useState([]);
-  const [itemCategories, setItemCategories] = useState([]);
-  const [uoms, setUoms] = useState([]);
-  const [bins, setBins] = useState([]);
-  const [filterGrades, setFilterGrades] = useState([]);
-  const [categorySpecs, setCategorySpecs] = useState([]);
+  // RTK Query Master Data
+  const { data: groupsRes, isLoading: loadingGroups } = useGetItemGroupsQuery({ typeFilter: 'MASTER' }, { skip: !isOpen });
+  const { data: catsRes, isLoading: loadingCats } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' }, { skip: !isOpen });
+  const { data: uomsRes, isLoading: loadingUoms } = useGetUOMsQuery({}, { skip: !isOpen });
+  const { data: binsRes, isLoading: loadingBins } = useGetBinsQuery({}, { skip: !isOpen });
+  const { data: fgsRes, isLoading: loadingFgs } = useGetFilterGradesQuery({}, { skip: !isOpen });
 
-  const [loadingData, setLoadingData] = useState(false);
+  const isSystemCode = (code) => {
+    if (!code) return false;
+    const u = String(code).toUpperCase();
+    return (
+      u.startsWith('CAT-WO-') ||
+      u === 'CAT-INV' ||
+      u === 'CAT-OBOM' ||
+      u.startsWith('GP-WO-') ||
+      u === 'GP-INV' ||
+      u === 'GP-OBOM'
+    );
+  };
+
+  const itemGroups = useMemo(() => {
+    const raw = groupsRes?.itemGroups || groupsRes?.groups || [];
+    return Array.isArray(raw) ? raw.filter((g) => g.status === 'active' && !isSystemCode(g.groupCode)) : [];
+  }, [groupsRes]);
+
+  const itemCategories = useMemo(() => {
+    const raw = catsRes?.itemCategories || catsRes?.categories || [];
+    return Array.isArray(raw) ? raw.filter((c) => c.status === 'active' && !isSystemCode(c.categoryCode)) : [];
+  }, [catsRes]);
+
+  const uoms = useMemo(() => {
+    const raw = uomsRes?.uoms || [];
+    return Array.isArray(raw) ? raw.filter((u) => u.status === 'active') : [];
+  }, [uomsRes]);
+
+  const bins = useMemo(() => {
+    const raw = binsRes?.bins || [];
+    return Array.isArray(raw) ? raw.filter((b) => b.status === 'active') : [];
+  }, [binsRes]);
+
+  const filterGrades = useMemo(() => {
+    const raw = fgsRes?.filterGrades || [];
+    return Array.isArray(raw) ? raw.filter((f) => f.status === 'active') : [];
+  }, [fgsRes]);
+
+  const loadingData = loadingGroups || loadingCats || loadingUoms || loadingBins || loadingFgs;
+
+  // RTK Query Mutations
+  const [createItemMutation] = useCreateItemMutation();
+  const [updateItemMutation] = useUpdateItemMutation();
+  const [uploadItemImageMutation] = useUploadItemImageMutation();
+  const [removeItemImageMutation] = useRemoveItemImageMutation();
+  const [assignItemSpecMutation] = useAssignItemSpecificationMutation();
+  const [updateItemSpecMutation] = useUpdateItemSpecificationMutation();
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showAdvancedInventory, setShowAdvancedInventory] = useState(false);
 
-  // Fetch dropdown master records when modal opens
-  useEffect(() => {
-    if (!isOpen) return;
+  // Category specifications via RTK Query
+  const { data: catSpecsRes } = useGetCategorySpecificationsQuery(formData.itemCategory, {
+    skip: !formData.itemCategory,
+  });
 
-    const fetchMasterData = async () => {
-      setLoadingData(true);
-      setErrorMessage('');
-      try {
-        const isSystemCode = (code) => {
-          if (!code) return false;
-          const u = String(code).toUpperCase();
-          return (
-            u.startsWith('CAT-WO-') ||
-            u === 'CAT-INV' ||
-            u === 'CAT-OBOM' ||
-            u.startsWith('GP-WO-') ||
-            u === 'GP-INV' ||
-            u === 'GP-OBOM'
-          );
+  const categorySpecs = useMemo(() => {
+    if (!catSpecsRes?.specifications || !Array.isArray(catSpecsRes.specifications)) return [];
+    const specs = catSpecsRes.specifications
+      .map((cs) => {
+        if (!cs.specification) return null;
+        return {
+          ...cs.specification,
+          isRequiredCategorySpec: !!cs.required,
+          categoryDisplayOrder: cs.displayOrder ?? 0,
         };
+      })
+      .filter(Boolean);
+    specs.sort((a, b) => a.categoryDisplayOrder - b.categoryDisplayOrder);
+    return specs;
+  }, [catSpecsRes]);
 
-        const [groupRes, catRes, uomRes, binRes, fgRes] = await Promise.all([
-          getItemGroups({ typeFilter: 'MASTER' }),
-          getItemCategories({ typeFilter: 'MASTER' }),
-          getUOMs(),
-          getBins().catch(() => ({ success: true, bins: [] })), // Graceful fallback if bins list empty
-          getFilterGrades().catch(() => ({ success: true, filterGrades: [] }))
-        ]);
+  // Item specifications via RTK Query
+  const { data: itemSpecsData } = useGetItemSpecificationsQuery(item?._id, {
+    skip: !item?._id || !isOpen,
+  });
 
-        const groupsArray = groupRes.itemGroups || groupRes.groups;
-        if (groupRes.success && Array.isArray(groupsArray)) {
-          setItemGroups(groupsArray.filter((g) => g.status === 'active' && !isSystemCode(g.groupCode)));
-        }
-        const categoriesArray = catRes.itemCategories || catRes.categories;
-        if (catRes.success && Array.isArray(categoriesArray)) {
-          setItemCategories(categoriesArray.filter((c) => c.status === 'active' && !isSystemCode(c.categoryCode)));
-        }
-        if (uomRes.success && Array.isArray(uomRes.uoms)) {
-          setUoms(uomRes.uoms.filter((u) => u.status === 'active'));
-        }
-        if (binRes.success && Array.isArray(binRes.bins)) {
-          setBins(binRes.bins.filter((b) => b.status === 'active'));
-        }
-        if (fgRes.success && Array.isArray(fgRes.filterGrades)) {
-          setFilterGrades(fgRes.filterGrades.filter((f) => f.status === 'active'));
-        }
-      } catch (err) {
-        console.error("Failed to load Item master option lists:", err);
-        setErrorMessage("Could not load Item master options. Please try again.");
-      } finally {
-        setLoadingData(false);
-      }
-    };
+  useEffect(() => {
+    if (itemSpecsData?.specifications && Array.isArray(itemSpecsData.specifications)) {
+      const map = {};
+      let specLength = '';
+      let specWidth = '';
+      let specDepth = '';
 
-    fetchMasterData();
+      itemSpecsData.specifications.forEach((s) => {
+        const specId = s.specification?._id || s.specification;
+        const code = (s.specification?.specificationCode || '').toUpperCase().trim();
+        const name = (s.specification?.specificationName || '').toUpperCase().trim();
+        if (code === 'SPEC-LENGTH-01' || name === 'LENGTH') specLength = s.value;
+        if (code === 'SPEC-WIDTH-01' || name === 'WIDTH') specWidth = s.value;
+        if (code === 'DEPTH' || name === 'DEPTH') specDepth = s.value;
 
-    // Populate form data
+        map[specId] = {
+          value: s.value,
+          isApply: s.isApply || false,
+          isFix: s.isFix || false,
+          isExisting: true,
+        };
+      });
+      setSpecsData(map);
+
+      setFormData((prev) => ({
+        ...prev,
+        filterLength: prev.filterLength !== '' ? prev.filterLength : (specLength || ''),
+        filterWidth: prev.filterWidth !== '' ? prev.filterWidth : (specWidth || ''),
+        filterDepth: prev.filterDepth !== '' ? prev.filterDepth : (specDepth || ''),
+      }));
+    }
+  }, [itemSpecsData]);
+
+  // Populate form data
+  useEffect(() => {
     if (item) {
       let initialConstruction = item.constructionType || '';
       if (!initialConstruction && (item.productType === 'FILTER' || (!item.productType && item.filterGrade))) {
@@ -262,40 +314,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       setFilterType(item.filterType || '');
       setImageError('');
 
-      // Load existing item specification values
-      getItemSpecifications(item._id).then((specRes) => {
-        if (specRes.success && Array.isArray(specRes.specifications)) {
-          const map = {};
-          let specLength = '';
-          let specWidth = '';
-          let specDepth = '';
-
-          specRes.specifications.forEach((s) => {
-            const specId = s.specification?._id || s.specification;
-            const code = (s.specification?.specificationCode || '').toUpperCase().trim();
-            const name = (s.specification?.specificationName || '').toUpperCase().trim();
-            if (code === 'SPEC-LENGTH-01' || name === 'LENGTH') specLength = s.value;
-            if (code === 'SPEC-WIDTH-01' || name === 'WIDTH') specWidth = s.value;
-            if (code === 'DEPTH' || name === 'DEPTH') specDepth = s.value;
-
-            map[specId] = {
-              value: s.value,
-              isApply: s.isApply || false,
-              isFix: s.isFix || false,
-              isExisting: true
-            };
-          });
-          setSpecsData(map);
-
-          setFormData((prev) => ({
-            ...prev,
-            filterLength: prev.filterLength !== '' ? prev.filterLength : (specLength || ''),
-            filterWidth: prev.filterWidth !== '' ? prev.filterWidth : (specWidth || ''),
-            filterDepth: prev.filterDepth !== '' ? prev.filterDepth : (specDepth || '')
-          }));
-        }
-      }).catch(console.error);
-
     } else {
       const pType = initialProductType || 'RAW_ITEM';
       setFormData({
@@ -346,38 +364,6 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
     setErrorMessage('');
     setSuccessMessage('');
   }, [item, isOpen, initialProductType]);
-
-  // Load category specifications when selected category changes
-  useEffect(() => {
-    if (!formData.itemCategory) {
-      setCategorySpecs([]);
-      return;
-    }
-
-    getCategorySpecifications(formData.itemCategory)
-      .then((res) => {
-        if (res.success && Array.isArray(res.specifications)) {
-          // Preserve required and displayOrder from CategorySpecification wrapper
-          const specs = res.specifications
-            .map((cs) => {
-              if (!cs.specification) return null;
-              return {
-                ...cs.specification,
-                isRequiredCategorySpec: !!cs.required,
-                categoryDisplayOrder: cs.displayOrder ?? 0,
-              };
-            })
-            .filter(Boolean);
-
-          // Sort by categoryDisplayOrder
-          specs.sort((a, b) => a.categoryDisplayOrder - b.categoryDisplayOrder);
-          setCategorySpecs(specs);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load Category Specifications:", err);
-      });
-  }, [formData.itemCategory]);
 
   // For edit mode: derive filterType if not set on item
   useEffect(() => {
@@ -592,19 +578,19 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       const uploadData = new FormData();
       uploadData.append('image', file);
 
-      const res = await uploadItemImage(uploadData, item?._id || null);
-      if (res.success && res.imageUrl) {
+      const res = await uploadItemImageMutation({ id: item?._id || null, formData: uploadData }).unwrap();
+      if (res?.imageUrl) {
         setFormData((prev) => ({
           ...prev,
           imageUrl: res.imageUrl,
           imagePublicId: res.imagePublicId || '',
         }));
       } else {
-        setImageError(res.message || 'Failed to upload image.');
+        setImageError(res?.message || 'Failed to upload image.');
       }
     } catch (err) {
       console.error('Item image upload error:', err);
-      setImageError(err.response?.data?.message || err.message || 'Image upload failed.');
+      setImageError(err?.data?.message || err.message || 'Image upload failed.');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -614,7 +600,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
   const handleRemoveImage = async () => {
     if (isEditMode && item?._id && formData.imagePublicId) {
       try {
-        await removeItemImage(item._id);
+        await removeItemImageMutation(item._id).unwrap();
       } catch (err) {
         console.warn('Could not remove remote image asset:', err);
       }
@@ -856,15 +842,11 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
 
       let savedItem;
       if (isEditMode) {
-        const res = await updateItem(item._id, submitPayload);
-        if (res.success) {
-          savedItem = res.item;
-        }
+        const res = await updateItemMutation({ id: item._id, ...submitPayload }).unwrap();
+        savedItem = res.item || res;
       } else {
-        const res = await createItem(submitPayload);
-        if (res.success) {
-          savedItem = res.item;
-        }
+        const res = await createItemMutation(submitPayload).unwrap();
+        savedItem = res.item || res;
       }
 
       // Build effective specs to save
@@ -898,23 +880,31 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       }
 
       // Save specification values for the item
-      if (savedItem && savedItem._id) {
+      const targetItemId = savedItem?._id || item?._id;
+      if (targetItemId) {
         for (const [specId, specVal] of Object.entries(effectiveSpecs)) {
           if (specVal.value !== undefined && specVal.value !== null && specVal.value !== '') {
             try {
               if (specVal.isExisting) {
-                await updateItemSpecification(savedItem._id, specId, {
-                  value: specVal.value,
-                  isApply: !!specVal.isApply,
-                  isFix: !!specVal.isFix,
-                });
-              } else {
-                await assignItemSpecification(savedItem._id, {
+                await updateItemSpecMutation({
+                  itemId: targetItemId,
                   specificationId: specId,
-                  value: specVal.value,
-                  isApply: !!specVal.isApply,
-                  isFix: !!specVal.isFix,
-                });
+                  specData: {
+                    value: specVal.value,
+                    isApply: !!specVal.isApply,
+                    isFix: !!specVal.isFix,
+                  },
+                }).unwrap();
+              } else {
+                await assignItemSpecMutation({
+                  itemId: targetItemId,
+                  specData: {
+                    specificationId: specId,
+                    value: specVal.value,
+                    isApply: !!specVal.isApply,
+                    isFix: !!specVal.isFix,
+                  },
+                }).unwrap();
               }
             } catch (specErr) {
               console.error(`Error saving spec ${specId}:`, specErr);
@@ -930,7 +920,7 @@ const ItemFormModal = ({ item, isOpen, onClose, onSuccess, initialProductType = 
       }, 800);
 
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save Item record.';
+      const apiMsg = err.data?.message || err.response?.data?.message || err.message || 'Failed to save Item record.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

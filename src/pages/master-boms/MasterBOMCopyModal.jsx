@@ -3,41 +3,27 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Select, Textarea, FormField } from '../../components/ui/FormField';
-import { getItems } from '../../services/itemService';
-import { copyBOM } from '../../services/masterBomService';
+import { useGetProductsQuery } from '../../features/products/productsApi';
+import { useCopyMasterBOMMutation } from '../../features/boms/bomsApi';
 import { Copy, Layers, AlertCircle } from 'lucide-react';
 
 const MasterBOMCopyModal = ({ isOpen, bom, onClose, onSuccess }) => {
-  const [items, setItems] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(true);
-
   const [targetParentItem, setTargetParentItem] = useState('');
   const [description, setDescription] = useState('');
-
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const { data: itemData, isLoading: loadingItems } = useGetProductsQuery(
+    { all: true },
+    { skip: !isOpen }
+  );
+
+  const [copyMasterBOM, { isLoading: submitting }] = useCopyMasterBOMMutation();
+
+  const items = (itemData?.items || itemData?.products || []).filter(i => i.status === 'active');
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const fetchItems = async () => {
-      setLoadingItems(true);
-      setError('');
-      try {
-        const res = await getItems({ all: true });
-        if (res.success && Array.isArray(res.items)) {
-          // Filter active items
-          setItems(res.items.filter(i => i.status === 'active'));
-        }
-      } catch (err) {
-        console.error('Failed to load items:', err);
-        setError('Failed to fetch item master list.');
-      } finally {
-        setLoadingItems(false);
-      }
-    };
-
-    fetchItems();
+    setError('');
 
     if (bom) {
       const parentId = typeof bom.parentItem === 'object' ? bom.parentItem?._id : bom.parentItem;
@@ -50,7 +36,6 @@ const MasterBOMCopyModal = ({ isOpen, bom, onClose, onSuccess }) => {
     e.preventDefault();
     if (!bom) return;
 
-    setSubmitting(true);
     setError('');
     try {
       const payload = {
@@ -58,17 +43,15 @@ const MasterBOMCopyModal = ({ isOpen, bom, onClose, onSuccess }) => {
         description: description.trim()
       };
 
-      const res = await copyBOM(bom._id, payload);
-      if (res.success) {
-        onSuccess(res.bom);
+      const res = await copyMasterBOM({ id: bom._id, data: payload }).unwrap();
+      if (res.success || res.bom) {
+        onSuccess(res.bom || res);
       } else {
         setError(res.message || 'Failed to copy Master BOM');
       }
     } catch (err) {
       console.error('Copy BOM error:', err);
-      setError(err.response?.data?.message || 'Server error copying Master BOM');
-    } finally {
-      setSubmitting(false);
+      setError(err.data?.message || err.message || 'Server error copying Master BOM');
     }
   };
 

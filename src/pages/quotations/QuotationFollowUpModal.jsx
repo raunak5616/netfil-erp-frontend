@@ -3,7 +3,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Textarea, Select, FormField } from '../../components/ui/FormField';
-import { addQuotationFollowUp } from '../../services/quotationService';
+import { useAddQuotationFollowUpMutation } from '../../features/quotations/quotationsApi';
 import { Calendar, History, Clock, AlertCircle } from 'lucide-react';
 
 const OUTCOME_OPTIONS = [
@@ -27,8 +27,9 @@ const QuotationFollowUpModal = ({ isOpen, onClose, quotation, onSuccess }) => {
   const [outcome, setOutcome] = useState('PENDING');
   const [outcomeNotes, setOutcomeNotes] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const [addQuotationFollowUpMutation, { isLoading: submitting }] = useAddQuotationFollowUpMutation();
 
   if (!isOpen || !quotation) return null;
 
@@ -44,28 +45,28 @@ const QuotationFollowUpModal = ({ isOpen, onClose, quotation, onSuccess }) => {
       return;
     }
 
-    setSubmitting(true);
     setError('');
 
     try {
-      const res = await addQuotationFollowUp(quotation._id, {
-        followUpDate,
-        followUpTime,
-        outcome,
-        outcomeNotes: outcomeNotes.trim(),
-        remarks: remarks.trim(),
-      });
+      const res = await addQuotationFollowUpMutation({
+        id: quotation._id,
+        data: {
+          followUpDate,
+          followUpTime,
+          outcome,
+          outcomeNotes: outcomeNotes.trim(),
+          remarks: remarks.trim(),
+        },
+      }).unwrap();
 
-      if (res.success) {
-        onSuccess(res.quotation);
+      if (res.success || res.quotation) {
+        onSuccess(res.quotation || res);
       } else {
         setError(res.message || 'Failed to add follow-up');
       }
     } catch (err) {
       console.error('Add Follow-up error:', err);
-      setError(err.response?.data?.message || 'Error occurred while saving follow-up');
-    } finally {
-      setSubmitting(false);
+      setError(err?.data?.message || err?.message || 'Error occurred while saving follow-up');
     }
   };
 

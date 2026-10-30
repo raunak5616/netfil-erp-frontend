@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { changeUserPassword } from '../../services/userService';
+import { useChangeUserPasswordMutation } from '../../features/users/usersApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -13,6 +13,8 @@ const ChangePasswordModal = ({ user, isOpen, onClose, onSuccess }) => {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [changeUserPasswordMutation] = useChangeUserPasswordMutation();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -51,16 +53,14 @@ const ChangePasswordModal = ({ user, isOpen, onClose, onSuccess }) => {
     setSuccessMessage('');
 
     try {
-      const res = await changeUserPassword(user._id, { newPassword });
-      if (res.success) {
-        setSuccessMessage(`Password updated successfully for account '${user.username}'!`);
-        setTimeout(() => {
-          if (onSuccess) onSuccess();
-          onClose();
-        }, 1000);
-      }
+      await changeUserPasswordMutation({ id: user._id, newPassword }).unwrap();
+      setSuccessMessage(`Password updated successfully for account '${user.username}'!`);
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+      }, 1000);
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to update user password.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to update user password.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

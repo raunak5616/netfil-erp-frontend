@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getUOMs } from '../../services/uomService';
+import React, { useState, useMemo } from 'react';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -24,8 +24,9 @@ const UOMList = () => {
   const canCreate = hasPermission('UOM_CREATE');
   const canEdit = hasPermission('UOM_EDIT');
 
-  const [uoms, setUoms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hook
+  const { data: uomsData, isLoading: loading, error: queryError, refetch } = useGetUOMsQuery();
+  const uoms = uomsData?.uoms || [];
   const [error, setError] = useState('');
 
   // Filter states
@@ -38,28 +39,6 @@ const UOMList = () => {
   const [editingUom, setEditingUom] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedUom, setSelectedUom] = useState(null);
-
-  const fetchUOMData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getUOMs();
-      if (data.success && Array.isArray(data.uoms)) {
-        setUoms(data.uoms);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch UOMs:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUOMData();
-  }, []);
 
   const filteredUOMs = useMemo(() => {
     return uoms.filter((uom) => {
@@ -189,7 +168,7 @@ const UOMList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchUOMData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -275,7 +254,7 @@ const UOMList = () => {
         uom={editingUom}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchUOMData}
+        onSuccess={refetch}
       />
 
       <UOMDetailModal

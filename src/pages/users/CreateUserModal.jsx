@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createUser } from '../../services/userService';
-import { getEmployees } from '../../services/employeeService';
-import { getRoles } from '../../services/roleService';
+import { useCreateUserMutation } from '../../features/users/usersApi';
+import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
+import { useGetRolesQuery } from '../../features/roles/rolesApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -18,15 +18,20 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
 
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
-
-  const [employees, setEmployees] = useState([]);
-  const [roles, setRoles] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [loadingData, setLoadingData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // RTK Query hooks
+  const { data: empData, isLoading: loadingEmployees } = useGetEmployeesQuery({ withoutUser: true }, { skip: !isOpen });
+  const { data: rolesData, isLoading: loadingRoles } = useGetRolesQuery(undefined, { skip: !isOpen });
+  const [createUserMutation] = useCreateUserMutation();
+
+  const employees = empData?.employees || [];
+  const roles = rolesData?.roles || [];
+  const loadingData = loadingEmployees || loadingRoles;
 
   // Set of employee IDs that already have a User account (active or inactive)
   const existingUserEmployeeIds = useMemo(() => new Set(
@@ -43,31 +48,6 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchData = async () => {
-      setLoadingData(true);
-      setErrorMessage('');
-      try {
-        const [empRes, roleRes] = await Promise.all([
-          getEmployees({ withoutUser: true }),
-          getRoles(),
-        ]);
-
-        if (empRes.success && Array.isArray(empRes.employees)) {
-          setEmployees(empRes.employees);
-        }
-        if (roleRes.success && Array.isArray(roleRes.roles)) {
-          setRoles(roleRes.roles);
-        }
-      } catch (err) {
-        console.error("Failed to load employees or roles:", err);
-        setErrorMessage("Could not load employee or role options. Please try again.");
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    fetchData();
-
     // Reset form state
     setFormData({
       employeeId: '',
@@ -77,6 +57,7 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
     });
     setSelectedRoleIds([]);
     setRoleSearchTerm('');
+    setErrorMessage('');
     setSuccessMessage('');
   }, [isOpen]);
 
@@ -143,23 +124,21 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess, existingUsers = [] }) => 
     setSuccessMessage('');
 
     try {
-      const res = await createUser({
+      await createUserMutation({
         employeeId: formData.employeeId,
         username: formData.username,
         password: formData.password,
         roleIds: selectedRoleIds,
         isActive: formData.isActive === 'true' || formData.isActive === true,
-      });
+      }).unwrap();
 
-      if (res.success) {
-        setSuccessMessage('ERP User account created successfully!');
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 800);
-      }
+      setSuccessMessage('ERP User account created successfully!');
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+      }, 800);
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to create user account.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to create user account.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

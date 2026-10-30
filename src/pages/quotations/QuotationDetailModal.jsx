@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { getQuotationById, releaseQuotation, getQuotationReferences, printQuotationPdf } from '../../services/quotationService';
+import React, { useState } from 'react';
+import { printQuotationPdf } from '../../services/quotationService';
+import {
+  useGetQuotationByIdQuery,
+  useGetQuotationReferencesQuery,
+  useReleaseQuotationMutation,
+} from '../../features/quotations/quotationsApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -325,48 +330,29 @@ const QuotationDetailModal = ({
   canRelease,
   canAmend,
 }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [quotation, setQuotation] = useState(null);
-  const [items, setItems] = useState([]);
-  const [terms, setTerms] = useState([]);
-  const [references, setReferences] = useState(null);
-  const [releasing, setReleasing] = useState(false);
+  const [actionError, setActionError] = useState('');
 
-  useEffect(() => {
-    const fetchDetail = async () => {
-      if (!quotationId) return;
-      setLoading(true);
-      setError('');
-      try {
-        const [detailRes, refRes] = await Promise.all([
-          getQuotationById(quotationId),
-          getQuotationReferences(quotationId).catch(() => ({ success: false })),
-        ]);
+  const {
+    data: detailData,
+    isLoading: loading,
+    error: detailError,
+  } = useGetQuotationByIdQuery(quotationId, {
+    skip: !isOpen || !quotationId,
+  });
 
-        if (detailRes.success && detailRes.quotation) {
-          setQuotation(detailRes.quotation);
-          setItems(detailRes.items || []);
-          setTerms(detailRes.terms || []);
-        } else {
-          setError('Quotation details not found');
-        }
+  const {
+    data: refData,
+  } = useGetQuotationReferencesQuery(quotationId, {
+    skip: !isOpen || !quotationId,
+  });
 
-        if (refRes.success && refRes.references) {
-          setReferences(refRes.references);
-        }
-      } catch (err) {
-        console.error('Failed to fetch quotation details:', err);
-        setError(err.response?.data?.message || 'Failed to load quotation details');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const [releaseQuotationMutation, { isLoading: releasing }] = useReleaseQuotationMutation();
 
-    if (isOpen) {
-      fetchDetail();
-    }
-  }, [isOpen, quotationId]);
+  const quotation = detailData?.quotation || null;
+  const items = detailData?.items || [];
+  const terms = detailData?.terms || [];
+  const references = refData?.references || null;
+  const error = actionError || (detailError ? (detailError?.data?.message || 'Failed to load quotation details') : '');
 
   if (!isOpen) return null;
 
@@ -375,18 +361,15 @@ const QuotationDetailModal = ({
     const confirmMsg = `Are you sure you want to RELEASE Quotation "${quotation.quotationNo}"? Once released, direct edits will be locked.`;
     if (!window.confirm(confirmMsg)) return;
 
-    setReleasing(true);
+    setActionError('');
     try {
-      const res = await releaseQuotation(quotation._id);
-      if (res.success) {
-        setQuotation((prev) => ({ ...prev, status: 'released' }));
+      const res = await releaseQuotationMutation(quotation._id).unwrap();
+      if (res.success || res.quotation) {
         if (onRelease) onRelease();
       }
     } catch (err) {
       console.error('Failed to release quotation:', err);
-      setError(err.response?.data?.message || 'Failed to release quotation');
-    } finally {
-      setReleasing(false);
+      setActionError(err?.data?.message || err?.message || 'Failed to release quotation');
     }
   };
 

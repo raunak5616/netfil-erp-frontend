@@ -3,13 +3,13 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Select } from '../../components/ui/FormField';
-import { getFilterGrades } from '../../services/filterGradeService';
 import {
-  createDrawing,
-  updateDrawing,
-  getHoleConfigurations,
-  getVersionedImageUrl
-} from '../../services/drawingMasterService';
+  useCreateDrawingMutation,
+  useUpdateDrawingMutation,
+  useGetHoleConfigurationsQuery
+} from '../../features/drawingMaster/drawingMasterApi';
+import { useGetFilterGradesQuery } from '../../features/masterData/masterDataApi';
+import { getVersionedImageUrl } from '../../services/drawingMasterService';
 import {
   UploadCloud,
   FileText,
@@ -116,14 +116,28 @@ const DrawingMasterFormModal = ({
   const sideInputRef = useRef(null);
   const picInputRef = useRef(null);
 
-  const [loadingGrades, setLoadingGrades] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // Dropdown UI state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [gradeSearch, setGradeSearch] = useState('');
   const dropdownRef = useRef(null);
+
+  // RTK Query Hooks
+  const { data: holeConfigData } = useGetHoleConfigurationsQuery(
+    { category: formData.filterCategory },
+    { skip: formData.drawingType !== 'FLANGE' }
+  );
+
+  const { data: filterGradesData, isLoading: loadingGrades } = useGetFilterGradesQuery(
+    undefined,
+    { skip: !isOpen }
+  );
+
+  const [createDrawing, { isLoading: creating }] = useCreateDrawingMutation();
+  const [updateDrawing, { isLoading: updating }] = useUpdateDrawingMutation();
+
+  const submitting = creating || updating;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -138,50 +152,24 @@ const DrawingMasterFormModal = ({
 
   // Fetch available hole configurations for category
   useEffect(() => {
-    const fetchHoleConfigs = async () => {
-      try {
-        const res = await getHoleConfigurations({ category: formData.filterCategory });
-        if (res.success && Array.isArray(res.options)) {
-          setAvailableHoleConfigs(res.options.filter(opt => opt && opt.toLowerCase() !== 'ing1'));
-        }
-      } catch (err) {
-        console.warn('Could not fetch dynamic hole configurations:', err);
-      }
-    };
-
-    if (formData.drawingType === 'FLANGE') {
-      fetchHoleConfigs();
+    if (holeConfigData?.success && Array.isArray(holeConfigData.options)) {
+      setAvailableHoleConfigs(holeConfigData.options.filter(opt => opt && opt.toLowerCase() !== 'ing1'));
     }
-  }, [formData.filterCategory, formData.drawingType]);
+  }, [holeConfigData]);
 
   // Load Filter Grades on modal open
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !filterGradesData?.filterGrades) return;
 
-    const loadGrades = async () => {
-      setLoadingGrades(true);
-      try {
-        const res = await getFilterGrades();
-        if (res.success && Array.isArray(res.filterGrades)) {
-          const initialIds = new Set(
-            (Array.isArray(initialData?.filterGrades) ? initialData.filterGrades : [initialData?.filterGrade])
-              .filter(Boolean)
-              .map(g => String(g._id || g))
-          );
-          setFilterGradesList(
-            res.filterGrades.filter(g => g.status === 'active' || initialIds.has(String(g._id)))
-          );
-        }
-      } catch (err) {
-        console.error('Failed to load filter grades:', err);
-        setError('Failed to load filter grades master.');
-      } finally {
-        setLoadingGrades(false);
-      }
-    };
-
-    loadGrades();
-  }, [isOpen, initialData]);
+    const initialIds = new Set(
+      (Array.isArray(initialData?.filterGrades) ? initialData.filterGrades : [initialData?.filterGrade])
+        .filter(Boolean)
+        .map(g => String(g._id || g))
+    );
+    setFilterGradesList(
+      filterGradesData.filterGrades.filter(g => g.status === 'active' || initialIds.has(String(g._id)))
+    );
+  }, [isOpen, filterGradesData, initialData]);
 
   // Set initial form state
   useEffect(() => {
@@ -561,20 +549,17 @@ const DrawingMasterFormModal = ({
       if (picFile) {
         data.append('pictorialViewImage', picFile);
       }
-
       if (isEdit) {
-        await updateDrawing(initialData._id, data);
+        await updateDrawing({ id: initialData._id, data }).unwrap();
       } else {
-        await createDrawing(data);
+        await createDrawing(data).unwrap();
       }
 
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Failed to save drawing configuration:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to save drawing configuration.');
-    } finally {
-      setSubmitting(false);
+      setError(err.data?.message || err.message || 'Failed to save drawing configuration.');
     }
   };
 

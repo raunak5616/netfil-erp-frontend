@@ -3,8 +3,11 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { Input, Textarea, FormField } from '../../components/ui/FormField';
-import { getQuotations, getQuotationById } from '../../services/quotationService';
-import { createSalesOrder } from '../../services/salesOrderService';
+import {
+  useGetQuotationsQuery,
+  useLazyGetQuotationByIdQuery,
+} from '../../features/quotations/quotationsApi';
+import { useCreateSalesOrderMutation } from '../../features/salesOrders/salesOrdersApi';
 import { 
   Search, 
   Calculator, 
@@ -26,13 +29,10 @@ import QuotationChangesModal from './components/QuotationChangesModal';
 import { compareQuotationWithSalesOrder } from '../../utils/quotationComparator';
 
 const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
-  const [loadingEligible, setLoadingEligible] = useState(true);
-  const [eligibleQuotations, setEligibleQuotations] = useState([]);
   const [quotationSearch, setQuotationSearch] = useState('');
 
   const [selectedQuotationId, setSelectedQuotationId] = useState('');
   const [selectedQuotationDetails, setSelectedQuotationDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Form Fields - PO & Dates (SO-only fields)
   const [customerPoNumber, setCustomerPoNumber] = useState('');
@@ -61,45 +61,44 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
   const [detectedChanges, setDetectedChanges] = useState([]);
   const [showChangesModal, setShowChangesModal] = useState(false);
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [customError, setCustomError] = useState('');
 
-  // Fetch eligible quotations (status: accepted or released)
-  useEffect(() => {
-    if (!isOpen) return;
+  const {
+    data: eligibleQuotationsData,
+    isLoading: loadingEligible,
+    error: eligibleError,
+  } = useGetQuotationsQuery(
+    { eligibleForSalesOrder: 'true' },
+    { skip: !isOpen }
+  );
 
-    const fetchEligible = async () => {
-      setLoadingEligible(true);
-      setError('');
-      try {
-        const res = await getQuotations({ eligibleForSalesOrder: 'true' });
+  const [triggerGetQuotationById, { isLoading: loadingDetails }] = useLazyGetQuotationByIdQuery();
+  const [createSalesOrderMutation, { isLoading: submitting }] = useCreateSalesOrderMutation();
 
-        let list = [];
-        if (res.success && Array.isArray(res.quotations)) {
-          list = res.quotations;
-        }
+  const error = customError || (eligibleError ? (eligibleError?.data?.message || 'Failed to load eligible quotations from server.') : '');
+  const setError = setCustomError;
 
-        // De-duplicate by _id and strictly exclude any quotation with existing salesOrder or terminal status
-        const uniqueMap = new Map();
-        list.forEach((q) => {
-          if (!q || !q._id) return;
-          if (q.salesOrder) return;
-          const statusLower = (q.status || '').toLowerCase();
-          if (['won', 'converted', 'lost', 'cancelled'].includes(statusLower)) return;
-          uniqueMap.set(q._id, q);
-        });
+  const eligibleQuotations = useMemo(() => {
+    let list = [];
+    if (eligibleQuotationsData?.success && Array.isArray(eligibleQuotationsData.quotations)) {
+      list = eligibleQuotationsData.quotations;
+    } else if (Array.isArray(eligibleQuotationsData?.quotations)) {
+      list = eligibleQuotationsData.quotations;
+    } else if (Array.isArray(eligibleQuotationsData)) {
+      list = eligibleQuotationsData;
+    }
 
-        setEligibleQuotations(Array.from(uniqueMap.values()));
-      } catch (err) {
-        console.error('Failed to load eligible quotations:', err);
-        setError('Failed to load eligible quotations from server.');
-      } finally {
-        setLoadingEligible(false);
-      }
-    };
+    const uniqueMap = new Map();
+    list.forEach((q) => {
+      if (!q || !q._id) return;
+      if (q.salesOrder) return;
+      const statusLower = (q.status || '').toLowerCase();
+      if (['won', 'converted', 'lost', 'cancelled'].includes(statusLower)) return;
+      uniqueMap.set(q._id, q);
+    });
 
-    fetchEligible();
-  }, [isOpen]);
+    return Array.from(uniqueMap.values());
+  }, [eligibleQuotationsData]);
 
   // Load detailed quotation when selected
   const handleSelectQuotation = async (qId) => {
@@ -111,10 +110,9 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
       return;
     }
 
-    setLoadingDetails(true);
     setError('');
     try {
-      const res = await getQuotationById(qId);
+      const res = await triggerGetQuotationById(qId).unwrap();
       if (res.success && res.quotation) {
         const qDoc = res.quotation;
         const items = res.items || [];
@@ -166,9 +164,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
       }
     } catch (err) {
       console.error('Failed to load quotation details:', err);
-      setError(err.response?.data?.message || 'Error fetching quotation details.');
-    } finally {
-      setLoadingDetails(false);
+      setError(err?.data?.message || err?.message || 'Error fetching quotation details.');
     }
   };
 
@@ -358,14 +354,12 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
     };
   };
 
-  // Perform backend creation request
   const executeCreateSalesOrder = async (payload) => {
     if (submitting) return; // Prevent duplicate creation on double click
-    setSubmitting(true);
     setError('');
     try {
-      const res = await createSalesOrder(payload);
-      if (res.success) {
+      const res = await createSalesOrderMutation(payload).unwrap();
+      if (res.success || res.salesOrder) {
         setShowChangesModal(false);
         onSuccess();
       } else {
@@ -373,9 +367,7 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
       }
     } catch (err) {
       console.error('Create Sales Order error:', err);
-      setError(err.response?.data?.message || 'Server error while creating Sales Order');
-    } finally {
-      setSubmitting(false);
+      setError(err?.data?.message || err?.message || 'Server error while creating Sales Order');
     }
   };
 

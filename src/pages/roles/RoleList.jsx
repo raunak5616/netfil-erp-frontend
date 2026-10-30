@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getRoles, createRole, updateRole } from '../../services/roleService';
-import { getPermissions } from '../../services/permissionService';
+import React, { useState, useMemo } from 'react';
+import { 
+  useGetRolesQuery, 
+  useGetPermissionsQuery, 
+  useCreateRoleMutation, 
+  useUpdateRoleMutation 
+} from '../../features/roles/rolesApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -25,9 +29,15 @@ const RoleList = () => {
   const canCreate = hasPermission('ROLE_CREATE');
   const canEdit = hasPermission('ROLE_EDIT');
 
-  const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: rolesData, isLoading: loadingRoles, error: rolesError, refetch: refetchRoles } = useGetRolesQuery();
+  const { data: permData, isLoading: loadingPerms } = useGetPermissionsQuery();
+  const [createRoleMutation] = useCreateRoleMutation();
+  const [updateRoleMutation] = useUpdateRoleMutation();
+
+  const roles = rolesData?.roles || [];
+  const permissions = permData?.permissions || [];
+  const loading = loadingRoles || loadingPerms;
   const [error, setError] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,33 +48,6 @@ const RoleList = () => {
 
   const [selectedViewRole, setSelectedViewRole] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [roleRes, permRes] = await Promise.all([
-        getRoles(),
-        getPermissions(),
-      ]);
-
-      if (roleRes.success && Array.isArray(roleRes.roles)) {
-        setRoles(roleRes.roles);
-      }
-      if (permRes.success && Array.isArray(permRes.permissions)) {
-        setPermissions(permRes.permissions);
-      }
-    } catch (err) {
-      console.error("Failed to load roles or permissions:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const filteredRoles = useMemo(() => {
     return roles.filter((r) => {
@@ -95,15 +78,9 @@ const RoleList = () => {
 
   const handleSaveRole = async (payload, roleId) => {
     if (roleId) {
-      const res = await updateRole(roleId, payload);
-      if (res.success) {
-        await fetchData();
-      }
+      await updateRoleMutation({ id: roleId, ...payload }).unwrap();
     } else {
-      const res = await createRole(payload);
-      if (res.success) {
-        await fetchData();
-      }
+      await createRoleMutation(payload).unwrap();
     }
   };
 
@@ -217,7 +194,7 @@ const RoleList = () => {
             />
           </div>
 
-          <Button variant="outline" size="sm" onClick={fetchData} loading={loading}>
+          <Button variant="outline" size="sm" onClick={refetchRoles} loading={loading}>
             <RefreshCw size={14} />
             <span>Refresh</span>
           </Button>

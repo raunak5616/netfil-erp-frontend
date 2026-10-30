@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getStores, updateStoreStatus, deleteStore } from '../../services/storeService';
+import React, { useState, useMemo } from 'react';
+import {
+  useGetStoresQuery,
+  useUpdateStoreStatusMutation,
+  useDeleteStoreMutation,
+} from '../../features/stores/storesApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -17,9 +21,9 @@ import {
   Filter, 
   Eye, 
   Edit, 
-  RefreshCw,
-  Power,
-  Trash2
+  RefreshCw, 
+  Power, 
+  Trash2 
 } from 'lucide-react';
 
 const StoreList = () => {
@@ -30,8 +34,10 @@ const StoreList = () => {
   const canChangeStatus = hasPermission('STORE_STATUS');
   const canDelete = hasPermission('STORE_DELETE') || hasPermission('STORE_EDIT');
 
-  const [stores, setStores] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: storesData, isLoading: loading, error: queryError, refetch } = useGetStoresQuery();
+  const [updateStoreStatusMutation] = useUpdateStoreStatusMutation();
+  const [deleteStoreMutation] = useDeleteStoreMutation();
+
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -50,27 +56,9 @@ const StoreList = () => {
   const [storeToDelete, setStoreToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchStoreData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getStores();
-      if (data.success && Array.isArray(data.stores)) {
-        setStores(data.stores);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch stores:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStoreData();
-  }, []);
+  const stores = useMemo(() => {
+    return storesData?.stores || (Array.isArray(storesData) ? storesData : []);
+  }, [storesData]);
 
   const filteredStores = useMemo(() => {
     return stores.filter((store) => {
@@ -89,10 +77,9 @@ const StoreList = () => {
   const toggleStatus = async (store) => {
     try {
       const newStatus = store.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-      await updateStoreStatus(store._id, newStatus);
-      fetchStoreData();
+      await updateStoreStatusMutation({ id: store._id, status: newStatus }).unwrap();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update status');
+      setError(err?.data?.message || err?.message || 'Failed to update status');
     }
   };
 
@@ -109,19 +96,13 @@ const StoreList = () => {
     setError('');
     setSuccessMessage('');
     try {
-      const res = await deleteStore(storeToDelete._id);
-      if (res.success) {
-        setSuccessMessage(res.message || `Store "${storeToDelete.storeName}" (${storeToDelete.storeCode}) deleted successfully.`);
-        setIsDeleteDialogOpen(false);
-        setStoreToDelete(null);
-        await fetchStoreData();
-      } else {
-        setError(res.message || 'Failed to delete store');
-        setIsDeleteDialogOpen(false);
-      }
+      const res = await deleteStoreMutation(storeToDelete._id).unwrap();
+      setSuccessMessage(res?.message || `Store "${storeToDelete.storeName}" (${storeToDelete.storeCode}) deleted successfully.`);
+      setIsDeleteDialogOpen(false);
+      setStoreToDelete(null);
     } catch (err) {
       console.error("Failed to delete store:", err);
-      setError(err.response?.data?.message || err.message || 'Failed to delete store');
+      setError(err?.data?.message || err?.message || 'Failed to delete store');
       setIsDeleteDialogOpen(false);
     } finally {
       setDeleteLoading(false);
@@ -235,7 +216,7 @@ const StoreList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchStoreData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -254,7 +235,13 @@ const StoreList = () => {
         }
       />
 
-      {error && <Alert type="danger" message={error} onClose={() => setError('')} />}
+      {(error || queryError) && (
+        <Alert
+          type="danger"
+          message={error || queryError?.data?.message || 'Error loading stores'}
+          onClose={() => setError('')}
+        />
+      )}
       {successMessage && <Alert type="success" message={successMessage} onClose={() => setSuccessMessage('')} />}
 
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
@@ -309,7 +296,7 @@ const StoreList = () => {
         store={editingStore}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchStoreData}
+        onSuccess={refetch}
       />
 
       <StoreDetailModal
@@ -320,7 +307,7 @@ const StoreList = () => {
           setEditingStore(st);
           setIsFormOpen(true);
         }}
-        onSuccess={fetchStoreData}
+        onSuccess={refetch}
         canEdit={canEdit}
         canDelete={canDelete}
       />

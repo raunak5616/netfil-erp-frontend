@@ -1,5 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getClients, updateClientStatus, approveOrRejectClient, deleteClient } from '../../services/clientService';
+import React, { useState, useMemo } from 'react';
+import { 
+  useGetClientsQuery, 
+  useUpdateClientStatusMutation, 
+  useApproveOrRejectClientMutation, 
+  useDeleteClientMutation 
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -32,8 +37,13 @@ const ClientList = () => {
   const canEdit = hasPermission('PARTY_EDIT') || hasPermission('CLIENT_EDIT');
   const canDelete = hasPermission('PARTY_DELETE') || hasPermission('CLIENT_DELETE');
 
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // RTK Query hooks
+  const { data: clientsData, isLoading: loading, error: queryError, refetch } = useGetClientsQuery({ approvalStatus: 'all' });
+  const [updateClientStatusMutation] = useUpdateClientStatusMutation();
+  const [approveOrRejectMutation] = useApproveOrRejectClientMutation();
+  const [deleteClientMutation] = useDeleteClientMutation();
+
+  const clients = clientsData?.clients || [];
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -49,28 +59,6 @@ const ClientList = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
 
-  const fetchClientData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getClients({ approvalStatus: 'all' });
-      if (data.success && Array.isArray(data.clients)) {
-        setClients(data.clients);
-      } else {
-        setError('Unexpected API response format');
-      }
-    } catch (err) {
-      console.error("Failed to fetch Parties:", err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchClientData();
-  }, []);
-
   const handleStatusToggle = async (client) => {
     const nextStatus = client.status === 'active' ? 'inactive' : 'active';
     const confirmMessage = `Are you sure you want to mark party "${client.companyName}" (${client.clientCode}) as ${nextStatus}?`;
@@ -78,15 +66,10 @@ const ClientList = () => {
 
     setActionLoading(client._id);
     try {
-      const res = await updateClientStatus(client._id, nextStatus);
-      if (res.success) {
-        setClients((prev) =>
-          prev.map((c) => (c._id === client._id ? { ...c, status: nextStatus } : c))
-        );
-      }
+      await updateClientStatusMutation({ id: client._id, status: nextStatus }).unwrap();
     } catch (err) {
       console.error("Failed to update party status:", err);
-      setError(err.response?.data?.message || 'Failed to update party status');
+      setError(err?.data?.message || err?.message || 'Failed to update party status');
     } finally {
       setActionLoading(null);
     }
@@ -228,12 +211,9 @@ const ClientList = () => {
                 onClick={async () => {
                   if (!window.confirm(`Approve party "${row.companyName}" (${row.clientCode})?`)) return;
                   try {
-                    const res = await approveOrRejectClient(row._id, { action: 'APPROVE' });
-                    if (res.success) {
-                      setClients((prev) => prev.map((c) => (c._id === row._id ? res.client : c)));
-                    }
+                    await approveOrRejectMutation({ id: row._id, action: 'APPROVE' }).unwrap();
                   } catch (e) {
-                    setError(e.response?.data?.message || 'Approval failed');
+                    setError(e?.data?.message || e?.message || 'Approval failed');
                   }
                 }}
               >
@@ -249,12 +229,9 @@ const ClientList = () => {
                   const reason = window.prompt(`Enter rejection reason for party "${row.companyName}":`);
                   if (!reason || !reason.trim()) return;
                   try {
-                    const res = await approveOrRejectClient(row._id, { action: 'REJECT', rejectionReason: reason.trim() });
-                    if (res.success) {
-                      setClients((prev) => prev.map((c) => (c._id === row._id ? res.client : c)));
-                    }
+                    await approveOrRejectMutation({ id: row._id, action: 'REJECT', rejectionReason: reason.trim() }).unwrap();
                   } catch (e) {
-                    setError(e.response?.data?.message || 'Rejection failed');
+                    setError(e?.data?.message || e?.message || 'Rejection failed');
                   }
                 }}
               >
@@ -302,12 +279,9 @@ const ClientList = () => {
                 if (!window.confirm(`Are you sure you want to delete party "${row.companyName}" (${row.clientCode})?`)) return;
                 setActionLoading(`delete_${row._id}`);
                 try {
-                  const res = await deleteClient(row._id);
-                  if (res.success) {
-                    setClients((prev) => prev.filter((c) => c._id !== row._id));
-                  }
+                  await deleteClientMutation(row._id).unwrap();
                 } catch (e) {
-                  setError(e.response?.data?.message || 'Delete failed');
+                  setError(e?.data?.message || e?.message || 'Delete failed');
                 } finally {
                   setActionLoading(null);
                 }
@@ -335,7 +309,7 @@ const ClientList = () => {
         ]}
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={fetchClientData}>
+            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refetch}>
               Refresh
             </Button>
             {canCreate && (
@@ -429,7 +403,7 @@ const ClientList = () => {
         client={editingClient}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={fetchClientData}
+        onSuccess={refetch}
       />
 
       <ClientDetailModal
@@ -442,8 +416,8 @@ const ClientList = () => {
         }}
         canEdit={canEdit}
         onStatusUpdate={(updatedClient) => {
-          setClients((prev) => prev.map((c) => (c._id === updatedClient._id ? updatedClient : c)));
           setSelectedClient(updatedClient);
+          refetch();
         }}
       />
     </div>

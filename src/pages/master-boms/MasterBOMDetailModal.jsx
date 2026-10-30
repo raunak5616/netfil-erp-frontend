@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
 import { Input, Select, FormField } from '../../components/ui/FormField';
 import { useAuth } from '../../context/AuthContext';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
+import { useGetProductsQuery } from '../../features/products/productsApi';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
 import {
-  getBOMById,
-  releaseBOM,
-  getBOMRevisions,
-  addBOMItem,
-  updateBOMItem,
-  deleteBOMItem
-} from '../../services/masterBomService';
+  useGetMasterBOMByIdQuery,
+  useReleaseMasterBOMMutation,
+  useGetMasterBOMRevisionsQuery,
+  useAddMasterBOMItemMutation,
+  useUpdateMasterBOMItemMutation,
+  useDeleteMasterBOMItemMutation
+} from '../../features/boms/bomsApi';
 import {
   Package,
   Layers,
@@ -37,15 +37,43 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
   const canEdit = hasPermission('BOM_EDIT');
   const canCreate = hasPermission('BOM_CREATE');
 
-  const [loading, setLoading] = useState(true);
-  const [bom, setBom] = useState(null);
-  const [items, setItems] = useState([]);
-  const [revisions, setRevisions] = useState([]);
   const [activeTab, setActiveTab] = useState('components'); // 'components' | 'revisions'
 
-  // Master options for inline item addition
-  const [allActiveItems, setAllActiveItems] = useState([]);
-  const [allActiveUoms, setAllActiveUoms] = useState([]);
+  // RTK Query Hooks
+  const {
+    data: bomData,
+    isLoading: loadingBOM,
+    error: bomQueryError,
+    refetch: fetchBOMData
+  } = useGetMasterBOMByIdQuery(bomId, {
+    skip: !isOpen || !bomId
+  });
+
+  const { data: revData } = useGetMasterBOMRevisionsQuery(bomId, {
+    skip: !isOpen || !bomId || activeTab !== 'revisions'
+  });
+
+  const { data: itemData } = useGetProductsQuery(
+    { all: true },
+    { skip: !isOpen }
+  );
+
+  const { data: uomData } = useGetUOMsQuery(
+    undefined,
+    { skip: !isOpen }
+  );
+
+  const [releaseMasterBOM, { isLoading: releasing }] = useReleaseMasterBOMMutation();
+  const [addMasterBOMItem, { isLoading: addingItem }] = useAddMasterBOMItemMutation();
+  const [updateMasterBOMItem, { isLoading: updatingItem }] = useUpdateMasterBOMItemMutation();
+  const [deleteMasterBOMItem, { isLoading: deletingItem }] = useDeleteMasterBOMItemMutation();
+
+  const bom = bomData?.bom || null;
+  const items = bomData?.items || [];
+  const revisions = revData?.revisions || [];
+  const allActiveItems = (itemData?.items || itemData?.products || []).filter(i => i.status === 'active');
+  const allActiveUoms = (uomData?.uoms || []).filter(u => u.status === 'active');
+  const loading = loadingBOM;
 
   // Inline Component Modal / Form state
   const [isAddComponentOpen, setIsAddComponentOpen] = useState(false);
@@ -64,98 +92,37 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [isEditHeaderOpen, setIsEditHeaderOpen] = useState(false);
 
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const fetchBOMData = async () => {
-    if (!bomId || !isOpen) return;
-    setLoading(true);
-    setError('');
-    try {
-      const [res, masterItemsRes, masterUomsRes] = await Promise.all([
-        getBOMById(bomId),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
-        getUOMs().catch(() => ({ success: false, uoms: [] }))
-      ]);
-
-      if (res.success && res.bom) {
-        setBom(res.bom);
-        setItems(res.items || []);
-      } else {
-        setError('Failed to load Master BOM record');
-      }
-
-      if (masterItemsRes.success && Array.isArray(masterItemsRes.items)) {
-        setAllActiveItems(masterItemsRes.items.filter(i => i.status === 'active'));
-      }
-      if (masterUomsRes.success && Array.isArray(masterUomsRes.uoms)) {
-        setAllActiveUoms(masterUomsRes.uoms.filter(u => u.status === 'active'));
-      }
-    } catch (err) {
-      console.error('Error loading BOM details:', err);
-      setError(err.response?.data?.message || 'Error connecting to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchRevisionsData = async () => {
-    if (!bomId) return;
-    try {
-      const res = await getBOMRevisions(bomId);
-      if (res.success && Array.isArray(res.revisions)) {
-        setRevisions(res.revisions);
-      }
-    } catch (err) {
-      console.error('Failed to fetch BOM revisions:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchBOMData();
-  }, [bomId, isOpen]);
-
-  useEffect(() => {
-    if (activeTab === 'revisions' && bomId) {
-      fetchRevisionsData();
-    }
-  }, [activeTab, bomId]);
+  const actionLoading = releasing || addingItem || updatingItem || deletingItem;
+  const error = localError || (bomQueryError ? (bomQueryError.data?.message || bomQueryError.message || 'Error connecting to server') : '');
 
   const handleRelease = async () => {
     if (!bom) return;
     const confirmMsg = `Are you sure you want to RELEASE Master BOM "${bom.bomCode}" (Version ${bom.version})? Releasing locks this BOM and marks any previous released version as REVISED.`;
     if (!window.confirm(confirmMsg)) return;
 
-    setActionLoading(true);
-    setError('');
+    setLocalError('');
     setSuccessMsg('');
     try {
-      const res = await releaseBOM(bom._id);
-      if (res.success) {
-        setSuccessMsg(res.message || 'Master BOM released successfully');
-        setBom(res.bom);
-        if (onBOMUpdated) onBOMUpdated();
-      } else {
-        setError(res.message || 'Failed to release Master BOM');
-      }
+      const res = await releaseMasterBOM(bom._id).unwrap();
+      setSuccessMsg(res.message || 'Master BOM released successfully');
+      if (onBOMUpdated) onBOMUpdated();
     } catch (err) {
       console.error('Release BOM error:', err);
-      setError(err.response?.data?.message || 'Error releasing Master BOM');
-    } finally {
-      setActionLoading(false);
+      setLocalError(err.data?.message || err.message || 'Error releasing Master BOM');
     }
   };
 
   const handleAddComponentSubmit = async (e) => {
     e.preventDefault();
     if (!newCompItem || !newCompQty || !newCompUom) {
-      setError('Please select Component Item, Quantity, and UOM.');
+      setLocalError('Please select Component Item, Quantity, and UOM.');
       return;
     }
 
-    setActionLoading(true);
-    setError('');
+    setLocalError('');
     setSuccessMsg('');
     try {
       const payload = {
@@ -168,43 +135,28 @@ const MasterBOMDetailModal = ({ isOpen, bomId, onClose, onBOMUpdated }) => {
         remarks: newCompRemarks.trim()
       };
 
-      const res = await addBOMItem(bom._id, payload);
-      if (res.success) {
-        setSuccessMsg('Component item added successfully');
-        setIsAddComponentOpen(false);
-        setNewCompItem('');
-        setNewCompQty(1);
-        setNewCompPos('');
-        setNewCompPrice(0);
-        fetchBOMData();
-      } else {
-        setError(res.message || 'Failed to add component item');
-      }
+      await addMasterBOMItem({ bomId: bom._id, itemData: payload }).unwrap();
+      setSuccessMsg('Component item added successfully');
+      setIsAddComponentOpen(false);
+      setNewCompItem('');
+      setNewCompQty(1);
+      setNewCompPos('');
+      setNewCompPrice(0);
     } catch (err) {
       console.error('Add component error:', err);
-      setError(err.response?.data?.message || 'Error adding component item');
-    } finally {
-      setActionLoading(false);
+      setLocalError(err.data?.message || err.message || 'Error adding component item');
     }
   };
 
   const handleDeleteComponent = async (itemId) => {
     if (!window.confirm('Remove this component from draft Master BOM?')) return;
-    setActionLoading(true);
-    setError('');
+    setLocalError('');
     try {
-      const res = await deleteBOMItem(bom._id, itemId);
-      if (res.success) {
-        setSuccessMsg('Component item removed');
-        fetchBOMData();
-      } else {
-        setError(res.message || 'Failed to remove component');
-      }
+      await deleteMasterBOMItem({ bomId: bom._id, itemId }).unwrap();
+      setSuccessMsg('Component item removed');
     } catch (err) {
       console.error('Delete component error:', err);
-      setError(err.response?.data?.message || 'Error removing component');
-    } finally {
-      setActionLoading(false);
+      setLocalError(err.data?.message || err.message || 'Error removing component');
     }
   };
 

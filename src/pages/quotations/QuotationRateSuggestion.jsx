@@ -1,49 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { getQuotationSuggestions } from '../../services/quotationService';
+import React, { useState } from 'react';
+import { useGetQuotationSuggestionsQuery } from '../../features/quotations/quotationsApi';
 import Button from '../../components/ui/Button';
 import { Lightbulb, History, Check } from 'lucide-react';
 
 const QuotationRateSuggestion = ({ customerId, itemId, onSelectRate }) => {
-  const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchSuggestions = async () => {
-      if (!customerId || !itemId) {
-        setSuggestions([]);
-        return;
-      }
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const res = await getQuotationSuggestions(customerId, itemId);
-        if (isMounted) {
-          if (res.success && Array.isArray(res.data)) {
-            setSuggestions(res.data);
-          } else {
-            setSuggestions([]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch quotation suggestions", err);
-        if (isMounted) setError("Could not load suggestions.");
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+  const { data: suggestionsData, isLoading: loading, error: queryError } = useGetQuotationSuggestionsQuery(
+    { customerId, itemId },
+    { skip: !customerId || !itemId }
+  );
 
-    fetchSuggestions();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [customerId, itemId]);
+  const suggestions = (suggestionsData?.success && Array.isArray(suggestionsData?.data))
+    ? suggestionsData.data
+    : (Array.isArray(suggestionsData?.data) ? suggestionsData.data : (Array.isArray(suggestionsData) ? suggestionsData : []));
+
+  const error = queryError ? 'Could not load suggestions.' : null;
 
   if (!customerId || !itemId) return null;
 

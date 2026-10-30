@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  getPurchaseOrderById,
-  updatePurchaseOrderStatus,
-  getPurchaseOrderAmendments
-} from '../../services/purchaseOrderService';
-import { getItems } from '../../services/itemService';
-import { getUOMs } from '../../services/uomService';
+  useGetPurchaseOrderByIdQuery,
+  useUpdatePurchaseOrderStatusMutation,
+  useGetPurchaseOrderAmendmentsQuery,
+} from '../../features/purchase/purchaseApi';
+import { useGetItemsQuery } from '../../features/products/productsApi';
+import { useGetUOMsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -71,15 +71,27 @@ const PurchaseOrderDetail = () => {
   const canAmend = hasPermission('PURCHASE_ORDER_AMENDMENT_CREATE');
   const canViewAmendments = hasPermission('PURCHASE_ORDER_AMENDMENT_VIEW');
 
-  const [po, setPo] = useState(null);
-  const [amendments, setAmendments] = useState([]);
-  const [itemsList, setItemsList] = useState([]);
-  const [uomsList, setUomsList] = useState([]);
+  const { data: poData, isLoading: loading, error: queryError } = useGetPurchaseOrderByIdQuery(id);
+  const { data: amendmentsData } = useGetPurchaseOrderAmendmentsQuery(id, { skip: !canViewAmendments || !id });
+  const { data: itemsData } = useGetItemsQuery({ limit: 1000 });
+  const { data: uomsData } = useGetUOMsQuery();
 
-  const [loading, setLoading] = useState(true);
+  const [updatePurchaseOrderStatusMutation, { isLoading: isUpdatingStatus }] = useUpdatePurchaseOrderStatusMutation();
+
+  const po = poData?.purchaseOrder || null;
+  const amendments = useMemo(() => amendmentsData?.amendments || [], [amendmentsData]);
+  const itemsList = useMemo(() => {
+    const raw = itemsData?.items || [];
+    return Array.isArray(raw) ? raw.filter((i) => i.status === 'active') : [];
+  }, [itemsData]);
+  const uomsList = useMemo(() => {
+    const raw = uomsData?.uoms || [];
+    return Array.isArray(raw) ? raw.filter((u) => u.status === 'active') : [];
+  }, [uomsData]);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const actionLoading = isUpdatingStatus;
 
   // Workflow Confirmation Modal State
   const [activeAction, setActiveAction] = useState(null); // 'CHECK', 'RELEASE', 'CLOSE', 'CANCEL'
@@ -90,83 +102,29 @@ const PurchaseOrderDetail = () => {
   const [selectedAmendment, setSelectedAmendment] = useState(null);
   const [isAmendmentDetailOpen, setIsAmendmentDetailOpen] = useState(false);
 
-  const fetchPODetail = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [poRes, itemRes, uomRes] = await Promise.all([
-        getPurchaseOrderById(id),
-        getItems({ all: true }).catch(() => ({ success: false, items: [] })),
-        getUOMs().catch(() => ({ success: false, uoms: [] }))
-      ]);
-
-      if (poRes.success && poRes.purchaseOrder) {
-        setPo(poRes.purchaseOrder);
-      } else {
-        setError('Purchase Order record not found.');
-      }
-
-      if (itemRes.success && Array.isArray(itemRes.items)) {
-        setItemsList(itemRes.items.filter((i) => i.status === 'active'));
-      }
-      if (uomRes.success && Array.isArray(uomRes.uoms)) {
-        setUomsList(uomRes.uoms.filter((u) => u.status === 'active'));
-      }
-
-      if (canViewAmendments) {
-        fetchAmendments();
-      }
-    } catch (err) {
-      console.error('Fetch PO Detail Error:', err);
-      setError(err.response?.data?.message || 'Failed to fetch Purchase Order details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAmendments = async () => {
-    try {
-      const res = await getPurchaseOrderAmendments(id);
-      if (res.success && Array.isArray(res.amendments)) {
-        setAmendments(res.amendments);
-      }
-    } catch (err) {
-      console.error('Fetch PO Amendments Error:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchPODetail();
-  }, [id]);
-
   const handleExecuteAction = async () => {
     if (!activeAction || !po) return;
 
-    setActionLoading(true);
     setError('');
     try {
-      const res = await updatePurchaseOrderStatus(po._id, activeAction, actionRemarks.trim());
-      if (res.success && res.purchaseOrder) {
-        setSuccess(`Purchase Order status transitioned to '${STATUS_DISPLAY_MAP[res.purchaseOrder.status] || res.purchaseOrder.status}'`);
-        setPo(res.purchaseOrder);
-        setActiveAction(null);
-        setActionRemarks('');
-      } else {
-        setError(res.message || 'Workflow transition failed.');
-      }
+      const res = await updatePurchaseOrderStatusMutation({
+        id: po._id,
+        action: activeAction,
+        remarks: actionRemarks.trim(),
+      }).unwrap();
+      const nextStatus = res?.purchaseOrder?.status || activeAction;
+      setSuccess(`Purchase Order status transitioned to '${STATUS_DISPLAY_MAP[nextStatus] || nextStatus}'`);
+      setActiveAction(null);
+      setActionRemarks('');
     } catch (err) {
       console.error('PO Workflow transition error:', err);
-      setError(err.response?.data?.message || 'Error executing workflow transition.');
-    } finally {
-      setActionLoading(false);
+      setError(err?.data?.message || err.message || 'Error executing workflow transition.');
     }
   };
 
-  const handleAmendmentSuccess = (newAmendment, updatedPO) => {
-    setSuccess(`Amendment ${newAmendment.amendmentNo} issued successfully.`);
+  const handleAmendmentSuccess = (newAmendment) => {
+    setSuccess(`Amendment ${newAmendment?.amendmentNo || ''} issued successfully.`);
     setIsAmendmentCreateOpen(false);
-    if (updatedPO) setPo(updatedPO);
-    fetchAmendments();
   };
 
   if (loading) {

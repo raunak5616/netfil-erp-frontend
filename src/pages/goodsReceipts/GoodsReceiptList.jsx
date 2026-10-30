@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getGoodsReceipts,
-  deleteGoodsReceipt,
-  updateGoodsReceiptStatus
-} from '../../services/goodsReceiptService';
-import { getPlants } from '../../services/plantService';
-import { getStores } from '../../services/storeService';
-import { getClients } from '../../services/clientService';
+  useGetGoodsReceiptsQuery,
+  useDeleteGoodsReceiptMutation,
+  useUpdateGoodsReceiptStatusMutation,
+} from '../../features/purchase/purchaseApi';
+import { useGetPlantsQuery, useGetStoresQuery } from '../../features/stores/storesApi';
+import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -46,17 +45,13 @@ const GoodsReceiptList = () => {
   const canPost = hasPermission('GOODS_RECEIPT_POST');
   const canCancel = hasPermission('GOODS_RECEIPT_CANCEL');
 
-  const [receipts, setReceipts] = useState([]);
-  const [plants, setPlants] = useState([]);
-  const [stores, setStores] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [plantFilter, setPlantFilter] = useState('all');
@@ -67,8 +62,64 @@ const GoodsReceiptList = () => {
   // Pagination States
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const queryParams = useMemo(() => {
+    const params = { page, limit };
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (supplierFilter !== 'all') params.supplier = supplierFilter;
+    if (plantFilter !== 'all') params.plant = plantFilter;
+    if (storeFilter !== 'all') params.store = storeFilter;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return params;
+  }, [page, limit, debouncedSearch, statusFilter, supplierFilter, plantFilter, storeFilter, startDate, endDate]);
+
+  const {
+    data: grData,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useGetGoodsReceiptsQuery(queryParams);
+
+  const { data: plantsData } = useGetPlantsQuery();
+  const { data: storesData } = useGetStoresQuery();
+  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' });
+
+  const [deleteGoodsReceiptMutation] = useDeleteGoodsReceiptMutation();
+  const [updateGoodsReceiptStatusMutation] = useUpdateGoodsReceiptStatusMutation();
+
+  const receipts = useMemo(() => {
+    return grData?.goodsReceipts || [];
+  }, [grData]);
+
+  const totalCount = grData?.pagination?.totalCount || 0;
+  const totalPages = grData?.pagination?.totalPages || 1;
+
+  const plants = useMemo(() => {
+    const raw = plantsData?.plants || [];
+    return Array.isArray(raw) ? raw.filter((p) => p.status === 'active') : [];
+  }, [plantsData]);
+
+  const stores = useMemo(() => {
+    const raw = storesData?.stores || [];
+    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active') : [];
+  }, [storesData]);
+
+  const suppliers = useMemo(() => {
+    const raw = clientData?.clients || clientData?.parties || [];
+    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
+  }, [clientData]);
 
   // Delete Target Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -78,87 +129,15 @@ const GoodsReceiptList = () => {
   const [workflowAction, setWorkflowAction] = useState(null); // 'POST' or 'CANCEL'
   const [workflowRemarks, setWorkflowRemarks] = useState('');
 
-  const fetchReceipts = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (supplierFilter !== 'all') params.supplier = supplierFilter;
-      if (plantFilter !== 'all') params.plant = plantFilter;
-      if (storeFilter !== 'all') params.store = storeFilter;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      const res = await getGoodsReceipts(params);
-
-      if (res.success && Array.isArray(res.goodsReceipts)) {
-        setReceipts(res.goodsReceipts);
-        if (res.pagination) {
-          setTotalCount(res.pagination.totalCount || 0);
-          setTotalPages(res.pagination.totalPages || 1);
-        }
-      } else {
-        setError('Unexpected response structure from server');
-      }
-    } catch (err) {
-      console.error('Failed to fetch Goods Receipts:', err);
-      setError(err.response?.data?.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMasterData = async () => {
-    try {
-      const [plantRes, storeRes, supplierRes] = await Promise.all([
-        getPlants().catch(() => ({ success: false, plants: [] })),
-        getStores().catch(() => ({ success: false, stores: [] })),
-        getClients({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' }).catch(() => ({ success: false, clients: [], parties: [] }))
-      ]);
-
-      if (plantRes.success && Array.isArray(plantRes.plants)) {
-        setPlants(plantRes.plants.filter((p) => p.status === 'active'));
-      } else if (Array.isArray(plantRes)) {
-        setPlants(plantRes.filter((p) => p.status === 'active'));
-      }
-
-      if (storeRes.success && Array.isArray(storeRes.stores)) {
-        setStores(storeRes.stores.filter((s) => s.status === 'active'));
-      } else if (Array.isArray(storeRes)) {
-        setStores(storeRes.filter((s) => s.status === 'active'));
-      }
-
-      const rawSuppliers = supplierRes.clients || supplierRes.parties || [];
-      if (Array.isArray(rawSuppliers)) {
-        setSuppliers(rawSuppliers.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)));
-      }
-    } catch (err) {
-      console.error('Failed to fetch GRN master data:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchMasterData();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchReceipts();
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, statusFilter, supplierFilter, plantFilter, storeFilter, startDate, endDate, page, limit]);
-
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
+    setDebouncedSearch(searchTerm);
     setPage(1);
-    fetchReceipts();
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setStatusFilter('all');
     setSupplierFilter('all');
     setPlantFilter('all');
@@ -174,16 +153,11 @@ const GoodsReceiptList = () => {
     setActionLoading(deleteTarget._id);
     setError('');
     try {
-      const res = await deleteGoodsReceipt(deleteTarget._id);
-      if (res.success) {
-        setSuccessMessage(res.message || 'Goods Receipt action completed');
-        fetchReceipts();
-      } else {
-        setError(res.message || 'Failed to delete/cancel Goods Receipt');
-      }
+      const res = await deleteGoodsReceiptMutation(deleteTarget._id).unwrap();
+      setSuccessMessage(res?.message || 'Goods Receipt action completed');
     } catch (err) {
       console.error('Delete/Cancel GRN error:', err);
-      setError(err.response?.data?.message || 'Failed to perform action');
+      setError(err?.data?.message || err.message || 'Failed to perform action');
     } finally {
       setActionLoading(null);
       setDeleteTarget(null);
@@ -196,19 +170,18 @@ const GoodsReceiptList = () => {
     setActionLoading(workflowTarget._id);
     setError('');
     try {
-      const res = await updateGoodsReceiptStatus(workflowTarget._id, workflowAction, workflowRemarks);
-      if (res.success) {
-        setSuccessMessage(res.message || `Goods Receipt status updated to ${res.goodsReceipt?.status || 'new status'}`);
-        fetchReceipts();
-        setWorkflowTarget(null);
-        setWorkflowAction(null);
-        setWorkflowRemarks('');
-      } else {
-        setError(res.message || 'Workflow action failed');
-      }
+      const res = await updateGoodsReceiptStatusMutation({
+        id: workflowTarget._id,
+        action: workflowAction,
+        remarks: workflowRemarks,
+      }).unwrap();
+      setSuccessMessage(res?.message || `Goods Receipt status updated to ${res?.goodsReceipt?.status || 'new status'}`);
+      setWorkflowTarget(null);
+      setWorkflowAction(null);
+      setWorkflowRemarks('');
     } catch (err) {
       console.error('GRN Workflow error:', err);
-      setError(err.response?.data?.message || 'Failed to execute workflow action');
+      setError(err?.data?.message || err.message || 'Failed to execute workflow action');
     } finally {
       setActionLoading(null);
     }
@@ -409,10 +382,10 @@ const GoodsReceiptList = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={fetchReceipts}
-              disabled={loading}
+              onClick={() => refetch()}
+              disabled={loading || isFetching}
             >
-              <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={14} className={`mr-1.5 ${loading || isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             {canCreate && (

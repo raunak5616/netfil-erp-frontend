@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createItemGroup, updateItemGroup } from '../../services/itemGroupService';
+import { useCreateItemGroupMutation, useUpdateItemGroupMutation } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -7,6 +7,9 @@ import { FormField, Input, Select } from '../../components/ui/FormField';
 
 const ItemGroupFormModal = ({ itemGroup, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!itemGroup;
+
+  const [createItemGroupMutation] = useCreateItemGroupMutation();
+  const [updateItemGroupMutation] = useUpdateItemGroupMutation();
 
   const [formData, setFormData] = useState({
     groupCode: '',
@@ -76,26 +79,22 @@ const ItemGroupFormModal = ({ itemGroup, isOpen, onClose, onSuccess }) => {
 
     try {
       if (isEditMode) {
-        const res = await updateItemGroup(itemGroup._id, formData);
-        if (res.success) {
-          setSuccessMessage('Item group updated successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await updateItemGroupMutation({ id: itemGroup._id, ...formData }).unwrap();
+        setSuccessMessage('Item group updated successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       } else {
-        const res = await createItemGroup(formData);
-        if (res.success) {
-          setSuccessMessage('Item group created successfully!');
-          setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 800);
-        }
+        await createItemGroupMutation(formData).unwrap();
+        setSuccessMessage('Item group created successfully!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 800);
       }
     } catch (err) {
-      const apiMsg = err.response?.data?.message || 'Failed to save item group.';
+      const apiMsg = err?.data?.message || err?.message || 'Failed to save item group.';
       setErrorMessage(apiMsg);
     } finally {
       setSubmitting(false);

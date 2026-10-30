@@ -20,16 +20,35 @@ import {
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
-import { getHoleImages, saveHoleImage, deleteHoleImage, getVersionedImageUrl } from '../../services/drawingMasterService';
+import {
+  useGetHoleImagesQuery,
+  useSaveHoleImageMutation,
+  useDeleteHoleImageMutation
+} from '../../features/drawingMaster/drawingMasterApi';
+import { getVersionedImageUrl } from '../../services/drawingMasterService';
 
 const DEFAULT_STANDARD_HOLES = [4, 8, 12];
 
 const HoleImageManagementTab = () => {
-  const [configurations, setConfigurations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [localError, setLocalError] = useState('');
   const [brokenImages, setBrokenImages] = useState({});
+
+  // RTK Query Hooks
+  const {
+    data: holeImagesData,
+    isLoading: loadingHoles,
+    isFetching: fetchingHoles,
+    error: holeQueryError,
+    refetch: fetchHoleConfigurations
+  } = useGetHoleImagesQuery();
+
+  const [saveHoleImageMutation, { isLoading: isSubmitting }] = useSaveHoleImageMutation();
+  const [deleteHoleImageMutation] = useDeleteHoleImageMutation();
+
+  const configurations = useMemo(() => holeImagesData?.holeImages || [], [holeImagesData]);
+  const loading = loadingHoles || fetchingHoles;
+  const error = localError || (holeQueryError ? (holeQueryError.data?.message || holeQueryError.message || 'Error connecting to server') : '');
 
   // ================= Direct On-Page Manual Upload / Configuration State =================
   const [editingConfigId, setEditingConfigId] = useState(null); // null = new pattern, string = editing existing
@@ -41,7 +60,6 @@ const HoleImageManagementTab = () => {
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadFilePreview, setUploadFilePreview] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
   const directFileInputRef = useRef(null);
@@ -52,29 +70,6 @@ const HoleImageManagementTab = () => {
   // Blueprint Inspection Modal state
   const [inspectModalImage, setInspectModalImage] = useState(null);
 
-  // Fetch hole image configurations from server
-  const fetchHoleConfigurations = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getHoleImages();
-      if (res.success && Array.isArray(res.holeImages)) {
-        setConfigurations(res.holeImages);
-      } else {
-        setError('Failed to load hole image configurations from server');
-      }
-    } catch (err) {
-      console.error('Failed to load hole configurations:', err);
-      setError(err.response?.data?.message || 'Error connecting to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHoleConfigurations();
-  }, []);
-
   // Sort and present all hole configurations (supporting multiple variants of the same hole count)
   const holeConfigs = useMemo(() => {
     if (!Array.isArray(configurations)) return [];
@@ -83,6 +78,12 @@ const HoleImageManagementTab = () => {
       return (a.drawingCode || '').localeCompare(b.drawingCode || '');
     });
   }, [configurations]);
+
+  const presetHoleCounts = useMemo(() => {
+    const fromBackend = holeImagesData?.supportedHoleCounts || [];
+    const set = new Set([...DEFAULT_STANDARD_HOLES, ...fromBackend]);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [holeImagesData]);
 
   const generateNewDrawingCode = (count) => {
     const existingSameHoles = holeConfigs.filter((c) => c.holes === count && c.drawingId);
@@ -232,8 +233,8 @@ const HoleImageManagementTab = () => {
         formData.append('fileUrl', uploadFilePreview);
       }
 
-      const res = await saveHoleImage(formData);
-      if (res.success) {
+      const res = await saveHoleImageMutation(formData).unwrap();
+      if (res.success || res.holeImage || res.drawing) {
         const msg = editingConfigId
           ? `Hole pattern '${uploadDrawingCode}' updated successfully.`
           : `New pattern variant for ${targetHoles} Holes created successfully.`;
@@ -248,9 +249,7 @@ const HoleImageManagementTab = () => {
       }
     } catch (err) {
       console.error('Failed to save hole image:', err);
-      setFormError(err.response?.data?.message || err.message || 'Server error while saving hole pattern');
-    } finally {
-      setIsSubmitting(false);
+      setFormError(err.data?.message || err.message || 'Server error while saving hole pattern');
     }
   };
 
@@ -267,7 +266,7 @@ const HoleImageManagementTab = () => {
 
     try {
       if (cfg.drawingId) {
-        await deleteHoleImage(cfg.drawingId);
+        await deleteHoleImageMutation(cfg.drawingId).unwrap();
       }
       setSuccessMsg(`Hole configuration '${cfg.drawingCode}' removed.`);
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -277,7 +276,7 @@ const HoleImageManagementTab = () => {
       fetchHoleConfigurations();
     } catch (err) {
       console.error('Failed to delete hole pattern:', err);
-      setError(err.response?.data?.message || 'Failed to remove hole configuration');
+      setLocalError(err.data?.message || err.message || 'Failed to remove hole configuration');
     }
   };
 
@@ -383,15 +382,15 @@ const HoleImageManagementTab = () => {
                 </label>
 
                 {/* Quick Presets Buttons + Custom Toggle */}
-                <div className="grid grid-cols-4 gap-2 mb-2.5">
-                  {[4, 8, 12].map((cnt) => {
+                <div className="flex flex-wrap gap-2 mb-2.5">
+                  {presetHoleCounts.map((cnt) => {
                     const isSelected = uploadHoles === cnt && !isCustomMode;
                     return (
                       <button
                         key={cnt}
                         type="button"
                         onClick={() => handlePresetSelect(cnt)}
-                        className={`p-2 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                        className={`py-1.5 px-3 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center ${
                           isSelected
                             ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                             : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300'
@@ -408,8 +407,8 @@ const HoleImageManagementTab = () => {
                       setIsCustomMode(true);
                       setTimeout(() => customHoleInputRef.current?.focus(), 100);
                     }}
-                    className={`p-2 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                      isCustomMode || !DEFAULT_STANDARD_HOLES.includes(Number(uploadHoles))
+                    className={`py-1.5 px-3 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center ${
+                      isCustomMode || !presetHoleCounts.includes(Number(uploadHoles))
                         ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
                         : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border-purple-200'
                     }`}
