@@ -583,7 +583,7 @@ const GoodsReceiptForm = () => {
                 <option value="">-- Select Released PO --</option>
                 {releasedPos.map((po) => (
                   <option key={po._id} value={po._id}>
-                    {po.poNumber} — {po.supplierNameSnapshot || po.supplier?.companyName} ({new Date(po.poDate).toLocaleDateString('en-GB')})
+                    {po.poNumber} — {po.supplierNameSnapshot || po.supplier?.supplierName || po.supplier?.companyName} ({new Date(po.poDate).toLocaleDateString('en-GB')})
                   </option>
                 ))}
               </Select>
@@ -593,7 +593,7 @@ const GoodsReceiptForm = () => {
             <FormField label="Supplier (Party)">
               <Input
                 type="text"
-                value={selectedPO ? (selectedPO.supplierNameSnapshot || selectedPO.supplier?.companyName || '') : ''}
+                value={selectedPO ? (selectedPO.supplierNameSnapshot || selectedPO.supplier?.supplierName || selectedPO.supplier?.companyName || '') : ''}
                 readOnly
                 disabled
                 placeholder="Auto populated from PO"

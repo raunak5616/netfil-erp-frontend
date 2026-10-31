@@ -7,6 +7,7 @@ import {
 } from '../../features/purchase/purchaseApi';
 import { useGetPlantsQuery, useGetStoresQuery } from '../../features/stores/storesApi';
 import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery } from '../../features/suppliers/suppliersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -94,7 +95,8 @@ const GoodsReceiptList = () => {
 
   const { data: plantsData } = useGetPlantsQuery();
   const { data: storesData } = useGetStoresQuery();
-  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' });
+  const { data: suppliersData } = useGetSuppliersQuery({ limit: 200, status: 'active', approvalStatus: 'APPROVED' });
+  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 200 });
 
   const [deleteGoodsReceiptMutation] = useDeleteGoodsReceiptMutation();
   const [updateGoodsReceiptStatusMutation] = useUpdateGoodsReceiptStatusMutation();
@@ -117,9 +119,41 @@ const GoodsReceiptList = () => {
   }, [storesData]);
 
   const suppliers = useMemo(() => {
-    const raw = clientData?.clients || clientData?.parties || [];
-    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
-  }, [clientData]);
+    const list = [];
+    const seen = new Set();
+
+    const fromSuppliers = suppliersData?.data?.suppliers || suppliersData?.suppliers || [];
+    if (Array.isArray(fromSuppliers)) {
+      for (const s of fromSuppliers) {
+        if (s._id && !seen.has(String(s._id))) {
+          seen.add(String(s._id));
+          list.push({
+            _id: s._id,
+            name: s.supplierName,
+            code: s.supplierCode,
+            status: s.status
+          });
+        }
+      }
+    }
+
+    const fromParties = clientData?.clients || clientData?.parties || [];
+    if (Array.isArray(fromParties)) {
+      for (const p of fromParties) {
+        if (p._id && !seen.has(String(p._id))) {
+          seen.add(String(p._id));
+          list.push({
+            _id: p._id,
+            name: p.companyName,
+            code: p.partyCode,
+            status: p.status
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [suppliersData, clientData]);
 
   // Delete Target Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -230,10 +264,12 @@ const GoodsReceiptList = () => {
         render: (_, row) => (
           <div>
             <div className="font-semibold text-slate-900">
-              {row.supplierNameSnapshot || row.supplier?.companyName || '—'}
+              {row.supplierNameSnapshot || row.supplier?.supplierName || row.supplier?.companyName || '—'}
             </div>
-            {row.supplier?.partyCode && (
-              <div className="text-[11px] text-slate-500 font-mono">{row.supplier.partyCode}</div>
+            {(row.supplierCodeSnapshot || row.supplier?.supplierCode || row.supplier?.partyCode) && (
+              <div className="text-[11px] text-slate-500 font-mono">
+                {row.supplierCodeSnapshot || row.supplier?.supplierCode || row.supplier?.partyCode}
+              </div>
             )}
           </div>
         )
@@ -449,7 +485,7 @@ const GoodsReceiptList = () => {
               <option value="all">All Suppliers</option>
               {suppliers.map((sup) => (
                 <option key={sup._id} value={sup._id}>
-                  {sup.companyName}
+                  {sup.name} {sup.code ? `(${sup.code})` : ''}
                 </option>
               ))}
             </Select>

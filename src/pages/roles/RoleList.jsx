@@ -77,8 +77,9 @@ const RoleList = () => {
   };
 
   const handleSaveRole = async (payload, roleId) => {
-    if (roleId) {
-      await updateRoleMutation({ id: roleId, ...payload }).unwrap();
+    const targetId = roleId || payload?.id || payload?._id;
+    if (targetId) {
+      await updateRoleMutation({ id: targetId, ...payload }).unwrap();
     } else {
       await createRoleMutation(payload).unwrap();
     }
@@ -178,7 +179,11 @@ const RoleList = () => {
         }
       />
 
-      {error && <Alert type="danger">{error}</Alert>}
+      {(error || rolesError) && (
+        <Alert type="danger">
+          {error || rolesError?.data?.message || rolesError?.message || 'Failed to load roles'}
+        </Alert>
+      )}
 
       {/* Filter and Table Container */}
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5 space-y-4">

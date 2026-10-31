@@ -219,6 +219,38 @@ export const purchaseApi = apiSlice.injectEndpoints({
       providesTags: (result, error, id) => [{ type: 'PurchaseOrders', id: `AMENDMENTS_${id}` }],
     }),
 
+    // --- Purchase Order P-CAT Documents ---
+    getPurchaseOrderPCatDocuments: builder.query({
+      query: (purchaseOrderId) => ({
+        url: `/purchase-orders/${purchaseOrderId}/pcat-documents`,
+        method: 'get',
+      }),
+      providesTags: (result, error, id) => [{ type: 'PurchaseOrders', id: `PCAT_${id}` }],
+    }),
+    uploadPurchaseOrderPCatDocuments: builder.mutation({
+      query: ({ purchaseOrderId, formData }) => ({
+        url: `/purchase-orders/${purchaseOrderId}/pcat-documents`,
+        method: 'post',
+        data: formData,
+      }),
+      invalidatesTags: (result, error, { purchaseOrderId }) => [
+        { type: 'PurchaseOrders', id: `PCAT_${purchaseOrderId}` },
+        { type: 'PurchaseOrders', id: purchaseOrderId },
+        { type: 'PurchaseOrders', id: 'LIST' },
+      ],
+    }),
+    deletePurchaseOrderPCatDocument: builder.mutation({
+      query: ({ purchaseOrderId, documentId }) => ({
+        url: `/purchase-orders/${purchaseOrderId}/pcat-documents/${documentId}`,
+        method: 'delete',
+      }),
+      invalidatesTags: (result, error, { purchaseOrderId }) => [
+        { type: 'PurchaseOrders', id: `PCAT_${purchaseOrderId}` },
+        { type: 'PurchaseOrders', id: purchaseOrderId },
+        { type: 'PurchaseOrders', id: 'LIST' },
+      ],
+    }),
+
     // --- Goods Receipts (GRN) ---
     getGoodsReceipts: builder.query({
       query: (params = {}) => ({
@@ -317,6 +349,11 @@ export const {
   useDeletePurchaseOrderMutation,
   useCreatePurchaseOrderAmendmentMutation,
   useGetPurchaseOrderAmendmentsQuery,
+  // P-CAT Documents
+  useGetPurchaseOrderPCatDocumentsQuery,
+  useLazyGetPurchaseOrderPCatDocumentsQuery,
+  useUploadPurchaseOrderPCatDocumentsMutation,
+  useDeletePurchaseOrderPCatDocumentMutation,
   // Goods Receipts
   useGetGoodsReceiptsQuery,
   useLazyGetGoodsReceiptsQuery,

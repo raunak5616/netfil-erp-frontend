@@ -27,6 +27,22 @@ export const getEquivalentPermissionCodes = (permissionCode) => {
   return PERMISSION_ALIASES[permissionCode] || [permissionCode];
 };
 
+export const isUserAdmin = (user) => {
+  if (!user) return false;
+  const rolesArray = user.roles
+    ? user.roles
+    : user.role
+    ? [user.role]
+    : [];
+
+  return rolesArray.some((r) => {
+    if (!r) return false;
+    const roleName = typeof r === 'string' ? r : r.roleName;
+    const clean = roleName?.toLowerCase()?.replace(/[\s_-]+/g, '');
+    return clean === 'admin' || clean === 'superadmin' || clean === 'administrator';
+  });
+};
+
 /**
  * Pure RBAC Permission Checker
  * Evaluates user-specific overrides first (DENY -> ALLOW), then Admin role bypass, then Role permissions union.
@@ -49,6 +65,9 @@ export const checkUserPermission = (user, permissionCode) => {
     if (userOverrides.some((item) => item.effect === 'ALLOW')) return true;
   }
 
+  // 2. Check if user has an "Admin" role (Admin has all permissions)
+  if (isUserAdmin(user)) return true;
+
   // Support both user.roles (array) and fallback user.role (object)
   const rolesArray = user.roles
     ? user.roles
@@ -57,15 +76,6 @@ export const checkUserPermission = (user, permissionCode) => {
     : [];
 
   if (!Array.isArray(rolesArray) || rolesArray.length === 0) return false;
-
-  // 2. Check if user has an "Admin" role (Admin has all permissions)
-  const isAdmin = rolesArray.some((r) => {
-    if (!r) return false;
-    const roleName = typeof r === 'string' ? r : r.roleName;
-    return roleName?.toLowerCase() === 'admin';
-  });
-
-  if (isAdmin) return true;
 
   // 3. Check union of all assigned roles permissions
   return rolesArray.some((role) => {
@@ -150,15 +160,7 @@ export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;
 
-export const selectIsAdmin = createSelector([selectCurrentUser], (user) => {
-  if (!user) return false;
-  const rolesArray = user.roles ? user.roles : user.role ? [user.role] : [];
-  return rolesArray.some((r) => {
-    if (!r) return false;
-    const roleName = typeof r === 'string' ? r : r.roleName;
-    return roleName?.toLowerCase() === 'admin';
-  });
-});
+export const selectIsAdmin = createSelector([selectCurrentUser], (user) => isUserAdmin(user));
 
 export const makeSelectHasPermission = (permissionCode) =>
   createSelector([selectCurrentUser], (user) => checkUserPermission(user, permissionCode));

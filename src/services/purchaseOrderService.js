@@ -45,3 +45,19 @@ export const getPurchaseOrderAmendmentById = async (id, amendmentId) => {
   const response = await api.get(`/purchase-orders/${id}/amendments/${amendmentId}`);
   return response.data;
 };
+
+// P-CAT Document API methods
+export const getPurchaseOrderPCatDocuments = async (id) => {
+  const response = await api.get(`/purchase-orders/${id}/pcat-documents`);
+  return response.data;
+};
+
+export const uploadPurchaseOrderPCatDocuments = async (id, formData) => {
+  const response = await api.post(`/purchase-orders/${id}/pcat-documents`, formData);
+  return response.data;
+};
+
+export const deletePurchaseOrderPCatDocument = async (id, documentId) => {
+  const response = await api.delete(`/purchase-orders/${id}/pcat-documents/${documentId}`);
+  return response.data;
+};

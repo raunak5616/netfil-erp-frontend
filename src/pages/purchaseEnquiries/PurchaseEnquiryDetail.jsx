@@ -283,10 +283,10 @@ const PurchaseEnquiryDetail = () => {
             <UserCheck size={14} className="text-blue-600" /> Supplier (Party)
           </div>
           <div className="font-semibold text-sm text-slate-900">
-            {pe.supplierName || pe.supplier?.companyName || '—'}
+            {pe.supplierName || pe.supplier?.supplierName || pe.supplier?.companyName || '—'}
           </div>
           <div className="text-xs text-slate-500 font-mono">
-            Code: <span className="text-slate-800">{pe.supplier?.partyCode || 'N/A'}</span>
+            Code: <span className="text-slate-800">{pe.supplier?.supplierCode || pe.supplier?.partyCode || 'N/A'}</span>
           </div>
         </div>
 

@@ -32,8 +32,10 @@ import {
   IndianRupee,
   UserCheck,
   Truck,
-  Eye
+  Eye,
+  Paperclip
 } from 'lucide-react';
+import PurchaseOrderPCatModal from './PurchaseOrderPCatModal';
 
 const PO_TYPE_LABELS = {
   GENERAL_PO: 'General PO',
@@ -102,6 +104,9 @@ const PurchaseOrderDetail = () => {
   const [selectedAmendment, setSelectedAmendment] = useState(null);
   const [isAmendmentDetailOpen, setIsAmendmentDetailOpen] = useState(false);
 
+  // P-CAT Documents Modal State
+  const [isPCatModalOpen, setIsPCatModalOpen] = useState(false);
+
   const handleExecuteAction = async () => {
     if (!activeAction || !po) return;
 
@@ -165,6 +170,22 @@ const PurchaseOrderDetail = () => {
             >
               <ArrowLeft size={14} className="mr-1.5" />
               Back to Orders
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPCatModalOpen(true)}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+              title="Manage P-CAT Documents"
+            >
+              <Paperclip size={14} className="mr-1.5 text-blue-600" />
+              P-CAT Documents
+              {(po.pcatDocumentCount || 0) > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-100 text-blue-700">
+                  {po.pcatDocumentCount}
+                </span>
+              )}
             </Button>
 
             {canEdit && po.status === 'DRAFT' && (
@@ -289,10 +310,10 @@ const PurchaseOrderDetail = () => {
             <UserCheck size={14} className="text-blue-600" /> Supplier (Party)
           </div>
           <div className="font-semibold text-sm text-slate-900">
-            {po.supplierNameSnapshot || po.supplier?.companyName || '—'}
+            {po.supplierNameSnapshot || po.supplier?.supplierName || po.supplier?.companyName || '—'}
           </div>
           <div className="text-xs text-slate-500 font-mono">
-            Code: <span className="text-slate-800">{po.supplierCodeSnapshot || po.supplier?.partyCode || 'N/A'}</span>
+            Code: <span className="text-slate-800">{po.supplierCodeSnapshot || po.supplier?.supplierCode || po.supplier?.partyCode || 'N/A'}</span>
           </div>
         </div>
 
@@ -651,6 +672,15 @@ const PurchaseOrderDetail = () => {
             setSelectedAmendment(null);
           }}
           amendment={selectedAmendment}
+        />
+      )}
+
+      {/* P-CAT DOCUMENTS MODAL */}
+      {isPCatModalOpen && po && (
+        <PurchaseOrderPCatModal
+          isOpen={isPCatModalOpen}
+          onClose={() => setIsPCatModalOpen(false)}
+          purchaseOrder={po}
         />
       )}
 

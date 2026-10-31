@@ -6,6 +6,7 @@ import {
 } from '../../features/purchase/purchaseApi';
 import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery } from '../../features/suppliers/suppliersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -92,7 +93,8 @@ const PurchaseEnquiryList = () => {
   } = useGetPurchaseEnquiriesQuery(queryParams);
 
   const { data: deptData } = useGetDepartmentsQuery();
-  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' });
+  const { data: supplierData } = useGetSuppliersQuery({ limit: 200, status: 'active', approvalStatus: 'APPROVED' });
+  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 200 });
   const [deletePurchaseEnquiryMutation] = useDeletePurchaseEnquiryMutation();
 
   const enquiries = useMemo(() => {
@@ -108,9 +110,33 @@ const PurchaseEnquiryList = () => {
   }, [deptData]);
 
   const suppliers = useMemo(() => {
-    const raw = clientData?.clients || clientData?.parties || [];
-    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
-  }, [clientData]);
+    const supplierList = supplierData?.suppliers || [];
+    const partyList = clientData?.clients || clientData?.parties || [];
+
+    const list = [
+      ...supplierList.map((s) => ({
+        _id: s._id,
+        name: s.supplierName || s.legalName,
+        code: s.supplierCode,
+        status: s.status,
+      })),
+      ...partyList
+        .filter((p) => p.status === 'active' && ['SUPPLIER', 'BOTH'].includes(p.partyType))
+        .map((p) => ({
+          _id: p._id,
+          name: p.companyName,
+          code: p.partyCode,
+          status: p.status,
+        })),
+    ];
+
+    const seen = new Set();
+    return list.filter((item) => {
+      if (!item._id || seen.has(item._id.toString())) return false;
+      seen.add(item._id.toString());
+      return true;
+    });
+  }, [supplierData, clientData]);
 
   // Confirm Delete / Cancel Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -185,10 +211,10 @@ const PurchaseEnquiryList = () => {
         render: (_, row) => (
           <div>
             <div className="font-semibold text-slate-900">
-              {row.supplierName || row.supplier?.companyName || '—'}
+              {row.supplierName || row.supplier?.supplierName || row.supplier?.companyName || '—'}
             </div>
-            {row.supplier?.partyCode && (
-              <div className="text-[11px] text-slate-500 font-mono">{row.supplier.partyCode}</div>
+            {(row.supplier?.supplierCode || row.supplier?.partyCode) && (
+              <div className="text-[11px] text-slate-500 font-mono">{row.supplier.supplierCode || row.supplier.partyCode}</div>
             )}
           </div>
         )
@@ -362,7 +388,7 @@ const PurchaseEnquiryList = () => {
               <option value="all">All Suppliers</option>
               {suppliers.map((sup) => (
                 <option key={sup._id} value={sup._id}>
-                  {sup.companyName}
+                  {sup.name || sup.supplierName || sup.companyName}
                 </option>
               ))}
             </Select>

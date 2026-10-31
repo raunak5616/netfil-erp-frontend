@@ -263,6 +263,7 @@ export const masterDataApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, id) => [
         { type: 'ItemCategories', id },
         { type: 'ItemCategories', id: 'LIST' },
+        { type: 'Specifications', id: 'LIST' },
       ],
     }),
     getCategorySpecifications: builder.query({

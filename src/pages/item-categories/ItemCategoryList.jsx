@@ -470,7 +470,7 @@ const ItemCategoryList = () => {
         title="Delete Item Category"
         message={
           categoryToDelete
-            ? `Are you sure you want to permanently delete category "${categoryToDelete.categoryName}" (${categoryToDelete.categoryCode})? This action cannot be undone.`
+            ? `Are you sure you want to permanently delete category "${categoryToDelete.categoryName}" (${categoryToDelete.categoryCode})? Any assigned technical specifications will be safely detached. Categories referenced by actual Items or transactional records cannot be deleted and must be deactivated instead.`
             : 'Are you sure you want to delete this category?'
         }
         confirmLabel="Delete Category"

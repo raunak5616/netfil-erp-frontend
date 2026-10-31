@@ -7,6 +7,7 @@ import {
 } from '../../features/purchase/purchaseApi';
 import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery } from '../../features/suppliers/suppliersApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -32,8 +33,10 @@ import {
   Play,
   FileEdit,
   XCircle,
-  Archive
+  Archive,
+  Paperclip
 } from 'lucide-react';
+import PurchaseOrderPCatModal from './PurchaseOrderPCatModal';
 
 const PO_TYPE_LABELS = {
   GENERAL_PO: 'General PO',
@@ -118,7 +121,8 @@ const PurchaseOrderList = () => {
   } = useGetPurchaseOrdersQuery(queryParams);
 
   const { data: deptData } = useGetDepartmentsQuery();
-  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', approvalStatus: 'APPROVED' });
+  const { data: suppliersData } = useGetSuppliersQuery({ limit: 200, status: 'active', approvalStatus: 'APPROVED' });
+  const { data: clientData } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 200 });
 
   const [deletePurchaseOrderMutation] = useDeletePurchaseOrderMutation();
   const [updatePurchaseOrderStatusMutation] = useUpdatePurchaseOrderStatusMutation();
@@ -136,12 +140,47 @@ const PurchaseOrderList = () => {
   }, [deptData]);
 
   const suppliers = useMemo(() => {
-    const raw = clientData?.clients || clientData?.parties || [];
-    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
-  }, [clientData]);
+    const list = [];
+    const seen = new Set();
+
+    const fromSuppliers = suppliersData?.data?.suppliers || suppliersData?.suppliers || [];
+    if (Array.isArray(fromSuppliers)) {
+      for (const s of fromSuppliers) {
+        if (s._id && !seen.has(String(s._id))) {
+          seen.add(String(s._id));
+          list.push({
+            _id: s._id,
+            name: s.supplierName,
+            code: s.supplierCode,
+            status: s.status
+          });
+        }
+      }
+    }
+
+    const fromParties = clientData?.clients || clientData?.parties || [];
+    if (Array.isArray(fromParties)) {
+      for (const p of fromParties) {
+        if (p._id && !seen.has(String(p._id))) {
+          seen.add(String(p._id));
+          list.push({
+            _id: p._id,
+            name: p.companyName,
+            code: p.partyCode,
+            status: p.status
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [suppliersData, clientData]);
 
   // Confirm Delete / Cancel Modal State
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // P-CAT Documents Modal State
+  const [pcatModalPO, setPcatModalPO] = useState(null);
 
   // Workflow Quick Action Modal State
   const [workflowTarget, setWorkflowTarget] = useState(null);
@@ -249,10 +288,12 @@ const PurchaseOrderList = () => {
         render: (_, row) => (
           <div>
             <div className="font-semibold text-slate-900">
-              {row.supplierNameSnapshot || row.supplier?.companyName || '—'}
+              {row.supplierNameSnapshot || row.supplier?.supplierName || row.supplier?.companyName || '—'}
             </div>
-            {(row.supplierCodeSnapshot || row.supplier?.partyCode) && (
-              <div className="text-[11px] text-slate-500 font-mono">{row.supplierCodeSnapshot || row.supplier?.partyCode}</div>
+            {(row.supplierCodeSnapshot || row.supplier?.supplierCode || row.supplier?.partyCode) && (
+              <div className="text-[11px] text-slate-500 font-mono">
+                {row.supplierCodeSnapshot || row.supplier?.supplierCode || row.supplier?.partyCode}
+              </div>
             )}
           </div>
         )
@@ -317,6 +358,29 @@ const PurchaseOrderList = () => {
         )
       },
       {
+        key: 'pcatDocuments',
+        header: 'P-CAT Docs',
+        align: 'center',
+        render: (_, row) => {
+          const docCount = row.pcatDocumentCount || 0;
+          return (
+            <button
+              type="button"
+              onClick={() => setPcatModalPO(row)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                docCount > 0
+                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300'
+                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+              title="Manage P-CAT Documents"
+            >
+              <Paperclip size={12} className={docCount > 0 ? 'text-blue-600' : 'text-slate-400'} />
+              <span>{docCount} {docCount === 1 ? 'Doc' : 'Docs'}</span>
+            </button>
+          );
+        }
+      },
+      {
         key: 'status',
         header: 'Status',
         render: (val) => (
@@ -336,6 +400,16 @@ const PurchaseOrderList = () => {
               title="View Details"
             >
               <Eye size={13} className="mr-1" /> View
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setPcatModalPO(row)}
+              title="P-CAT Documents"
+              className="text-slate-700 hover:bg-slate-100"
+            >
+              <Paperclip size={13} className="mr-1 text-blue-600" /> P-CAT
             </Button>
 
             {/* DRAFT Actions */}
@@ -529,7 +603,7 @@ const PurchaseOrderList = () => {
               <option value="all">All Suppliers</option>
               {suppliers.map((sup) => (
                 <option key={sup._id} value={sup._id}>
-                  {sup.companyName}
+                  {sup.name} {sup.code ? `(${sup.code})` : ''}
                 </option>
               ))}
             </Select>
@@ -665,6 +739,15 @@ const PurchaseOrderList = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* P-CAT Documents Modal */}
+      {pcatModalPO && (
+        <PurchaseOrderPCatModal
+          isOpen={!!pcatModalPO}
+          onClose={() => setPcatModalPO(null)}
+          purchaseOrder={pcatModalPO}
+        />
       )}
     </div>
   );

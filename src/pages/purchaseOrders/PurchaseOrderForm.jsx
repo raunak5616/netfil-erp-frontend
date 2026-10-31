@@ -10,6 +10,7 @@ import {
   useLazyGetPurchaseEnquiryByIdQuery,
 } from '../../features/purchase/purchaseApi';
 import { useGetClientsQuery, useGetUOMsQuery } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery } from '../../features/suppliers/suppliersApi';
 import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useGetItemsQuery } from '../../features/products/productsApi';
 import { useAuth } from '../../context/AuthContext';
@@ -60,7 +61,8 @@ const PurchaseOrderForm = () => {
   const [getPRById] = useLazyGetPurchaseRequisitionByIdQuery();
   const { data: peRes } = useGetPurchaseEnquiriesQuery({ limit: 100 });
   const [getPEById] = useLazyGetPurchaseEnquiryByIdQuery();
-  const { data: supplierRes } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' });
+  const { data: supplierRes } = useGetSuppliersQuery({ limit: 200, status: 'active', approvalStatus: 'APPROVED' });
+  const { data: clientRes } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 200 });
   const { data: deptRes } = useGetDepartmentsQuery();
   const { data: itemRes } = useGetItemsQuery({ limit: 1000 });
   const { data: uomRes } = useGetUOMsQuery();
@@ -75,9 +77,33 @@ const PurchaseOrderForm = () => {
   }, [peRes]);
 
   const suppliers = useMemo(() => {
-    const raw = supplierRes?.clients || supplierRes?.parties || [];
-    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active') : [];
-  }, [supplierRes]);
+    const supplierList = supplierRes?.suppliers || supplierRes?.data?.suppliers || [];
+    const partyList = clientRes?.clients || clientRes?.parties || [];
+
+    const list = [
+      ...supplierList.map((s) => ({
+        _id: s._id,
+        supplierName: s.supplierName || s.legalName,
+        supplierCode: s.supplierCode,
+        status: s.status,
+      })),
+      ...partyList
+        .filter((p) => p.status === 'active' && ['SUPPLIER', 'BOTH'].includes(p.partyType))
+        .map((p) => ({
+          _id: p._id,
+          supplierName: p.companyName,
+          supplierCode: p.partyCode,
+          status: p.status,
+        })),
+    ];
+
+    const seen = new Set();
+    return list.filter((item) => {
+      if (!item._id || seen.has(item._id.toString())) return false;
+      seen.add(item._id.toString());
+      return true;
+    });
+  }, [supplierRes, clientRes]);
 
   const departments = useMemo(() => {
     const raw = deptRes?.departments || [];
@@ -744,48 +770,61 @@ const PurchaseOrderForm = () => {
 
         {/* LINE ITEMS TABLE CARD */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Package size={16} className="text-blue-600" />
-              Order Line Items ({lineItems.length})
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                <Package size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-800">Order Line Items</h3>
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    {lineItems.length} {lineItems.length === 1 ? 'line item' : 'line items'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Total Quantity: <strong className="text-slate-700">{computedTotals.totalQuantity.toLocaleString('en-IN')}</strong> · Subtotal: <strong className="text-slate-700 font-mono">₹ {computedTotals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                </p>
+              </div>
+            </div>
             {!isFormDisabled && (
-              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                <Plus size={14} className="mr-1" /> Add Line Item
+              <Button type="button" variant="primary" size="sm" onClick={addLineItem} className="self-start sm:self-auto">
+                <Plus size={14} className="mr-1.5" /> Add Line Item
               </Button>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full min-w-[1520px] border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-[11px] uppercase tracking-wider text-left">
-                  <th className="px-3 py-2 w-10 text-center">#</th>
-                  <th className="px-3 py-2 min-w-[180px]">Item <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-24">Item Code</th>
-                  <th className="px-3 py-2 w-24">Qty <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-28">UOM <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-28">Rate <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-24">Discount</th>
-                  <th className="px-3 py-2 w-24">Tax %</th>
-                  <th className="px-3 py-2 w-28 text-right">Line Amt</th>
-                  <th className="px-3 py-2 w-32">Req. Date</th>
-                  <th className="px-3 py-2 min-w-[140px]">Specs</th>
-                  {!isFormDisabled && <th className="px-3 py-2 w-12 text-center">Action</th>}
+                <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-semibold text-[11px] uppercase tracking-wider text-left">
+                  <th className="px-3.5 py-3 w-12 text-center text-slate-500 whitespace-nowrap">#</th>
+                  <th className="px-3.5 py-3 w-[320px] min-w-[320px] whitespace-nowrap">Item Description <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[130px] min-w-[130px] text-center whitespace-nowrap">Item Code</th>
+                  <th className="px-3.5 py-3 w-[110px] min-w-[110px] text-right whitespace-nowrap">Quantity <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[140px] min-w-[140px] whitespace-nowrap">UOM <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[140px] min-w-[140px] text-right whitespace-nowrap">Unit Rate (₹) <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[120px] min-w-[120px] text-right whitespace-nowrap">Discount (₹)</th>
+                  <th className="px-3.5 py-3 w-[100px] min-w-[100px] text-right whitespace-nowrap">Tax (%)</th>
+                  <th className="px-3.5 py-3 w-[160px] min-w-[160px] text-right whitespace-nowrap">Line Total (₹)</th>
+                  <th className="px-3.5 py-3 w-[150px] min-w-[150px] whitespace-nowrap">Req. Date</th>
+                  <th className="px-3.5 py-3 min-w-[180px] whitespace-nowrap">Specification</th>
+                  {!isFormDisabled && <th className="px-3.5 py-3 w-14 text-center whitespace-nowrap">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {computedTotals.itemsWithAmounts.map((line, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-3 py-2 text-center text-slate-400 font-medium">{idx + 1}</td>
+                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="px-3.5 py-3 text-center text-slate-400 font-medium">{idx + 1}</td>
                     
                     {/* Item Select */}
-                    <td className="px-3 py-2">
+                    <td className="px-3.5 py-3">
                       <Select
                         value={line.item}
                         onChange={(e) => handleItemSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
+                        size="sm"
                         className="text-xs"
                       >
                         <option value="">-- Select Item --</option>
@@ -797,39 +836,40 @@ const PurchaseOrderForm = () => {
                       </Select>
                     </td>
 
-                    {/* Item Code */}
-                    <td className="px-3 py-2">
-                      <Input
-                        type="text"
-                        value={line.itemCode}
-                        readOnly
-                        disabled
-                        className="bg-slate-100 font-mono text-[11px] text-slate-700"
-                        placeholder="Auto"
-                      />
+                    {/* Item Code Badge */}
+                    <td className="px-3.5 py-3 text-center">
+                      {line.itemCode ? (
+                        <span className="inline-block px-2.5 py-1.5 font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-md whitespace-nowrap shadow-2xs">
+                          {line.itemCode}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs italic">—</span>
+                      )}
                     </td>
 
                     {/* Quantity */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3.5 py-3">
+                      <input
                         type="number"
                         step="any"
                         min="0.0001"
-                        value={line.quantity || line.requestedQuantity}
+                        placeholder="0"
+                        value={line.quantity || line.requestedQuantity || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'quantity', e.target.value)}
                         disabled={isFormDisabled}
                         required
-                        className="text-right font-semibold text-slate-900"
+                        className="w-full px-3 py-1.5 text-xs text-right font-semibold text-slate-900 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </td>
 
                     {/* UOM Select */}
-                    <td className="px-3 py-2">
+                    <td className="px-3.5 py-3">
                       <Select
                         value={line.uom}
                         onChange={(e) => handleUomSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
+                        size="sm"
                         className="text-xs"
                       >
                         <option value="">-- UOM --</option>
@@ -842,95 +882,141 @@ const PurchaseOrderForm = () => {
                     </td>
 
                     {/* Unit Rate */}
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={line.unitRate}
-                        onChange={(e) => handleLineFieldChange(idx, 'unitRate', e.target.value)}
-                        disabled={isFormDisabled}
-                        required
-                        className="text-right font-semibold text-slate-900"
-                      />
+                    <td className="px-3.5 py-3">
+                      <div className="relative rounded-md shadow-2xs">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-xs font-semibold text-slate-400">
+                          ₹
+                        </span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="0.00"
+                          value={line.unitRate ?? ''}
+                          onChange={(e) => handleLineFieldChange(idx, 'unitRate', e.target.value)}
+                          disabled={isFormDisabled}
+                          required
+                          className="w-full pl-6 pr-3 py-1.5 text-xs text-right font-semibold text-slate-900 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
                     </td>
 
                     {/* Discount */}
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={line.discount}
-                        onChange={(e) => handleLineFieldChange(idx, 'discount', e.target.value)}
-                        disabled={isFormDisabled}
-                        className="text-right"
-                      />
+                    <td className="px-3.5 py-3">
+                      <div className="relative rounded-md shadow-2xs">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-xs font-semibold text-slate-400">
+                          ₹
+                        </span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="0"
+                          value={line.discount ?? ''}
+                          onChange={(e) => handleLineFieldChange(idx, 'discount', e.target.value)}
+                          disabled={isFormDisabled}
+                          className="w-full pl-6 pr-3 py-1.5 text-xs text-right text-slate-700 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
                     </td>
 
                     {/* Tax Rate */}
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={line.taxRate}
-                        onChange={(e) => handleLineFieldChange(idx, 'taxRate', e.target.value)}
-                        disabled={isFormDisabled}
-                        className="text-right"
-                      />
+                    <td className="px-3.5 py-3">
+                      <div className="relative rounded-md shadow-2xs">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="0"
+                          value={line.taxRate ?? ''}
+                          onChange={(e) => handleLineFieldChange(idx, 'taxRate', e.target.value)}
+                          disabled={isFormDisabled}
+                          className="w-full pl-2.5 pr-6 py-1.5 text-xs text-right text-slate-700 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-xs font-semibold text-slate-400">
+                          %
+                        </span>
+                      </div>
                     </td>
 
                     {/* Line Amount (Computed Live Preview) */}
-                    <td className="px-3 py-2 text-right font-bold text-slate-900 font-mono">
-                      {line.lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <td className="px-3.5 py-3 text-right">
+                      <span className="inline-block px-3 py-1.5 bg-slate-50 border border-slate-200/90 rounded-md font-mono font-bold text-slate-900 text-xs whitespace-nowrap shadow-2xs">
+                        ₹ {line.lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </td>
 
                     {/* Required Date */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3.5 py-3">
+                      <input
                         type="date"
-                        value={line.requiredDate}
+                        value={line.requiredDate || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'requiredDate', e.target.value)}
                         disabled={isFormDisabled}
+                        className="w-full px-2.5 py-1.5 text-xs text-slate-800 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </td>
 
                     {/* Specification */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3.5 py-3">
+                      <input
                         type="text"
-                        placeholder="Specs..."
-                        value={line.specification}
+                        placeholder="Specs / Grade / Notes..."
+                        value={line.specification || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'specification', e.target.value)}
                         disabled={isFormDisabled}
+                        className="w-full px-2.5 py-1.5 text-xs text-slate-800 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </td>
 
                     {/* Remove Action */}
                     {!isFormDisabled && (
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-3.5 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => removeLineItem(idx)}
-                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                           title="Remove Line Item"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={16} />
                         </button>
                       </td>
                     )}
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-slate-50/90 border-t-2 border-slate-200 text-xs font-semibold text-slate-700">
+                <tr>
+                  <td colSpan={3} className="px-3.5 py-3 text-right uppercase tracking-wider text-[11px] text-slate-500 font-bold whitespace-nowrap">
+                    Totals:
+                  </td>
+                  <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                    {computedTotals.totalQuantity.toLocaleString('en-IN')}
+                  </td>
+                  <td colSpan={4} className="px-3.5 py-3 text-right uppercase tracking-wider text-[11px] text-slate-500 font-bold whitespace-nowrap">
+                    Subtotal:
+                  </td>
+                  <td className="px-3.5 py-3 text-right font-mono font-bold text-blue-700 text-xs whitespace-nowrap">
+                    ₹ {computedTotals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={isFormDisabled ? 2 : 3}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
           {!isFormDisabled && (
-            <div className="pt-2">
-              <Button type="button" variant="ghost" size="sm" onClick={addLineItem} className="text-blue-600">
-                <Plus size={14} className="mr-1" /> Add Another Line Item
-              </Button>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={addLineItem}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <Plus size={14} /> Add Another Line Item
+              </button>
+              <span className="text-[11.5px] text-slate-500">
+                {lineItems.length} {lineItems.length === 1 ? 'line item' : 'line items'} in this order
+              </span>
             </div>
           )}
         </div>

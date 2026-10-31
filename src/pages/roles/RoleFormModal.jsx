@@ -42,7 +42,7 @@ const RoleFormModal = ({
       setRoleName(roleToEdit.roleName || '');
       setDescription(roleToEdit.description || '');
       const existingIds = (roleToEdit.permissions || [])
-        .map((p) => (typeof p === 'string' ? p : p._id))
+        .map((p) => (typeof p === 'string' ? p : p?._id || p?.id))
         .filter(Boolean);
       setSelectedPermissionIds(existingIds);
     } else {
@@ -101,11 +101,17 @@ const RoleFormModal = ({
         permissionIds: selectedPermissionIds,
       };
 
-      await onSuccess(payload, roleToEdit?._id);
+      const targetRoleId = roleToEdit?._id || roleToEdit?.id;
+      await onSuccess(payload, targetRoleId);
       onClose();
     } catch (err) {
       console.error("Role save error:", err);
-      setErrorMessage(err.response?.data?.message || err.message || 'Failed to save role');
+      const serverMsg =
+        err?.data?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to save role. Please check your permissions.';
+      setErrorMessage(serverMsg);
     } finally {
       setSubmitting(false);
     }

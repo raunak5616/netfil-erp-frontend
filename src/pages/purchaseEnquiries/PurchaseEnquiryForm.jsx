@@ -8,6 +8,7 @@ import {
   useLazyGetPurchaseRequisitionByIdQuery,
 } from '../../features/purchase/purchaseApi';
 import { useGetClientsQuery, useGetUOMsQuery } from '../../features/masterData/masterDataApi';
+import { useGetSuppliersQuery } from '../../features/suppliers/suppliersApi';
 import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { useGetItemsQuery } from '../../features/products/productsApi';
 import { useAuth } from '../../context/AuthContext';
@@ -43,7 +44,8 @@ const PurchaseEnquiryForm = () => {
   // Master Data Dropdowns via RTK Query
   const { data: prRes } = useGetPurchaseRequisitionsQuery({ status: 'APPROVED', limit: 100 });
   const [getPRById] = useLazyGetPurchaseRequisitionByIdQuery();
-  const { data: supplierRes } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 100, approvalStatus: 'APPROVED' });
+  const { data: supplierRes } = useGetSuppliersQuery({ limit: 200, status: 'active', approvalStatus: 'APPROVED' });
+  const { data: clientRes } = useGetClientsQuery({ partyType: 'SUPPLIER', status: 'active', limit: 200 });
   const { data: deptRes } = useGetDepartmentsQuery();
   const { data: itemRes } = useGetItemsQuery({ limit: 1000 });
   const { data: uomRes } = useGetUOMsQuery();
@@ -53,9 +55,33 @@ const PurchaseEnquiryForm = () => {
   }, [prRes]);
 
   const suppliers = useMemo(() => {
-    const raw = supplierRes?.clients || supplierRes?.parties || [];
-    return Array.isArray(raw) ? raw.filter((s) => s.status === 'active' && ['SUPPLIER', 'BOTH'].includes(s.partyType)) : [];
-  }, [supplierRes]);
+    const supplierList = supplierRes?.suppliers || supplierRes?.data?.suppliers || [];
+    const partyList = clientRes?.clients || clientRes?.parties || [];
+
+    const list = [
+      ...supplierList.map((s) => ({
+        _id: s._id,
+        name: s.supplierName || s.legalName,
+        code: s.supplierCode,
+        status: s.status,
+      })),
+      ...partyList
+        .filter((p) => p.status === 'active' && ['SUPPLIER', 'BOTH'].includes(p.partyType))
+        .map((p) => ({
+          _id: p._id,
+          name: p.companyName,
+          code: p.partyCode,
+          status: p.status,
+        })),
+    ];
+
+    const seen = new Set();
+    return list.filter((item) => {
+      if (!item._id || seen.has(item._id.toString())) return false;
+      seen.add(item._id.toString());
+      return true;
+    });
+  }, [supplierRes, clientRes]);
 
   const departments = useMemo(() => {
     const raw = deptRes?.departments || [];
@@ -457,7 +483,7 @@ const PurchaseEnquiryForm = () => {
                 <option value="">-- Select Supplier --</option>
                 {suppliers.map((sup) => (
                   <option key={sup._id} value={sup._id}>
-                    {sup.companyName} ({sup.partyCode})
+                    {sup.name} ({sup.code})
                   </option>
                 ))}
               </Select>
@@ -561,45 +587,58 @@ const PurchaseEnquiryForm = () => {
 
         {/* LINE ITEMS TABLE CARD */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <Package size={16} className="text-blue-600" />
-              Enquiry Line Items ({lineItems.length}) — Total Qty: {totalRequestedQty.toLocaleString('en-IN')}
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                <Package size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-800">Enquiry Line Items</h3>
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    {lineItems.length} {lineItems.length === 1 ? 'line item' : 'line items'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Total Requested Quantity: <strong className="text-slate-700">{totalRequestedQty.toLocaleString('en-IN')}</strong>
+                </p>
+              </div>
+            </div>
             {!isFormDisabled && (
-              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                <Plus size={14} className="mr-1" /> Add Line Item
+              <Button type="button" variant="primary" size="sm" onClick={addLineItem} className="self-start sm:self-auto">
+                <Plus size={14} className="mr-1.5" /> Add Line Item
               </Button>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full min-w-[1240px] border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-[11px] uppercase tracking-wider text-left">
-                  <th className="px-3 py-2 w-10 text-center">#</th>
-                  <th className="px-3 py-2 min-w-[200px]">Item <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-28">Item Code</th>
-                  <th className="px-3 py-2 w-28">Qty <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-32">UOM <span className="text-red-500">*</span></th>
-                  <th className="px-3 py-2 w-36">Required Date</th>
-                  <th className="px-3 py-2 min-w-[160px]">Specification</th>
-                  <th className="px-3 py-2 min-w-[140px]">Remarks</th>
-                  {!isFormDisabled && <th className="px-3 py-2 w-12 text-center">Action</th>}
+                <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-semibold text-[11px] uppercase tracking-wider text-left">
+                  <th className="px-3.5 py-3 w-12 text-center text-slate-500 whitespace-nowrap">#</th>
+                  <th className="px-3.5 py-3 w-[320px] min-w-[320px] whitespace-nowrap">Item Description <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[130px] min-w-[130px] text-center whitespace-nowrap">Item Code</th>
+                  <th className="px-3.5 py-3 w-[120px] min-w-[120px] text-right whitespace-nowrap">Quantity <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[140px] min-w-[140px] whitespace-nowrap">UOM <span className="text-red-500">*</span></th>
+                  <th className="px-3.5 py-3 w-[150px] min-w-[150px] whitespace-nowrap">Required Date</th>
+                  <th className="px-3.5 py-3 min-w-[180px] whitespace-nowrap">Specification</th>
+                  <th className="px-3.5 py-3 min-w-[160px] whitespace-nowrap">Remarks</th>
+                  {!isFormDisabled && <th className="px-3.5 py-3 w-14 text-center whitespace-nowrap">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {lineItems.map((line, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-3 py-2 text-center text-slate-400 font-medium">{idx + 1}</td>
+                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="px-3.5 py-3 text-center text-slate-400 font-medium">{idx + 1}</td>
                     
                     {/* Item Select */}
-                    <td className="px-3 py-2">
+                    <td className="px-3.5 py-3">
                       <Select
                         value={line.item}
                         onChange={(e) => handleItemSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
+                        size="sm"
                         className="text-xs"
                       >
                         <option value="">-- Select Item --</option>
@@ -611,39 +650,40 @@ const PurchaseEnquiryForm = () => {
                       </Select>
                     </td>
 
-                    {/* Item Code */}
-                    <td className="px-3 py-2">
-                      <Input
-                        type="text"
-                        value={line.itemCode}
-                        readOnly
-                        disabled
-                        className="bg-slate-100 font-mono text-[11px] text-slate-700"
-                        placeholder="Auto"
-                      />
+                    {/* Item Code Badge */}
+                    <td className="px-3.5 py-3 text-center">
+                      {line.itemCode ? (
+                        <span className="inline-block px-2.5 py-1.5 font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-md whitespace-nowrap shadow-2xs">
+                          {line.itemCode}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs italic">—</span>
+                      )}
                     </td>
 
                     {/* Quantity */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3.5 py-3">
+                      <input
                         type="number"
                         step="any"
                         min="0.0001"
-                        value={line.requestedQuantity}
+                        placeholder="0"
+                        value={line.requestedQuantity || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'requestedQuantity', e.target.value)}
                         disabled={isFormDisabled}
                         required
-                        className="text-right font-semibold text-slate-900"
+                        className="w-full px-3 py-1.5 text-xs text-right font-semibold text-slate-900 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </td>
 
                     {/* UOM Select */}
-                    <td className="px-3 py-2">
+                    <td className="px-3.5 py-3">
                       <Select
                         value={line.uom}
                         onChange={(e) => handleUomSelect(idx, e.target.value)}
                         disabled={isFormDisabled}
                         required
+                        size="sm"
                         className="text-xs"
                       >
                         <option value="">-- UOM --</option>
@@ -656,61 +696,82 @@ const PurchaseEnquiryForm = () => {
                     </td>
 
                     {/* Required Date */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3 py-3">
+                      <input
                         type="date"
-                        value={line.requiredDate}
+                        value={line.requiredDate || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'requiredDate', e.target.value)}
                         disabled={isFormDisabled}
+                        className="w-full px-2.5 py-1.5 text-xs text-slate-800 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </td>
 
                     {/* Specification */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3 py-3">
+                      <input
                         type="text"
-                        placeholder="Grade, specs..."
-                        value={line.specification}
+                        placeholder="Grade, specs, details..."
+                        value={line.specification || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'specification', e.target.value)}
                         disabled={isFormDisabled}
+                        className="w-full px-2.5 py-1.5 text-xs text-slate-800 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </td>
 
                     {/* Remarks */}
-                    <td className="px-3 py-2">
-                      <Input
+                    <td className="px-3 py-3">
+                      <input
                         type="text"
-                        placeholder="Line note..."
-                        value={line.remarks}
+                        placeholder="Line item note..."
+                        value={line.remarks || ''}
                         onChange={(e) => handleLineFieldChange(idx, 'remarks', e.target.value)}
                         disabled={isFormDisabled}
+                        className="w-full px-2.5 py-1.5 text-xs text-slate-800 border border-slate-300 rounded-md bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </td>
 
                     {/* Remove Action */}
                     {!isFormDisabled && (
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-3 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => removeLineItem(idx)}
-                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                           title="Remove Line Item"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={16} />
                         </button>
                       </td>
                     )}
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-slate-50/90 border-t-2 border-slate-200 text-xs font-semibold text-slate-700">
+                <tr>
+                  <td colSpan={3} className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] text-slate-500 font-bold">
+                    Total Quantity:
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
+                    {totalRequestedQty.toLocaleString('en-IN')}
+                  </td>
+                  <td colSpan={isFormDisabled ? 4 : 5}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
           {!isFormDisabled && (
-            <div className="pt-2">
-              <Button type="button" variant="ghost" size="sm" onClick={addLineItem} className="text-blue-600">
-                <Plus size={14} className="mr-1" /> Add Another Line Item
-              </Button>
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={addLineItem}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <Plus size={14} /> Add Another Line Item
+              </button>
+              <span className="text-[11.5px] text-slate-500">
+                {lineItems.length} {lineItems.length === 1 ? 'line item' : 'line items'} in this enquiry
+              </span>
             </div>
           )}
         </div>

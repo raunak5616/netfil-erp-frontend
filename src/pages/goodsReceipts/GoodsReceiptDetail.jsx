@@ -231,7 +231,7 @@ const GoodsReceiptDetail = () => {
             <UserCheck size={14} className="text-blue-600" /> Supplier & PO Reference
           </div>
           <div className="font-semibold text-sm text-slate-900">
-            {grn.supplierNameSnapshot || grn.supplier?.companyName || '—'}
+            {grn.supplierNameSnapshot || grn.supplier?.supplierName || grn.supplier?.companyName || '—'}
           </div>
           <div className="text-xs text-slate-500 font-mono">
             PO Ref: <button

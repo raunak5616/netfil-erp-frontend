@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useUpdateUserMutation } from '../../features/users/usersApi';
 import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
 import { useGetRolesQuery } from '../../features/roles/rolesApi';
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { updateUser as updateAuthUser, selectCurrentUser } from '../../features/auth/authSlice';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -9,6 +11,9 @@ import { FormField, Input, Select } from '../../components/ui/FormField';
 import { Search, X, ShieldCheck } from 'lucide-react';
 
 const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] }) => {
+  const dispatch = useAppDispatch();
+  const currentUser = useAppSelector(selectCurrentUser);
+
   const [formData, setFormData] = useState({
     employeeId: '',
     username: '',
@@ -119,12 +124,16 @@ const EditUserModal = ({ user, isOpen, onClose, onSuccess, existingUsers = [] })
     setSuccessMessage('');
 
     try {
-      await updateUserMutation({
+      const res = await updateUserMutation({
         id: user._id,
         employeeId: formData.employeeId,
         roleIds: selectedRoleIds,
         isActive: formData.isActive === 'true' || formData.isActive === true,
       }).unwrap();
+
+      if (res?.user && (currentUser?._id === user._id || currentUser?.id === user._id)) {
+        dispatch(updateAuthUser(res.user));
+      }
 
       setSuccessMessage('User account updated successfully!');
       setTimeout(() => {
