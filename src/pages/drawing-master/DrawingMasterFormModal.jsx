@@ -496,8 +496,6 @@ const DrawingMasterFormModal = ({
 
     if (!validateForm()) return;
 
-    setSubmitting(true);
-
     try {
       const data = new FormData();
       data.append('drawingCode', formData.drawingCode.trim().toUpperCase());

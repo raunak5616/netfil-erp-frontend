@@ -56,10 +56,10 @@ const SalesOrderList = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [customError, setCustomError] = useState('');
 
-  // Delivery Reminders & Alerts State
   const [isAlertCenterExpanded, setIsAlertCenterExpanded] = useState(true);
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('all');
   const [dismissingId, setDismissingId] = useState(null);
+  const [syncingAlerts, setSyncingAlerts] = useState(false);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -188,7 +188,12 @@ const SalesOrderList = () => {
   };
 
   const handleSyncAlerts = async () => {
-    await Promise.all([refetchAlerts(), refetchSalesOrders()]);
+    setSyncingAlerts(true);
+    try {
+      await Promise.all([refetchAlerts(), refetchSalesOrders()]);
+    } finally {
+      setSyncingAlerts(false);
+    }
   };
 
   const handleDismissAlert = async (salesOrderId) => {
