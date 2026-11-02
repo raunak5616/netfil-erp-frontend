@@ -50,7 +50,11 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
         data,
         headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
       }),
-      invalidatesTags: [{ type: 'Drawings', id: 'LIST' }],
+      invalidatesTags: [
+        { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
+        { type: 'HoleImages', id: 'CONFIG_LIST' },
+      ],
     }),
     updateDrawing: builder.mutation({
       query: ({ id, data }) => ({
@@ -62,6 +66,8 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Drawings', id },
         { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
+        { type: 'HoleImages', id: 'CONFIG_LIST' },
       ],
     }),
     updateDrawingStatus: builder.mutation({
@@ -73,6 +79,7 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Drawings', id },
         { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
       ],
     }),
     deleteDrawing: builder.mutation({
@@ -83,6 +90,8 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, id) => [
         { type: 'Drawings', id },
         { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
+        { type: 'HoleImages', id: 'CONFIG_LIST' },
       ],
     }),
     getHoleConfigurations: builder.query({
@@ -114,7 +123,12 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
         data,
         headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
       }),
-      invalidatesTags: [{ type: 'HoleImages', id: 'LIST' }],
+      invalidatesTags: [
+        { type: 'HoleImages', id: 'LIST' },
+        { type: 'HoleImages', id: 'CONFIG_LIST' },
+        { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
+      ],
     }),
     deleteHoleImage: builder.mutation({
       query: (id) => ({
@@ -124,6 +138,9 @@ export const drawingMasterApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, id) => [
         { type: 'HoleImages', id },
         { type: 'HoleImages', id: 'LIST' },
+        { type: 'HoleImages', id: 'CONFIG_LIST' },
+        { type: 'Drawings', id: 'LIST' },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
       ],
     }),
   }),

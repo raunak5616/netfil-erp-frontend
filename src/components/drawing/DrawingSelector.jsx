@@ -137,6 +137,9 @@ const DrawingSelector = ({
           fileUrl: drawingSnapshot.fileUrl,
           format: drawingSnapshot.format,
           filterGradeName: drawingSnapshot.filterGradeName,
+          frontViewImage: drawingSnapshot.frontViewImage,
+          sideViewImage: drawingSnapshot.sideViewImage,
+          pictorialViewImage: drawingSnapshot.pictorialViewImage,
           isHistorical: true,
         }
       : null);

@@ -165,7 +165,7 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-center bg-slate-50 p-2 rounded-lg border border-slate-200 h-[280px] overflow-hidden">
+                      <div className="relative flex items-center justify-center bg-slate-50 p-2 rounded-lg border border-slate-200 h-[280px] overflow-hidden">
                         {v.url ? (
                           v.url.toLowerCase().endsWith('.pdf') ? (
                             <div className="flex flex-col items-center justify-center p-3 text-center">
@@ -173,14 +173,33 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
                               <span className="text-xs font-semibold text-slate-800">{v.title}.pdf</span>
                             </div>
                           ) : (
-                            <img
-                              src={getVersionedImageUrl(v.url, drawing.updatedAt)}
-                              alt={v.title}
-                              className="max-h-full max-w-full object-contain rounded"
-                            />
+                            <>
+                              <img
+                                src={getVersionedImageUrl(v.url, drawing.updatedAt)}
+                                alt={v.title}
+                                className="max-h-full max-w-full object-contain rounded"
+                                onError={(e) => {
+                                  if (v.id === 'front' && drawing.fileUrl && e.target.src !== drawing.fileUrl) {
+                                    e.target.src = drawing.fileUrl;
+                                  } else {
+                                    e.target.style.display = 'none';
+                                    const fallbackDiv = e.target.parentElement?.querySelector('.img-error-fallback');
+                                    if (fallbackDiv) fallbackDiv.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                              <div className="img-error-fallback hidden flex-col items-center justify-center text-slate-400 p-3 text-center">
+                                <FileText size={32} className="text-amber-500 mb-1" />
+                                <span className="text-xs font-semibold text-slate-700">Image Load Error</span>
+                                <span className="text-[10px] text-slate-400 mt-0.5">Asset unreachable</span>
+                              </div>
+                            </>
                           )
                         ) : (
-                          <span className="text-xs text-slate-400 italic">No drawing image</span>
+                          <div className="flex flex-col items-center justify-center text-slate-400 p-3 text-center">
+                            <span className="text-xs text-slate-400 italic">No drawing image uploaded</span>
+                            <span className="text-[10px] text-slate-400 mt-1">Upload in Drawing Master edit</span>
+                          </div>
                         )}
                       </div>
 

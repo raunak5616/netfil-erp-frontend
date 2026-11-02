@@ -540,12 +540,19 @@ const DrawingMasterFormModal = ({
       if (frontFile) {
         data.append('frontViewImage', frontFile);
         data.append('drawingFile', frontFile); // backwards compatibility
+      } else if (frontPreview && typeof frontPreview === 'string') {
+        data.append('frontViewImageUrl', frontPreview);
+        data.append('fileUrl', frontPreview);
       }
       if (sideFile) {
         data.append('sideViewImage', sideFile);
+      } else if (sidePreview && typeof sidePreview === 'string') {
+        data.append('sideViewImageUrl', sidePreview);
       }
       if (picFile) {
         data.append('pictorialViewImage', picFile);
+      } else if (picPreview && typeof picPreview === 'string') {
+        data.append('pictorialViewImageUrl', picPreview);
       }
       if (isEdit) {
         await updateDrawing({ id: initialData._id, data }).unwrap();

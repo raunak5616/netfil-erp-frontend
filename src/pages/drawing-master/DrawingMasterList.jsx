@@ -196,8 +196,7 @@ const DrawingMasterList = () => {
 
   // Helper to distinguish flange hole pattern drawings from filter product drawings
   const isHoleDrawing = (d) => Boolean(
-    d?.isHolePattern ||
-    (d?.drawingCode && d.drawingCode.toUpperCase().startsWith('HOLE-'))
+    d?.drawingCode && d.drawingCode.toUpperCase().startsWith('HOLE-')
   );
 
   // Dynamic counts per category
@@ -297,33 +296,121 @@ const DrawingMasterList = () => {
     () => [
       {
         key: 'preview',
-        header: 'Preview',
+        header: 'Drawing Views',
         align: 'center',
-        width: '64px',
+        width: '130px',
         render: (_, row) => {
           const isPdf = row.format === 'pdf' || row.fileUrl?.toLowerCase().endsWith('.pdf');
-          const rawSrc = row.frontViewImage?.url || row.holeImageUrl || row.fileUrl;
-          const previewSrc = getVersionedImageUrl(rawSrc, row.updatedAt);
+          const frontRaw = row.frontViewImage?.url || row.fileUrl || row.holeImageUrl;
+          const frontSrc = getVersionedImageUrl(frontRaw, row.updatedAt);
+          const sideSrc = getVersionedImageUrl(row.sideViewImage?.url, row.updatedAt);
+          const picSrc = getVersionedImageUrl(row.pictorialViewImage?.url, row.updatedAt);
           const hasThreeViews = Boolean(row.sideViewImage?.url || row.pictorialViewImage?.url);
+
+          if (isPdf) {
+            return (
+              <div
+                onClick={() => handlePreview(row)}
+                className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-xs flex items-center justify-center transition-all group mx-auto"
+                title="PDF Document (Click to preview)"
+              >
+                <FileText size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+              </div>
+            );
+          }
+
+          if (hasThreeViews) {
+            return (
+              <div
+                onClick={() => handlePreview(row)}
+                className="inline-flex items-center gap-1 p-1 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-all group shadow-2xs"
+                title="Three-View Configuration: Front (L), Side (C), 3D (R) — Click to view full preview"
+              >
+                {/* 1. Front View */}
+                <div className="relative w-8 h-8 rounded bg-white border border-slate-200 overflow-hidden flex items-center justify-center" title="1. Front View">
+                  {frontSrc ? (
+                    <img
+                      src={frontSrc}
+                      alt="Front View"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        if (row.fileUrl && e.target.src !== row.fileUrl) {
+                          e.target.src = row.fileUrl;
+                        } else {
+                          e.target.style.display = 'none';
+                        }
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon size={14} className="text-slate-300" />
+                  )}
+                  <span className="absolute bottom-0 right-0 bg-blue-600 text-white text-[7px] font-bold px-0.5 rounded-tl leading-none">
+                    F
+                  </span>
+                </div>
+
+                {/* 2. Side View */}
+                <div className="relative w-8 h-8 rounded bg-white border border-slate-200 overflow-hidden flex items-center justify-center" title="2. Side View">
+                  {sideSrc ? (
+                    <img
+                      src={sideSrc}
+                      alt="Side View"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="text-[8px] text-slate-300 font-bold">-</span>
+                  )}
+                  <span className="absolute bottom-0 right-0 bg-teal-600 text-white text-[7px] font-bold px-0.5 rounded-tl leading-none">
+                    S
+                  </span>
+                </div>
+
+                {/* 3. 3D / Pictorial View */}
+                <div className="relative w-8 h-8 rounded bg-white border border-slate-200 overflow-hidden flex items-center justify-center" title="3. 3D / Pictorial View">
+                  {picSrc ? (
+                    <img
+                      src={picSrc}
+                      alt="3D View"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="text-[8px] text-slate-300 font-bold">-</span>
+                  )}
+                  <span className="absolute bottom-0 right-0 bg-purple-600 text-white text-[7px] font-bold px-0.5 rounded-tl leading-none">
+                    3D
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               onClick={() => handlePreview(row)}
               className="relative w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-xs flex items-center justify-center transition-all group shrink-0 mx-auto"
-              title={hasThreeViews ? "Three-View Configuration (Click to preview Front, Side, and 3D views)" : "Click to view full preview"}
+              title="Click to view full preview"
             >
-              {isPdf ? (
-                <FileText size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
-              ) : (
+              {frontSrc ? (
                 <img
-                  src={previewSrc}
+                  src={frontSrc}
                   alt={row.drawingName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                  onError={(e) => {
+                    if (row.fileUrl && e.target.src !== row.fileUrl) {
+                      e.target.src = row.fileUrl;
+                    } else {
+                      e.target.style.display = 'none';
+                    }
+                  }}
                 />
-              )}
-              {hasThreeViews && (
-                <span className="absolute bottom-0 right-0 bg-blue-600 text-white text-[8px] font-bold px-1 rounded-tl leading-tight">
-                  3V
-                </span>
+              ) : (
+                <ImageIcon size={18} className="text-slate-300" />
               )}
             </div>
           );

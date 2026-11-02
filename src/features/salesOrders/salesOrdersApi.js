@@ -140,7 +140,10 @@ export const salesOrdersApi = apiSlice.injectEndpoints({
         url: `/sales-orders/${id}/drawings/config`,
         method: 'get',
       }),
-      providesTags: (result, error, id) => [{ type: 'SalesOrders', id: `DRAWING_CONFIG_${id}` }],
+      providesTags: (result, error, id) => [
+        { type: 'SalesOrders', id: `DRAWING_CONFIG_${id}` },
+        { type: 'SalesOrders', id: 'DRAWING_CONFIG' },
+      ],
     }),
     updateSalesOrderItemDrawingConfig: builder.mutation({
       query: ({ id, itemId, data }) => ({
