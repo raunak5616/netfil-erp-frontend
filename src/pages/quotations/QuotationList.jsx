@@ -353,15 +353,18 @@ const QuotationList = () => {
               <span
                 style={{
                   marginLeft: '6px',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   padding: '1px 5px',
                   borderRadius: '3px',
-                  background: 'var(--neutral-200)',
-                  color: 'var(--neutral-700)',
-                  fontWeight: 600,
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
+                  fontWeight: 700,
+                  fontFamily: 'monospace',
                 }}
+                title={`Quotation Revision ${row.amendmentCount}`}
               >
-                A{row.amendmentCount}
+                Rev {String(row.amendmentCount).padStart(2, '0')}
               </span>
             )}
           </div>

@@ -13,13 +13,31 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
   const [activeTab, setActiveTab] = useState('create');
   const [error, setError] = useState('');
 
+  // Calculate initial discount rate from quotation
+  const getInitialDiscountRate = () => {
+    if (quotation?.discountRate !== undefined && quotation?.discountRate !== null) {
+      return quotation.discountRate;
+    }
+    if (quotation?.discountAmount > 0 && quotation?.subtotal > 0) {
+      return Number(((quotation.discountAmount / quotation.subtotal) * 100).toFixed(2));
+    }
+    return 0;
+  };
+
   // Form Data for Amendment
   const [reason, setReason] = useState('');
   const [amendmentRemarks, setAmendmentRemarks] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(quotation?.discountAmount || 0);
+  const [discountRate, setDiscountRate] = useState(getInitialDiscountRate());
   const [pfAmount, setPfAmount] = useState(quotation?.pfAmount || 0);
   const [freightAmount, setFreightAmount] = useState(quotation?.freightAmount || 0);
   const [taxRate, setTaxRate] = useState(quotation?.taxRate || 0);
+  const [paymentTerms, setPaymentTerms] = useState(quotation?.paymentTerms || '');
+  const [deliveryTerms, setDeliveryTerms] = useState(quotation?.deliveryTerms || '');
+  const [generalTerms, setGeneralTerms] = useState(quotation?.generalTerms || '');
+
+  const subtotal = quotation?.subtotal || quotation?.subTotal || 0;
+  const numDiscountRate = Math.min(100, Math.max(0, Number(discountRate) || 0));
+  const calculatedDiscountAmount = subtotal > 0 && numDiscountRate > 0 ? (subtotal * numDiscountRate) / 100 : 0;
 
   const {
     data: amendmentsData,
@@ -36,10 +54,13 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
     if (isOpen && quotation?._id) {
       setReason('');
       setAmendmentRemarks('');
-      setDiscountAmount(quotation.discountAmount || 0);
+      setDiscountRate(getInitialDiscountRate());
       setPfAmount(quotation.pfAmount || 0);
       setFreightAmount(quotation.freightAmount || 0);
       setTaxRate(quotation.taxRate || 0);
+      setPaymentTerms(quotation.paymentTerms || '');
+      setDeliveryTerms(quotation.deliveryTerms || '');
+      setGeneralTerms(quotation.generalTerms || '');
       setError('');
     }
   }, [isOpen, quotation?._id]);
@@ -58,10 +79,14 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
         reason: reason.trim(),
         remarks: amendmentRemarks,
         headerUpdates: {
-          discountAmount: Number(discountAmount) || 0,
+          discountRate: numDiscountRate,
+          discountAmount: calculatedDiscountAmount,
           pfAmount: Number(pfAmount) || 0,
           freightAmount: Number(freightAmount) || 0,
           taxRate: Number(taxRate) || 0,
+          paymentTerms: paymentTerms.trim(),
+          deliveryTerms: deliveryTerms.trim(),
+          generalTerms: generalTerms.trim(),
         },
       };
 
@@ -153,13 +178,24 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
             </h5>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label className="form-label">Discount Amount (₹)</label>
+                <label className="form-label">Discount Rate (%)</label>
                 <Input
                   type="number"
                   min="0"
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  max="100"
+                  step="any"
+                  placeholder="0.00"
+                  value={discountRate === 0 || discountRate === '0' ? '' : discountRate}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 0 : Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    setDiscountRate(val);
+                  }}
                 />
+                {numDiscountRate > 0 && subtotal > 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--amber-700, #b45309)', marginTop: '3px', fontWeight: 500 }}>
+                    = -₹{calculatedDiscountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} off subtotal
+                  </div>
+                )}
               </div>
 
               <div>
@@ -190,6 +226,27 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
                   step="any"
                   value={taxRate}
                   onChange={(e) => setTaxRate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+              <div>
+                <label className="form-label">Payment Terms</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 100% against PI"
+                  value={paymentTerms}
+                  onChange={(e) => setPaymentTerms(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label">Delivery Terms</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. Ex-Works"
+                  value={deliveryTerms}
+                  onChange={(e) => setDeliveryTerms(e.target.value)}
                 />
               </div>
             </div>

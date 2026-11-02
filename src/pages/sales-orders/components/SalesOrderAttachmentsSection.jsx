@@ -32,25 +32,31 @@ import SalesOrderAttachmentUploadModal from './SalesOrderAttachmentUploadModal';
 import SalesOrderAttachmentPreviewModal from './SalesOrderAttachmentPreviewModal';
 
 const DOC_TYPE_CONFIG = {
-  TAX_INVOICE: {
-    label: 'Tax Invoice',
+  SALES_ORDER_INVOICE: {
+    label: 'Sales Order Invoice',
     icon: FileText,
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  },
-  PROFORMA_INVOICE: {
-    label: 'Proforma Invoice',
-    icon: FileCheck,
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
-  },
-  DOCKET_COPY: {
-    label: 'Docket Copy',
-    icon: Truck,
-    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200'
   },
   APPROVED_DRAWING: {
     label: 'Approved Drawing',
     icon: Layers,
     badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
+  },
+  // Legacy doc types for historical display continuity
+  TAX_INVOICE: {
+    label: 'Tax Invoice (Legacy)',
+    icon: FileText,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
+  },
+  PROFORMA_INVOICE: {
+    label: 'Proforma Invoice (Legacy)',
+    icon: FileCheck,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
+  },
+  DOCKET_COPY: {
+    label: 'Docket Copy (Legacy)',
+    icon: Truck,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
   }
 };
 
@@ -218,7 +224,7 @@ const SalesOrderAttachmentsSection = ({
         <EmptyState
           icon={Paperclip}
           title="No documents attached"
-          description="Upload tax invoices, proforma invoices, dispatch dockets, or approved drawings to attach them directly to this order."
+          description="Upload sales order invoices or approved drawings to attach them directly to this order."
           action={
             canEdit && (
               <Button
@@ -315,7 +321,7 @@ const SalesOrderAttachmentsSection = ({
                       {/* Contextual Information Pillbox */}
                       <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11.5px]">
                         {/* Invoices */}
-                        {['TAX_INVOICE', 'PROFORMA_INVOICE'].includes(attachment.documentType) && (
+                        {['SALES_ORDER_INVOICE', 'TAX_INVOICE', 'PROFORMA_INVOICE'].includes(attachment.documentType) && (
                           <>
                             <div>
                               <span className="text-slate-400 block text-[10px] uppercase">Invoice No</span>

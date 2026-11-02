@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { useGetWorkOrderByIdQuery } from '../../features/workOrders/workOrdersApi';
+import { 
+  useGetWorkOrderByIdQuery, 
+  useGetWorkOrderAttachmentsQuery 
+} from '../../features/workOrders/workOrdersApi';
 import { useAuth } from '../../context/AuthContext';
 import WorkOrderEditModal from './WorkOrderEditModal';
 import WorkOrderActionModal from './WorkOrderActionModal';
+import WorkOrderAttachmentsSection from './components/WorkOrderAttachmentsSection';
 import {
   Wrench,
   Building2,
@@ -18,11 +22,12 @@ import {
   Clock,
   Edit3,
   Layers,
+  FileText,
   ArrowRight,
   PackageCheck
 } from 'lucide-react';
 
-const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated }) => {
+const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated, initialTab = 'overview' }) => {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('WORK_ORDER_EDIT');
   const canRelease = hasPermission('WORK_ORDER_RELEASE');
@@ -30,12 +35,20 @@ const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated
   const canComplete = hasPermission('WORK_ORDER_COMPLETE');
   const canCancel = hasPermission('WORK_ORDER_CANCEL');
 
+  const [activeTab, setActiveTab] = useState(initialTab || 'overview');
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab || 'overview');
+    }
+  }, [isOpen, initialTab]);
+
   // Child Modals State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [actionType, setActionType] = useState(null);
 
-  // RTK Query Hook
+  // RTK Query Hooks
   const {
     data: detailData,
     isLoading: loading,
@@ -45,8 +58,18 @@ const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated
     skip: !isOpen || !workOrderId
   });
 
+  const {
+    data: attachmentsData,
+    isLoading: attachmentsLoading,
+    refetch: fetchAttachments
+  } = useGetWorkOrderAttachmentsQuery(
+    { id: workOrderId },
+    { skip: !isOpen || !workOrderId }
+  );
+
   const workOrder = detailData?.workOrder || null;
   const items = detailData?.items || [];
+  const attachments = attachmentsData?.attachments || [];
   const error = queryError ? (queryError.data?.message || queryError.message || 'Error connecting to server') : '';
 
   const handleOpenAction = (type) => {
@@ -145,9 +168,45 @@ const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated
         ) : !workOrder ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>No record found</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* SECTION A — WORK ORDER INFORMATION CARD */}
-            <div style={{ background: 'var(--neutral-50)', border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* TABS NAVIGATION */}
+            <div className="flex border-b border-slate-200 gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                className={`pb-2.5 px-1 font-semibold text-xs border-b-2 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'overview'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Layers size={14} />
+                Overview & Component Requirements
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('documents')}
+                className={`pb-2.5 px-1 font-semibold text-xs border-b-2 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'documents'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FileText size={14} />
+                Documents & Invoices
+                {attachments.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                    {attachments.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* TAB 1: OVERVIEW & COMPONENTS */}
+            {activeTab === 'overview' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                {/* SECTION A — WORK ORDER INFORMATION CARD */}
+                <div style={{ background: 'var(--neutral-50)', border: '1px solid var(--neutral-200)', borderRadius: '6px', padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -349,7 +408,21 @@ const WorkOrderDetailModal = ({ isOpen, workOrderId, onClose, onWorkOrderUpdated
             </div>
           </div>
         )}
-      </Modal>
+
+        {/* TAB 2: DOCUMENTS & INVOICES */}
+        {activeTab === 'documents' && (
+          <WorkOrderAttachmentsSection
+            workOrderId={workOrderId}
+            workOrderNo={workOrder.workOrderNo}
+            attachments={attachments}
+            loading={attachmentsLoading}
+            canEdit={canEdit && workOrder.status !== 'CANCELLED'}
+            onRefresh={fetchAttachments}
+          />
+        )}
+      </div>
+    )}
+  </Modal>
 
       {/* Edit Modal */}
       {isEditOpen && workOrder && (

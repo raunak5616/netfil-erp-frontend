@@ -27,7 +27,8 @@ import {
   Play,
   CheckCircle2,
   XCircle,
-  Wrench
+  Wrench,
+  FileText
 } from 'lucide-react';
 
 const WorkOrderList = () => {
@@ -94,6 +95,7 @@ const WorkOrderList = () => {
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState('overview');
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedWorkOrderForEdit, setSelectedWorkOrderForEdit] = useState(null);
@@ -257,11 +259,25 @@ const WorkOrderList = () => {
               size="xs"
               onClick={() => {
                 setSelectedWorkOrderId(row._id);
+                setDetailInitialTab('overview');
                 setIsDetailOpen(true);
               }}
               title="View Work Order Detail"
             >
               <Eye size={14} style={{ marginRight: '3px' }} /> View
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setSelectedWorkOrderId(row._id);
+                setDetailInitialTab('documents');
+                setIsDetailOpen(true);
+              }}
+              title="View & Upload Work Order Documents / Invoices"
+            >
+              <FileText size={14} style={{ marginRight: '3px' }} /> Docs
             </Button>
 
             {/* DRAFT Actions */}
@@ -481,6 +497,7 @@ const WorkOrderList = () => {
         <WorkOrderDetailModal
           isOpen={isDetailOpen}
           workOrderId={selectedWorkOrderId}
+          initialTab={detailInitialTab}
           onClose={() => {
             setIsDetailOpen(false);
             setSelectedWorkOrderId(null);

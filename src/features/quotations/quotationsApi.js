@@ -142,6 +142,13 @@ export const quotationsApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'Quotations', id: `AMEND_${id}` }],
     }),
+    getQuotationAmendmentById: builder.query({
+      query: ({ id, amendmentId }) => ({
+        url: `/quotations/${id}/amendments/${amendmentId}`,
+        method: 'get',
+      }),
+      providesTags: (result, error, { id, amendmentId }) => [{ type: 'Quotations', id: `AMEND_${id}_${amendmentId}` }],
+    }),
     createQuotationAmendment: builder.mutation({
       query: ({ id, data }) => ({
         url: `/quotations/${id}/amendments`,
@@ -199,6 +206,7 @@ export const {
   useGetQuotationRemindersSummaryQuery,
   useGetQuotationReferencesQuery,
   useGetQuotationAmendmentsQuery,
+  useGetQuotationAmendmentByIdQuery,
   useCreateQuotationMutation,
   useUpdateQuotationMutation,
   useUpdateQuotationStatusMutation,

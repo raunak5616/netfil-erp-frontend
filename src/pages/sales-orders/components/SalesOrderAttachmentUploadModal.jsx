@@ -20,9 +20,7 @@ import {
 } from 'lucide-react';
 
 const DOCUMENT_TYPES = [
-  { value: 'TAX_INVOICE', label: 'Tax Invoice', icon: FileText, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  { value: 'PROFORMA_INVOICE', label: 'Proforma Invoice', icon: FileCheck, color: 'text-blue-700 bg-blue-50 border-blue-200' },
-  { value: 'DOCKET_COPY', label: 'Docket Copy', icon: Truck, color: 'text-amber-700 bg-amber-50 border-amber-200' },
+  { value: 'SALES_ORDER_INVOICE', label: 'Sales Order Invoice', icon: FileText, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
   { value: 'APPROVED_DRAWING', label: 'Approved Drawing', icon: Layers, color: 'text-purple-700 bg-purple-50 border-purple-200' }
 ];
 
@@ -32,13 +30,13 @@ const SalesOrderAttachmentUploadModal = ({
   salesOrderId,
   salesOrderNo,
   existingAttachment = null,
-  initialDocumentType = 'TAX_INVOICE',
+  initialDocumentType = 'SALES_ORDER_INVOICE',
   onSuccess
 }) => {
   const isReplaceMode = Boolean(existingAttachment);
 
   const [documentType, setDocumentType] = useState(
-    existingAttachment?.documentType || ((initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'TAX_INVOICE')
+    existingAttachment?.documentType || ((initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'SALES_ORDER_INVOICE')
   );
   const [documentTitle, setDocumentTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -48,10 +46,6 @@ const SalesOrderAttachmentUploadModal = ({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
   const [invoiceAmount, setInvoiceAmount] = useState('');
-  const [docketNumber, setDocketNumber] = useState('');
-  const [transporterName, setTransporterName] = useState('');
-  const [dispatchDate, setDispatchDate] = useState('');
-  const [lrNumber, setLrNumber] = useState('');
   const [drawingNumber, setDrawingNumber] = useState('');
   const [revision, setRevision] = useState('R0');
   const [isApprovedDrawing, setIsApprovedDrawing] = useState(false);
@@ -73,15 +67,11 @@ const SalesOrderAttachmentUploadModal = ({
       setSelectedFile(null);
 
       if (existingAttachment) {
-        setDocumentType(existingAttachment.documentType || 'TAX_INVOICE');
+        setDocumentType(existingAttachment.documentType || 'SALES_ORDER_INVOICE');
         setDocumentTitle(existingAttachment.documentTitle || '');
         setInvoiceNumber(existingAttachment.invoiceNumber || '');
         setInvoiceDate(existingAttachment.invoiceDate ? existingAttachment.invoiceDate.split('T')[0] : '');
         setInvoiceAmount(existingAttachment.invoiceAmount || '');
-        setDocketNumber(existingAttachment.docketNumber || '');
-        setTransporterName(existingAttachment.transporterName || '');
-        setDispatchDate(existingAttachment.dispatchDate ? existingAttachment.dispatchDate.split('T')[0] : '');
-        setLrNumber(existingAttachment.lrNumber || '');
         setDrawingNumber(existingAttachment.drawingNumber || '');
         setRevision(existingAttachment.revision || 'R0');
         setIsApprovedDrawing(Boolean(existingAttachment.isApprovedDrawing));
@@ -90,16 +80,12 @@ const SalesOrderAttachmentUploadModal = ({
         setRemarks(existingAttachment.remarks || '');
         setChangeSummary('');
       } else {
-        const resolvedType = (initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'TAX_INVOICE';
+        const resolvedType = (initialDocumentType && initialDocumentType !== 'ALL') ? initialDocumentType : 'SALES_ORDER_INVOICE';
         setDocumentType(resolvedType);
         setDocumentTitle('');
         setInvoiceNumber('');
         setInvoiceDate('');
         setInvoiceAmount('');
-        setDocketNumber('');
-        setTransporterName('');
-        setDispatchDate('');
-        setLrNumber('');
         setDrawingNumber('');
         setRevision('R0');
         setIsApprovedDrawing(false);
@@ -165,17 +151,10 @@ const SalesOrderAttachmentUploadModal = ({
       formData.append('documentType', documentType);
       if (documentTitle.trim()) formData.append('documentTitle', documentTitle.trim());
 
-      if (['TAX_INVOICE', 'PROFORMA_INVOICE'].includes(documentType)) {
+      if (documentType === 'SALES_ORDER_INVOICE') {
         if (invoiceNumber.trim()) formData.append('invoiceNumber', invoiceNumber.trim());
         if (invoiceDate) formData.append('invoiceDate', invoiceDate);
         if (invoiceAmount) formData.append('invoiceAmount', invoiceAmount);
-      }
-
-      if (documentType === 'DOCKET_COPY') {
-        if (docketNumber.trim()) formData.append('docketNumber', docketNumber.trim());
-        if (transporterName.trim()) formData.append('transporterName', transporterName.trim());
-        if (dispatchDate) formData.append('dispatchDate', dispatchDate);
-        if (lrNumber.trim()) formData.append('lrNumber', lrNumber.trim());
       }
 
       if (documentType === 'APPROVED_DRAWING') {
@@ -260,7 +239,7 @@ const SalesOrderAttachmentUploadModal = ({
             <label className="block font-semibold text-slate-700 mb-1.5 uppercase tracking-wide text-[11px]">
               Select Document Type <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {DOCUMENT_TYPES.map((t) => {
                 const IconComponent = t.icon;
                 const isSelected = documentType === t.value;
@@ -287,14 +266,12 @@ const SalesOrderAttachmentUploadModal = ({
         {/* Dynamic Contextual Fields */}
         <div className="bg-slate-50 border border-slate-200 rounded-md p-3.5 flex flex-col gap-3">
           <div className="font-semibold text-slate-700 uppercase tracking-wide text-[10.5px]">
-            {documentType === 'TAX_INVOICE' && 'Tax Invoice Details'}
-            {documentType === 'PROFORMA_INVOICE' && 'Proforma Invoice Details'}
-            {documentType === 'DOCKET_COPY' && 'Dispatch & Shipment Details'}
+            {documentType === 'SALES_ORDER_INVOICE' && 'Sales Order Invoice Details'}
             {documentType === 'APPROVED_DRAWING' && 'Drawing & Approval Information'}
           </div>
 
-          {/* Invoices */}
-          {['TAX_INVOICE', 'PROFORMA_INVOICE'].includes(documentType) && (
+          {/* Sales Order Invoice */}
+          {documentType === 'SALES_ORDER_INVOICE' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-slate-600 mb-1 font-medium">Invoice Number</label>
@@ -302,7 +279,7 @@ const SalesOrderAttachmentUploadModal = ({
                   type="text"
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
-                  placeholder={documentType === 'TAX_INVOICE' ? 'e.g. INV-2026-001' : 'e.g. PI-2026-001'}
+                  placeholder="e.g. SOI-2026-001"
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -323,51 +300,6 @@ const SalesOrderAttachmentUploadModal = ({
                   value={invoiceAmount}
                   onChange={(e) => setInvoiceAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Docket Copy */}
-          {documentType === 'DOCKET_COPY' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">Docket / Waybill No.</label>
-                <input
-                  type="text"
-                  value={docketNumber}
-                  onChange={(e) => setDocketNumber(e.target.value)}
-                  placeholder="e.g. VRL-BLR-984210"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">Transporter Name</label>
-                <input
-                  type="text"
-                  value={transporterName}
-                  onChange={(e) => setTransporterName(e.target.value)}
-                  placeholder="e.g. VRL Logistics, TCI Freight"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">Dispatch Date</label>
-                <input
-                  type="date"
-                  value={dispatchDate}
-                  onChange={(e) => setDispatchDate(e.target.value)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">LR / Tracking No.</label>
-                <input
-                  type="text"
-                  value={lrNumber}
-                  onChange={(e) => setLrNumber(e.target.value)}
-                  placeholder="e.g. LR-984210"
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 />
               </div>

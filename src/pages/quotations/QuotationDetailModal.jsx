@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { printQuotationPdf } from '../../services/quotationService';
 import {
   useGetQuotationByIdQuery,
@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
+import QuotationAmendmentModal from './QuotationAmendmentModal';
 import {
   Building2,
   Calendar,
@@ -22,6 +23,11 @@ import {
   Tag,
   DollarSign,
   Printer,
+  History,
+  ArrowLeft,
+  AlertTriangle,
+  Eye,
+  Download,
 } from 'lucide-react';
 
 const findFilterGradeVariant = (filterGrade, itemDoc = {}, it = {}) => {
@@ -339,11 +345,23 @@ const QuotationDetailModal = ({
   canAmend,
 }) => {
   const [actionError, setActionError] = useState('');
+  const [selectedRevisionNo, setSelectedRevisionNo] = useState(null);
+  const [isAmendModalOpen, setIsAmendModalOpen] = useState(false);
+
+  // Reset selected revision when modal opens or quotationId changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedRevisionNo(null);
+      setIsAmendModalOpen(false);
+      setActionError('');
+    }
+  }, [isOpen, quotationId]);
 
   const {
     data: detailData,
     isLoading: loading,
     error: detailError,
+    refetch,
   } = useGetQuotationByIdQuery(quotationId, {
     skip: !isOpen || !quotationId,
   });
@@ -360,7 +378,133 @@ const QuotationDetailModal = ({
   const items = detailData?.items || [];
   const terms = detailData?.terms || [];
   const references = refData?.references || null;
+  const rawAmendments = detailData?.amendments || [];
   const error = actionError || (detailError ? (detailError?.data?.message || 'Failed to load quotation details') : '');
+
+  // Sort amendments chronologically
+  const sortedAmendments = useMemo(() => {
+    return [...rawAmendments].sort((a, b) => new Date(a.createdAt || a.amendmentDate) - new Date(b.createdAt || b.amendmentDate));
+  }, [rawAmendments]);
+
+  const amendmentCount = quotation?.amendmentCount || sortedAmendments.length || 0;
+
+  // Build complete revisions history list: Rev 00 (Original) -> Rev 01 -> ... -> Rev 0N (Current)
+  const revisionsList = useMemo(() => {
+    if (!quotation) return [];
+    const list = [];
+    const N = amendmentCount;
+
+    if (N === 0) {
+      list.push({
+        revisionNo: 0,
+        revisionLabel: 'Rev 00',
+        title: 'Original Quotation',
+        isCurrent: true,
+        status: quotation.status,
+        statusBadge: 'Current',
+        date: quotation.createdAt || quotation.quotationDate,
+        createdBy: quotation.createdBy?.username || 'Creator',
+        reason: 'Original Quotation',
+        remarks: quotation.remarks || '',
+        headerSnapshot: quotation,
+        itemsSnapshot: items,
+        termsSnapshot: terms,
+      });
+      return list;
+    }
+
+    // N >= 1
+    // Rev 00: Original Quotation (snapshot preserved in first amendment)
+    const firstAm = sortedAmendments[0];
+    list.push({
+      revisionNo: 0,
+      revisionLabel: 'Rev 00',
+      title: 'Original Quotation',
+      isCurrent: false,
+      status: 'superseded',
+      statusBadge: 'Superseded',
+      date: quotation.createdAt || quotation.quotationDate,
+      createdBy: quotation.createdBy?.username || 'Creator',
+      reason: 'Original Quotation',
+      remarks: firstAm?.remarks || '',
+      headerSnapshot: firstAm?.headerSnapshot || quotation,
+      itemsSnapshot: firstAm?.itemsSnapshot || items,
+      termsSnapshot: firstAm?.termsSnapshot || terms,
+    });
+
+    // Intermediate Revisions: Rev 01 ... Rev 0(N-1)
+    for (let i = 1; i < N; i++) {
+      const prevAm = sortedAmendments[i - 1];
+      const curAm = sortedAmendments[i];
+      list.push({
+        revisionNo: i,
+        revisionLabel: `Rev ${String(i).padStart(2, '0')}`,
+        title: i === 1 ? 'First Amendment' : `Amendment ${i}`,
+        isCurrent: false,
+        status: 'superseded',
+        statusBadge: 'Superseded',
+        date: prevAm?.amendmentDate || prevAm?.createdAt,
+        createdBy: prevAm?.createdBy?.username || 'User',
+        reason: prevAm?.reason || `Amendment ${i}`,
+        remarks: prevAm?.remarks || '',
+        headerSnapshot: curAm?.headerSnapshot || prevAm?.headerSnapshot || quotation,
+        itemsSnapshot: curAm?.itemsSnapshot || prevAm?.itemsSnapshot || items,
+        termsSnapshot: curAm?.termsSnapshot || prevAm?.termsSnapshot || terms,
+      });
+    }
+
+    // Latest Revision: Rev 0N (Current live quotation)
+    const latestAm = sortedAmendments[N - 1];
+    list.push({
+      revisionNo: N,
+      revisionLabel: `Rev ${String(N).padStart(2, '0')}`,
+      title: N === 1 ? 'First Amendment' : `Latest Amendment (Rev ${String(N).padStart(2, '0')})`,
+      isCurrent: true,
+      status: quotation.status,
+      statusBadge: 'Current',
+      date: latestAm?.amendmentDate || latestAm?.createdAt || quotation.updatedAt,
+      createdBy: latestAm?.createdBy?.username || quotation.updatedBy?.username || 'User',
+      reason: latestAm?.reason || 'Latest Amendment',
+      remarks: latestAm?.remarks || quotation.remarks || '',
+      headerSnapshot: quotation,
+      itemsSnapshot: items,
+      termsSnapshot: terms,
+    });
+
+    return list;
+  }, [quotation, items, terms, sortedAmendments, amendmentCount]);
+
+  const activeRevision = useMemo(() => {
+    if (selectedRevisionNo === null) {
+      return revisionsList.find((r) => r.isCurrent) || null;
+    }
+    return revisionsList.find((r) => r.revisionNo === selectedRevisionNo) || revisionsList.find((r) => r.isCurrent) || null;
+  }, [revisionsList, selectedRevisionNo]);
+
+  const isViewingHistorical = Boolean(activeRevision && !activeRevision.isCurrent);
+
+  // Authoritative display models for Quotation View
+  const displayQuotation = useMemo(() => {
+    if (!quotation) return null;
+    if (!isViewingHistorical || !activeRevision) return quotation;
+    return {
+      ...quotation,
+      ...activeRevision.headerSnapshot,
+      client: quotation.client, // keep populated client reference
+      requirement: quotation.requirement,
+      salesPerson: quotation.salesPerson,
+    };
+  }, [quotation, activeRevision, isViewingHistorical]);
+
+  const displayItems = useMemo(() => {
+    if (!isViewingHistorical || !activeRevision) return items;
+    return activeRevision.itemsSnapshot || [];
+  }, [items, activeRevision, isViewingHistorical]);
+
+  const displayTerms = useMemo(() => {
+    if (!isViewingHistorical || !activeRevision) return terms;
+    return activeRevision.termsSnapshot || [];
+  }, [terms, activeRevision, isViewingHistorical]);
 
   if (!isOpen) return null;
 
@@ -379,6 +523,13 @@ const QuotationDetailModal = ({
       console.error('Failed to release quotation:', err);
       setActionError(err?.data?.message || err?.message || 'Failed to release quotation');
     }
+  };
+
+  const handleAmendmentSuccess = () => {
+    setIsAmendModalOpen(false);
+    setSelectedRevisionNo(null);
+    if (refetch) refetch();
+    if (onRelease) onRelease();
   };
 
   const formatDate = (dateStr) => {
@@ -416,59 +567,114 @@ const QuotationDetailModal = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
+    <>
+      <Modal
+        isOpen={isOpen}
       onClose={onClose}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span>Quotation Details</span>
           {quotation && (
             <span className="font-mono" style={{ color: 'var(--primary-700)', fontSize: '15px' }}>
               ({quotation.quotationNo})
             </span>
           )}
+          {activeRevision && (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: 700,
+                backgroundColor: activeRevision.isCurrent ? '#dcfce7' : '#fef3c7',
+                color: activeRevision.isCurrent ? '#166534' : '#92400e',
+                border: activeRevision.isCurrent ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                fontFamily: 'monospace',
+              }}
+            >
+              {activeRevision.revisionLabel} {activeRevision.isCurrent ? '(Current)' : '(Historical Revision)'}
+            </span>
+          )}
         </div>
       }
       maxWidth="850px"
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
-            {quotation && `Created by ${quotation.createdBy?.username || 'System'} on ${formatDate(quotation.createdAt)}`}
+            {activeRevision && (
+              <>
+                {activeRevision.revisionLabel} • {activeRevision.isCurrent ? 'Current' : 'Superseded'} • {formatDate(activeRevision.date)} by {activeRevision.createdBy || 'System'}
+              </>
+            )}
           </div>
 
-          <div className="flex gap-2">
-            {quotation && (
-              <Button
-                variant="outline"
-                onClick={() => printQuotationPdf(quotation._id)}
-                title="Print Quotation PDF"
-              >
-                <Printer size={14} style={{ marginRight: '4px' }} /> Print Quotation
-              </Button>
+          <div className="flex gap-2 items-center flex-wrap">
+            {isViewingHistorical ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => printQuotationPdf(quotation._id, activeRevision.revisionNo)}
+                  title={`Download PDF for ${activeRevision.revisionLabel}`}
+                  style={{ color: 'var(--primary-700)', borderColor: 'var(--primary-300)' }}
+                >
+                  <Download size={14} style={{ marginRight: '4px' }} /> Download Rev PDF
+                </Button>
+
+                <Button
+                  variant="primary"
+                  onClick={() => setSelectedRevisionNo(null)}
+                  title="Return to Current Quotation"
+                >
+                  <ArrowLeft size={14} style={{ marginRight: '4px' }} /> Return to Current
+                </Button>
+              </>
+            ) : (
+              <>
+                {quotation && (
+                  <Button
+                    variant="outline"
+                    onClick={() => printQuotationPdf(quotation._id)}
+                    title="Print Current Quotation PDF"
+                  >
+                    <Printer size={14} style={{ marginRight: '4px' }} /> Print Quotation
+                  </Button>
+                )}
+
+                {quotation && !['won', 'converted', 'cancelled', 'lost'].includes(quotation.status) && canAmend && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAmendModalOpen(true)}
+                    title="Create Quotation Amendment"
+                    style={{ color: 'var(--primary-700)', borderColor: 'var(--primary-300)', backgroundColor: 'var(--primary-50)' }}
+                  >
+                    <FileDiff size={14} style={{ marginRight: '4px' }} /> Amend Quotation
+                  </Button>
+                )}
+
+                {quotation && quotation.status !== 'released' && canEdit && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      onClose();
+                      if (onEdit) onEdit(quotation);
+                    }}
+                  >
+                    <Edit size={14} style={{ marginRight: '4px' }} /> Edit Quotation
+                  </Button>
+                )}
+
+                {quotation && quotation.status !== 'released' && canRelease && (
+                  <Button variant="outline" onClick={handleReleaseAction} disabled={releasing}>
+                    <CheckCircle2 size={14} style={{ marginRight: '4px' }} color="var(--success-600)" />
+                    {releasing ? 'Releasing...' : 'Release Quotation'}
+                  </Button>
+                )}
+              </>
             )}
 
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-
-            {quotation && quotation.status !== 'released' && canEdit && (
-              <Button
-                variant="primary"
-                onClick={() => {
-                  onClose();
-                  if (onEdit) onEdit(quotation);
-                }}
-              >
-                <Edit size={14} style={{ marginRight: '4px' }} /> Edit Quotation
-              </Button>
-            )}
-
-            {quotation && quotation.status !== 'released' && canRelease && (
-              <Button variant="outline" onClick={handleReleaseAction} disabled={releasing}>
-                <CheckCircle2 size={14} style={{ marginRight: '4px' }} color="var(--success-600)" />
-                {releasing ? 'Releasing...' : 'Release Quotation'}
-              </Button>
-            )}
           </div>
         </div>
       }
@@ -479,6 +685,56 @@ const QuotationDetailModal = ({
         <Alert type="error" message={error} />
       ) : quotation ? (
         <div>
+          {/* Prominent Historical Revision Banner */}
+          {isViewingHistorical && activeRevision && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                background: '#fffbeb',
+                border: '2px solid #fcd34d',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#92400e' }}>
+                    Viewing Historical Revision: <span className="font-mono">{activeRevision.revisionLabel}</span> ({activeRevision.title})
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#b45309', marginTop: '2px' }}>
+                    Status: <strong style={{ textTransform: 'uppercase' }}>SUPERSEDED</strong> • Recorded on {formatDate(activeRevision.date)} by {activeRevision.createdBy || 'User'}
+                    {activeRevision.reason && <span> • Reason: <em>"{activeRevision.reason}"</em></span>}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => printQuotationPdf(quotation._id, activeRevision.revisionNo)}
+                  style={{ backgroundColor: '#ffffff', color: '#92400e', borderColor: '#fcd34d', fontWeight: 600 }}
+                >
+                  <Download size={13} style={{ marginRight: '4px' }} /> Download Rev PDF
+                </Button>
+                <Button
+                  variant="primary"
+                  size="xs"
+                  onClick={() => setSelectedRevisionNo(null)}
+                  style={{ fontWeight: 600 }}
+                >
+                  <ArrowLeft size={13} style={{ marginRight: '4px' }} /> Return to Current Quotation
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Header Summary Row */}
           <div
             style={{
@@ -486,38 +742,43 @@ const QuotationDetailModal = ({
               justify: 'space-between',
               alignItems: 'center',
               padding: '12px 16px',
-              background: 'var(--gray-100)',
+              background: isViewingHistorical ? '#fef3c7' : 'var(--gray-100)',
+              border: isViewingHistorical ? '1px solid #fde68a' : 'none',
               borderRadius: '6px',
               marginBottom: '16px',
             }}
           >
             <div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase' }}>
-                Quotation Status
+                {isViewingHistorical ? 'Revision Status' : 'Quotation Status'}
               </div>
-              <div style={{ marginTop: '2px' }}>
-                <StatusBadge status={quotation.status} />
-                {quotation.amendmentCount > 0 && (
-                  <span
-                    style={{
-                      marginLeft: '8px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--primary-700)',
-                    }}
-                  >
-                    (Amendment #{quotation.amendmentCount})
+              <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isViewingHistorical ? (
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#f1f5f9', color: '#475569', fontWeight: 700, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}>
+                    SUPERSEDED
                   </span>
+                ) : (
+                  <StatusBadge status={displayQuotation.status} />
                 )}
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: isViewingHistorical ? '#92400e' : 'var(--primary-700)',
+                  }}
+                >
+                  ({activeRevision?.revisionLabel || 'Rev 00'})
+                </span>
               </div>
             </div>
 
             <div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase' }}>
-                Quotation Date
+                {isViewingHistorical ? 'Revision Date' : 'Quotation Date'}
               </div>
               <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>
-                {formatDate(quotation.quotationDate)}
+                {formatDate(displayQuotation.quotationDate || activeRevision?.date)}
               </div>
             </div>
 
@@ -526,16 +787,16 @@ const QuotationDetailModal = ({
                 Type / Category
               </div>
               <div style={{ fontWeight: 600, textTransform: 'capitalize', color: 'var(--gray-800)' }}>
-                {quotation.quotationType} • {quotation.quotationCategory}
+                {displayQuotation.quotationType} • {displayQuotation.quotationCategory}
               </div>
             </div>
 
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase' }}>
-                Grand Total
+                Grand Total ({activeRevision?.revisionLabel})
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary-700)' }}>
-                ₹{(quotation.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹{(displayQuotation.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -573,12 +834,12 @@ const QuotationDetailModal = ({
                 Sales Person: {quotation.salesPerson?.fullName || '—'}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
-                Valid Till: {formatDate(quotation.validTill)}
+                Valid Till: {formatDate(displayQuotation.validTill)}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Attention Deadline: <strong>{formatDate(quotation.deadline || quotation.validTill || quotation.requirement?.deadline)}</strong></span>
-                {(quotation.deadline || quotation.validTill || quotation.requirement?.deadline) && (() => {
-                  const badge = getDeadlineBadge(quotation.deadline || quotation.validTill || quotation.requirement?.deadline);
+                <span>Attention Deadline: <strong>{formatDate(displayQuotation.deadline || displayQuotation.validTill || quotation.requirement?.deadline)}</strong></span>
+                {(displayQuotation.deadline || displayQuotation.validTill || quotation.requirement?.deadline) && (() => {
+                  const badge = getDeadlineBadge(displayQuotation.deadline || displayQuotation.validTill || quotation.requirement?.deadline);
                   return badge ? (
                     <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-semibold border ${badge.color}`}>
                       {badge.text}
@@ -587,10 +848,10 @@ const QuotationDetailModal = ({
                 })()}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
-                Next Follow-up: <strong>{formatDate(quotation.nextFollowUpDate || quotation.requirement?.followUpDate)}</strong>
+                Next Follow-up: <strong>{formatDate(displayQuotation.nextFollowUpDate || quotation.requirement?.followUpDate)}</strong>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
-                Currency: {quotation.currency || 'INR'}
+                Currency: {displayQuotation.currency || 'INR'}
               </div>
             </div>
           </div>
@@ -598,7 +859,7 @@ const QuotationDetailModal = ({
           {/* Line Items Table */}
           <div style={{ marginBottom: '20px' }}>
             <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-900)', marginBottom: '10px' }}>
-              Quotation Line Items ({items.length})
+              Quotation Line Items ({displayItems.length}) {isViewingHistorical && <span className="font-mono text-xs text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 ml-2">Historical Snapshot: {activeRevision?.revisionLabel}</span>}
             </h4>
 
             <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white shadow-2xs">
@@ -614,7 +875,7 @@ const QuotationDetailModal = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it, idx) => {
+                  {displayItems.map((it, idx) => {
                     const techSpecs = getItemTechnicalSpecs(it);
                     const uomCode = it.uom?.uomCode || (typeof it.uom === 'string' ? it.uom : '') || 'NOS';
                     return (
@@ -680,10 +941,10 @@ const QuotationDetailModal = ({
                 Commercial Terms
               </h4>
               <div style={{ fontSize: '12px', color: 'var(--gray-700)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div><strong>Payment Terms:</strong> {quotation.paymentTerms || 'As per standard agreement'}</div>
-                <div><strong>Delivery Terms:</strong> {quotation.deliveryTerms || 'FOB Ex-works'}</div>
-                <div><strong>General Terms:</strong> {quotation.generalTerms || 'None specified'}</div>
-                {quotation.remarks && <div><strong>Remarks:</strong> {quotation.remarks}</div>}
+                <div><strong>Payment Terms:</strong> {displayQuotation.paymentTerms || 'As per standard agreement'}</div>
+                <div><strong>Delivery Terms:</strong> {displayQuotation.deliveryTerms || 'FOB Ex-works'}</div>
+                <div><strong>General Terms:</strong> {displayQuotation.generalTerms || 'None specified'}</div>
+                {displayQuotation.remarks && <div><strong>Remarks:</strong> {displayQuotation.remarks}</div>}
               </div>
             </div>
 
@@ -698,33 +959,41 @@ const QuotationDetailModal = ({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span>Subtotal:</span>
-                <strong>₹{(quotation.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                <strong>₹{(displayQuotation.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
               </div>
-              {quotation.discountAmount > 0 && (
+              {displayQuotation.discountAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: 'var(--danger-700)' }}>
-                  <span>Discount:</span>
-                  <span>- ₹{quotation.discountAmount.toFixed(2)}</span>
+                  <span>
+                    Discount
+                    {displayQuotation.discountRate > 0
+                      ? ` (${displayQuotation.discountRate}%)`
+                      : displayQuotation.subtotal > 0
+                      ? ` (${Number(((displayQuotation.discountAmount / displayQuotation.subtotal) * 100).toFixed(2))}%)`
+                      : ''}
+                    :
+                  </span>
+                  <span>- ₹{displayQuotation.discountAmount.toFixed(2)}</span>
                 </div>
               )}
-              {quotation.pfAmount > 0 && (
+              {displayQuotation.pfAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span>P&F Charges:</span>
-                  <span>+ ₹{quotation.pfAmount.toFixed(2)}</span>
+                  <span>+ ₹{displayQuotation.pfAmount.toFixed(2)}</span>
                 </div>
               )}
-              {quotation.freightAmount > 0 && (
+              {displayQuotation.freightAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span>Freight Charges:</span>
-                  <span>+ ₹{quotation.freightAmount.toFixed(2)}</span>
+                  <span>+ ₹{displayQuotation.freightAmount.toFixed(2)}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', borderTop: '1px solid var(--gray-200)', paddingTop: '6px' }}>
                 <span>Taxable Amount:</span>
-                <strong>₹{(quotation.taxableAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                <strong>₹{(displayQuotation.taxableAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: 'var(--primary-700)' }}>
-                <span>{quotation.taxName || 'Tax'} ({quotation.taxRate || 0}%):</span>
-                <span>+ ₹{(quotation.taxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span>{displayQuotation.taxName || 'Tax'} ({displayQuotation.taxRate || 0}%):</span>
+                <span>+ ₹{(displayQuotation.taxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
               <div
                 style={{
@@ -738,7 +1007,7 @@ const QuotationDetailModal = ({
               >
                 <strong>Grand Total:</strong>
                 <strong style={{ color: 'var(--primary-700)' }}>
-                  ₹{(quotation.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{(displayQuotation.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </strong>
               </div>
             </div>
@@ -765,6 +1034,26 @@ const QuotationDetailModal = ({
                 <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--success-900)', marginTop: '2px' }} className="font-mono">
                   {typeof quotation.salesOrder === 'object' ? quotation.salesOrder.salesOrderNo : quotation.salesOrder}
                 </div>
+                {typeof quotation.salesOrder === 'object' && quotation.salesOrder.quotationRevisionNo && (
+                  <div style={{ marginTop: '4px' }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: 'var(--success-200)',
+                        color: 'var(--success-900)',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      Accepted Revision: {quotation.salesOrder.quotationRevisionNo} (Rev {String(quotation.salesOrder.quotationRevision ?? 0).padStart(2, '0')})
+                    </span>
+                  </div>
+                )}
                 {quotation.convertedAt && (
                   <div style={{ fontSize: '12px', color: 'var(--success-700)', marginTop: '4px' }}>
                     Converted on {formatDate(quotation.convertedAt)} {quotation.convertedBy?.username ? `by ${quotation.convertedBy.username}` : ''}
@@ -896,26 +1185,264 @@ const QuotationDetailModal = ({
             </div>
           )}
 
-          {/* References & Traceability Section */}
-          {references && references.amendments && references.amendments.length > 0 && (
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--gray-200)', paddingTop: '12px' }}>
-              <h5 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-800)', marginBottom: '8px' }}>
-                Amendment History ({references.amendments.length})
-              </h5>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-                {references.amendments.map((am) => (
-                  <div key={am._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--gray-100)', borderRadius: '4px' }}>
-                    <span className="font-mono" style={{ fontWeight: 600 }}>{am.amendmentNo}</span>
-                    <span>Reason: {am.reason}</span>
-                    <span style={{ color: 'var(--gray-500)' }}>{formatDate(am.createdAt)}</span>
-                  </div>
-                ))}
+          {/* Quotation Amendment History Section */}
+          <div
+            style={{
+              marginTop: '24px',
+              borderTop: '2px solid var(--gray-200)',
+              paddingTop: '16px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={18} style={{ color: 'var(--primary-600)' }} />
+                <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)', margin: 0 }}>
+                  Quotation Amendment History
+                </h4>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: 'var(--gray-100)',
+                    color: 'var(--gray-700)',
+                    border: '1px solid var(--gray-300)',
+                  }}
+                >
+                  {revisionsList.length} {revisionsList.length === 1 ? 'Revision' : 'Revisions'}
+                </span>
               </div>
+
+              {!['won', 'converted', 'cancelled', 'lost'].includes(quotation.status) && canAmend && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAmendModalOpen(true)}
+                  style={{
+                    fontSize: '12px',
+                    padding: '4px 10px',
+                    color: 'var(--primary-700)',
+                    borderColor: 'var(--primary-300)',
+                    backgroundColor: 'var(--primary-50)',
+                  }}
+                >
+                  <FileDiff size={13} style={{ marginRight: '5px' }} /> Create Amendment
+                </Button>
+              )}
             </div>
-          )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {revisionsList.map((rev) => {
+                const isActive = activeRevision?.revisionNo === rev.revisionNo;
+                const isCurrent = rev.isCurrent;
+                const revTotal = rev.headerSnapshot?.grandTotal ?? 0;
+
+                return (
+                  <div
+                    key={rev.revisionNo}
+                    style={{
+                      padding: '12px 14px',
+                      background: isActive
+                        ? isCurrent
+                          ? '#f0fdf4'
+                          : '#fffbeb'
+                        : 'var(--gray-50)',
+                      border: isActive
+                        ? isCurrent
+                          ? '1.5px solid #86efac'
+                          : '1.5px solid #fde047'
+                        : '1px solid var(--gray-200)',
+                      borderRadius: '8px',
+                      transition: 'all 0.15s ease-in-out',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span
+                            className="font-mono"
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: 'var(--gray-900)',
+                            }}
+                          >
+                            {rev.revisionLabel}
+                          </span>
+                          <span style={{ color: 'var(--gray-400)' }}>|</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-800)' }}>
+                            {rev.title}
+                          </span>
+
+                          {/* Status Badge */}
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: isCurrent ? '#dcfce7' : '#f1f5f9',
+                              color: isCurrent ? '#15803d' : '#64748b',
+                              border: isCurrent ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
+                            }}
+                          >
+                            {rev.statusBadge}
+                          </span>
+
+                          {/* Active viewing badge */}
+                          {isActive && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: isCurrent ? '#15803d' : '#b45309',
+                                color: '#ffffff',
+                              }}
+                            >
+                              Currently Viewing
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Revision Meta */}
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: 'var(--gray-600)',
+                            marginTop: '4px',
+                            display: 'flex',
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span>Created: <strong>{formatDate(rev.date)}</strong></span>
+                          <span>By: <strong>{rev.createdBy}</strong></span>
+                          <span>Total: <strong style={{ color: 'var(--primary-700)' }}>₹{Number(revTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+                        </div>
+
+                        {/* Amendment Reason & Remarks */}
+                        {rev.reason && rev.reason !== 'Original Quotation' && (
+                          <div style={{ fontSize: '12px', color: 'var(--gray-700)', marginTop: '4px' }}>
+                            <span style={{ fontWeight: 600 }}>Reason: </span>
+                            <span>{rev.reason}</span>
+                          </div>
+                        )}
+                        {rev.remarks && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '2px', fontStyle: 'italic' }}>
+                            Note: {rev.remarks}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {isActive ? (
+                          !isCurrent && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRevisionNo(null)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                color: 'var(--primary-700)',
+                                background: '#ffffff',
+                                border: '1px solid var(--primary-300)',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                              title="Return to Current Quotation"
+                            >
+                              <ArrowLeft size={12} /> Return to Current
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRevisionNo(isCurrent ? null : rev.revisionNo)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 8px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              color: 'var(--gray-700)',
+                              background: '#ffffff',
+                              border: '1px solid var(--gray-300)',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                            }}
+                            title={`View Details for ${rev.revisionLabel}`}
+                          >
+                            <Eye size={12} /> View Details
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => printQuotationPdf(quotation._id, rev.revisionNo)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            color: 'var(--primary-700)',
+                            background: '#ffffff',
+                            border: '1px solid var(--primary-300)',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                          title={`Download PDF for ${rev.revisionLabel}`}
+                        >
+                          <Download size={12} /> Download PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : null}
     </Modal>
+    {quotation && (
+      <QuotationAmendmentModal
+        isOpen={isAmendModalOpen}
+        onClose={() => setIsAmendModalOpen(false)}
+        quotation={quotation}
+        onSuccess={handleAmendmentSuccess}
+      />
+    )}
+    </>
   );
 };
 

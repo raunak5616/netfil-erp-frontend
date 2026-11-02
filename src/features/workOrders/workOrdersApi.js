@@ -90,6 +90,37 @@ export const workOrdersApi = apiSlice.injectEndpoints({
         { type: 'WorkOrders', id: 'LIST' },
       ],
     }),
+    getWorkOrderAttachments: builder.query({
+      query: ({ id, params = {} }) => ({
+        url: `/work-orders/${id}/attachments`,
+        method: 'get',
+        params,
+      }),
+      providesTags: (result, error, { id }) => [{ type: 'WorkOrders', id: `ATTACHMENTS_${id}` }],
+    }),
+    uploadWorkOrderAttachment: builder.mutation({
+      query: ({ id, formData }) => ({
+        url: `/work-orders/${id}/attachments`,
+        method: 'post',
+        data: formData,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'WorkOrders', id: `ATTACHMENTS_${id}` }],
+    }),
+    replaceWorkOrderAttachment: builder.mutation({
+      query: ({ id, attachmentId, formData }) => ({
+        url: `/work-orders/${id}/attachments/${attachmentId}/replace`,
+        method: 'post',
+        data: formData,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'WorkOrders', id: `ATTACHMENTS_${id}` }],
+    }),
+    deleteWorkOrderAttachment: builder.mutation({
+      query: ({ id, attachmentId }) => ({
+        url: `/work-orders/${id}/attachments/${attachmentId}`,
+        method: 'delete',
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'WorkOrders', id: `ATTACHMENTS_${id}` }],
+    }),
   }),
 });
 
@@ -102,4 +133,9 @@ export const {
   useStartWorkOrderMutation,
   useCompleteWorkOrderMutation,
   useCancelWorkOrderMutation,
+  useGetWorkOrderAttachmentsQuery,
+  useUploadWorkOrderAttachmentMutation,
+  useReplaceWorkOrderAttachmentMutation,
+  useDeleteWorkOrderAttachmentMutation,
 } = workOrdersApi;
+
