@@ -18,7 +18,6 @@ import Alert from '../../components/ui/Alert';
 import Modal from '../../components/ui/Modal';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
-import ItemTypeSelectionModal from './ItemTypeSelectionModal';
 import DeleteItemModal from './DeleteItemModal';
 import { 
   Plus, 
@@ -143,7 +142,6 @@ const ItemList = () => {
   const error = localError || (itemsQueryError ? (itemsQueryError.data?.message || itemsQueryError.message || 'Failed to connect to server') : '');
 
   // Modal states
-  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false);
   const [selectedProductType, setSelectedProductType] = useState('RAW_ITEM');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -292,11 +290,18 @@ const ItemList = () => {
     });
   };
 
-  // Categories available based on group filter
+  // Categories available for filtering: fixed categories (Raw, Filter, Coil, AHU) first
   const availableCategoryFilters = useMemo(() => {
-    if (groupFilter === 'all') return itemCategories;
-    return itemCategories.filter((c) => (c.itemGroup?._id || c.itemGroup) === groupFilter);
-  }, [itemCategories, groupFilter]);
+    const FIXED_CODES = ['RAW', 'FILTER', 'COIL', 'AHU'];
+    return [...itemCategories].sort((a, b) => {
+      const aFixed = FIXED_CODES.indexOf(a.categoryCode?.toUpperCase());
+      const bFixed = FIXED_CODES.indexOf(b.categoryCode?.toUpperCase());
+      if (aFixed !== -1 && bFixed !== -1) return aFixed - bFixed;
+      if (aFixed !== -1) return -1;
+      if (bFixed !== -1) return 1;
+      return (a.categoryName || '').localeCompare(b.categoryName || '');
+    });
+  }, [itemCategories]);
 
   const columns = [
     {
@@ -536,7 +541,9 @@ const ItemList = () => {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setIsTypeSelectionOpen(true);
+                  setEditingItem(null);
+                  setSelectedProductType('RAW_ITEM');
+                  setIsFormOpen(true);
                 }}
               >
                 <Plus size={14} />
@@ -723,17 +730,7 @@ const ItemList = () => {
         </div>
       </div>
 
-      {/* Type Selection Modal */}
-      <ItemTypeSelectionModal
-        isOpen={isTypeSelectionOpen}
-        onClose={() => setIsTypeSelectionOpen(false)}
-        onSelectType={(type) => {
-          setSelectedProductType(type);
-          setIsTypeSelectionOpen(false);
-          setEditingItem(null);
-          setIsFormOpen(true);
-        }}
-      />
+      {/* Item Form Modal */}
 
       {/* Item Form Modal */}
       <ItemFormModal

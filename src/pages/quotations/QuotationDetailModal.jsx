@@ -250,15 +250,23 @@ const getItemTechnicalSpecs = (it) => {
     specs.push({ label: 'MOC', value: moc });
   }
 
-  // 4. Temperature (°C)
-  const temp = findSpecValue(['temperature', 'temp', 'maxTemp', 'operatingTemp'])
+  // 3b. Box Construction
+  const boxConst = findSpecValue(['overallBoxConstruction', 'boxConstruction', 'overall_box_construction', 'box_construction', 'box construction'])
+    || itemDoc.overallBoxConstruction
+    || itemDoc.boxConstruction;
+  if (boxConst) {
+    specs.push({ label: 'Box Construction', value: boxConst });
+  }
+
+  // 4. Rated Operating Temperature (°C)
+  const temp = findSpecValue(['temperature', 'temp', 'maxTemp', 'operatingTemp', 'ratedOperatingTemperature'])
     || itemDoc.temperatureRating
     || itemDoc.grade_items?.filterTemp
     || matchedVariant?.temperature;
   if (temp) {
     const cleanTemp = String(temp).replace(/(?:degree|celcious|celsius|°c)/gi, '').trim();
     if (cleanTemp && cleanTemp !== '0' && cleanTemp.toLowerCase() !== 'null' && cleanTemp.toLowerCase() !== 'undefined') {
-      specs.push({ label: 'Temp', value: `${cleanTemp} °C` });
+      specs.push({ label: 'Rated Operating Temp', value: `${cleanTemp} °C` });
     }
   }
 

@@ -1,32 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   useCreateItemCategoryMutation,
   useUpdateItemCategoryMutation,
-  useGetItemGroupsQuery,
 } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select } from '../../components/ui/FormField';
+import { Layers } from 'lucide-react';
 
-const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialItemGroups = [] }) => {
+const FIXED_CATEGORIES = [
+  { code: 'RAW', name: 'Raw', desc: 'Raw material category' },
+  { code: 'FILTER', name: 'Filter', desc: 'Filter product category' },
+  { code: 'COIL', name: 'Coil', desc: 'Coil product category' },
+  { code: 'AHU', name: 'AHU', desc: 'Air Handling Unit category' },
+];
+
+const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
   const isEditMode = !!category;
 
   const [createItemCategoryMutation] = useCreateItemCategoryMutation();
   const [updateItemCategoryMutation] = useUpdateItemCategoryMutation();
 
-  const {
-    data: itemGroupsData,
-    isLoading: groupsLoading,
-    error: groupsQueryError,
-  } = useGetItemGroupsQuery({ typeFilter: 'MASTER' }, { skip: !isOpen });
-
-  const groupsError = groupsQueryError?.data?.message || '';
-
   const [formData, setFormData] = useState({
     categoryCode: '',
     categoryName: '',
-    itemGroup: '',
     description: '',
     status: 'active',
   });
@@ -35,43 +33,11 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const rawGroups = useMemo(() => {
-    return (
-      itemGroupsData?.itemGroups ||
-      itemGroupsData?.groups ||
-      (Array.isArray(itemGroupsData) ? itemGroupsData : initialItemGroups || [])
-    );
-  }, [itemGroupsData, initialItemGroups]);
-
-  // Filter out system internal groups and guarantee currently edited category's item group is included
-  const displayGroups = useMemo(() => {
-    const list = [...rawGroups];
-
-    // If editing a category and its group is an object not currently in list, inject it
-    if (category?.itemGroup && typeof category.itemGroup === 'object' && category.itemGroup._id) {
-      const exists = list.some((g) => String(g._id) === String(category.itemGroup._id));
-      if (!exists) {
-        list.push(category.itemGroup);
-      }
-    }
-
-    return list.filter((g) => {
-      if (g.groupType === 'SYSTEM') return false;
-      const code = String(g.groupCode || '').toUpperCase();
-      return !code.startsWith('GP-WO-') && code !== 'GP-INV' && code !== 'GP-OBOM';
-    });
-  }, [rawGroups, category]);
-
   useEffect(() => {
     if (category) {
       setFormData({
         categoryCode: category.categoryCode || '',
         categoryName: category.categoryName || '',
-        itemGroup: category.itemGroup?._id
-          ? String(category.itemGroup._id)
-          : category.itemGroup
-          ? String(category.itemGroup)
-          : '',
         description: category.description || '',
         status: category.status || 'active',
       });
@@ -79,7 +45,6 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
       setFormData({
         categoryCode: '',
         categoryName: '',
-        itemGroup: '',
         description: '',
         status: 'active',
       });
@@ -98,15 +63,21 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
     }));
   };
 
+  const handleSelectPreset = (preset) => {
+    setFormData((prev) => ({
+      ...prev,
+      categoryCode: preset.code,
+      categoryName: preset.name,
+      description: prev.description || preset.desc,
+    }));
+  };
+
   const validate = () => {
     if (!formData.categoryCode.trim()) {
       return 'Category Code is required.';
     }
     if (!formData.categoryName.trim()) {
       return 'Category Name is required.';
-    }
-    if (!formData.itemGroup) {
-      return 'Item Group selection is required.';
     }
     if (!['active', 'inactive'].includes(formData.status)) {
       return 'Status must be active or inactive.';
@@ -174,52 +145,46 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
           </div>
         )}
 
-        {groupsError && (
-          <div style={{ gridColumn: 'span 2' }}>
-            <Alert type="warning" message={groupsError} onClose={() => setGroupsError('')} />
-          </div>
-        )}
-
         {successMessage && (
           <div style={{ gridColumn: 'span 2' }}>
             <Alert type="success" message={successMessage} />
           </div>
         )}
 
-        {/* Parent Item Group Select */}
-        <FormField
-          label="Parent Item Group"
-          required
-          fullWidth
-          error={groupsError}
-          helperText="Master group classification this category belongs to"
-        >
-          <Select
-            name="itemGroup"
-            value={formData.itemGroup}
-            onChange={handleChange}
-            disabled={submitting || groupsLoading}
-          >
-            <option value="">-- Select Item Group --</option>
-            {groupsLoading && displayGroups.length === 0 ? (
-              <option value="" disabled>Loading item groups...</option>
-            ) : displayGroups.length === 0 ? (
-              <option value="" disabled>No item groups available</option>
-            ) : (
-              displayGroups.map((g) => (
-                <option key={g._id} value={g._id}>
-                  {`${g.groupCode} — ${g.groupName}${g.status === 'inactive' ? ' (Inactive)' : ''}`}
-                </option>
-              ))
-            )}
-          </Select>
-        </FormField>
+        {/* Quick select presets for predefined fixed categories */}
+        {!isEditMode && (
+          <div style={{ gridColumn: 'span 2' }} className="mb-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+              <Layers size={14} className="text-blue-600" />
+              <span>Predefined Fixed System Categories:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {FIXED_CATEGORIES.map((preset) => {
+                const isSelected = formData.categoryCode === preset.code;
+                return (
+                  <button
+                    key={preset.code}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border ${
+                      isSelected
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
+                    }`}
+                  >
+                    {preset.name} ({preset.code})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Category Code Input */}
-        <FormField label="Category Code" required fullWidth helperText="Unique code symbol (e.g. CAT-SHEET, CAT-PIPE, CAT-WIRE)">
+        <FormField label="Category Code" required fullWidth helperText="Unique code identifier (e.g. RAW, FILTER, COIL, AHU)">
           <Input
             name="categoryCode"
-            placeholder="e.g. CAT-SHEET"
+            placeholder="e.g. RAW"
             value={formData.categoryCode}
             onChange={handleChange}
             disabled={submitting}
@@ -228,10 +193,10 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
         </FormField>
 
         {/* Category Name Input */}
-        <FormField label="Category Name" required fullWidth helperText="Descriptive name for the category">
+        <FormField label="Category Name" required fullWidth helperText="Descriptive name (e.g. Raw, Filter, Coil, AHU)">
           <Input
             name="categoryName"
-            placeholder="e.g. Stainless Steel Sheets"
+            placeholder="e.g. Raw"
             value={formData.categoryName}
             onChange={handleChange}
             disabled={submitting}
@@ -255,7 +220,7 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess, initialIt
         <FormField label="Description" fullWidth helperText="Optional usage details or scope for this category">
           <Input
             name="description"
-            placeholder="e.g. Cold-rolled and hot-rolled industrial steel plates"
+            placeholder="e.g. Standard manufacturing category"
             value={formData.description}
             onChange={handleChange}
             disabled={submitting}

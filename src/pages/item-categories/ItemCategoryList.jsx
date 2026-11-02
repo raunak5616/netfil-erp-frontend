@@ -3,7 +3,6 @@ import {
   useGetItemCategoriesQuery,
   useUpdateItemCategoryStatusMutation,
   useDeleteItemCategoryMutation,
-  useGetItemGroupsQuery,
 } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -24,8 +23,10 @@ import {
   RefreshCw,
   Power,
   Trash2,
-  Layers
+  CheckCircle2
 } from 'lucide-react';
+
+const FIXED_CODES = ['RAW', 'FILTER', 'COIL', 'AHU'];
 
 const ItemCategoryList = () => {
   const { hasPermission, user } = useAuth();
@@ -46,14 +47,8 @@ const ItemCategoryList = () => {
   const {
     data: categoriesData,
     isLoading: categoriesLoading,
-    error: categoriesError,
     refetch: refetchCategories,
   } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' });
-
-  const {
-    data: groupsData,
-    isLoading: groupsLoading,
-  } = useGetItemGroupsQuery({ typeFilter: 'MASTER' });
 
   const [updateItemCategoryStatusMutation] = useUpdateItemCategoryStatusMutation();
   const [deleteItemCategoryMutation] = useDeleteItemCategoryMutation();
@@ -71,7 +66,6 @@ const ItemCategoryList = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [groupFilter, setGroupFilter] = useState('all');
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -94,15 +88,20 @@ const ItemCategoryList = () => {
 
   const itemCategories = useMemo(() => {
     const list = categoriesData?.itemCategories || categoriesData?.categories || (Array.isArray(categoriesData) ? categoriesData : []);
-    return list.filter((c) => !isSystemCode(c.categoryCode));
+    const valid = list.filter((c) => !isSystemCode(c.categoryCode));
+
+    // Sort to show 4 fixed categories at the top (Raw, Filter, Coil, AHU)
+    return [...valid].sort((a, b) => {
+      const aFixed = FIXED_CODES.indexOf(a.categoryCode?.toUpperCase());
+      const bFixed = FIXED_CODES.indexOf(b.categoryCode?.toUpperCase());
+      if (aFixed !== -1 && bFixed !== -1) return aFixed - bFixed;
+      if (aFixed !== -1) return -1;
+      if (bFixed !== -1) return 1;
+      return (a.categoryName || '').localeCompare(b.categoryName || '');
+    });
   }, [categoriesData]);
 
-  const itemGroups = useMemo(() => {
-    const list = groupsData?.itemGroups || groupsData?.groups || (Array.isArray(groupsData) ? groupsData : []);
-    return list.filter((g) => !isSystemCode(g.groupCode));
-  }, [groupsData]);
-
-  const loading = categoriesLoading || groupsLoading;
+  const loading = categoriesLoading;
 
   const handleStatusToggle = async (category) => {
     const nextStatus = category.status === 'active' ? 'inactive' : 'active';
@@ -154,20 +153,8 @@ const ItemCategoryList = () => {
 
   const filteredCategories = useMemo(() => {
     return itemCategories.filter((cat) => {
-      const parentGroupCode = cat.itemGroup?.groupCode || '';
-      const isSystem = cat.itemGroup?.groupType === 'SYSTEM' || parentGroupCode.startsWith('GP-') || cat.categoryCode.startsWith('CAT-WO') || cat.categoryCode.startsWith('CAT-OBOM') || cat.categoryCode === 'CAT-INV';
-
-      // Hide system categories by default unless explicitly searched or a specific system group is selected
-      if (!searchTerm.trim() && groupFilter === 'all' && isSystem) return false;
-
       // Status filter
       if (statusFilter !== 'all' && cat.status !== statusFilter) return false;
-
-      // Group filter
-      if (groupFilter !== 'all') {
-        const catGroupId = cat.itemGroup?._id || cat.itemGroup;
-        if (String(catGroupId) !== String(groupFilter)) return false;
-      }
 
       // Search filter
       if (!searchTerm.trim()) return true;
@@ -175,59 +162,49 @@ const ItemCategoryList = () => {
       const term = searchTerm.toLowerCase();
       const code = (cat.categoryCode || '').toLowerCase();
       const name = (cat.categoryName || '').toLowerCase();
-      const groupCode = (cat.itemGroup?.groupCode || '').toLowerCase();
-      const groupName = (cat.itemGroup?.groupName || '').toLowerCase();
       const desc = (cat.description || '').toLowerCase();
 
       return (
         code.includes(term) ||
         name.includes(term) ||
-        groupCode.includes(term) ||
-        groupName.includes(term) ||
         desc.includes(term)
       );
     });
-  }, [itemCategories, searchTerm, statusFilter, groupFilter]);
+  }, [itemCategories, searchTerm, statusFilter]);
 
   const columns = [
     {
       key: 'categoryCode',
       header: 'Category Code',
-      width: '140px',
-      render: (val) => (
-        <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
-          {val}
-        </span>
-      ),
+      width: '150px',
+      render: (val) => {
+        const isFixed = FIXED_CODES.includes(String(val).toUpperCase());
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono" style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
+              {val}
+            </span>
+            {isFixed && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                Fixed
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'categoryName',
       header: 'Category Name',
-      width: '220px',
-      render: (val) => <strong style={{ color: 'var(--neutral-900)' }}>{val}</strong>,
-    },
-    {
-      key: 'itemGroup',
-      header: 'Item Group',
-      width: '200px',
-      render: (group) => {
-        if (!group) return <span style={{ color: 'var(--neutral-400)' }}>—</span>;
+      width: '240px',
+      render: (val, row) => {
+        const isFixed = FIXED_CODES.includes(String(row.categoryCode).toUpperCase());
         return (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <span
-              style={{
-                backgroundColor: 'var(--neutral-100)',
-                color: 'var(--neutral-800)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                border: '1px solid var(--neutral-300)',
-              }}
-            >
-              {group.groupCode}
-            </span>
-            <span style={{ fontSize: '13px', color: 'var(--neutral-700)' }}>{group.groupName}</span>
+          <div className="flex items-center gap-2">
+            <strong style={{ color: 'var(--neutral-900)' }}>{val}</strong>
+            {isFixed && (
+              <CheckCircle2 size={13} className="text-blue-500" title="Fixed System Category" />
+            )}
           </div>
         );
       },
@@ -235,7 +212,7 @@ const ItemCategoryList = () => {
     {
       key: 'description',
       header: 'Description',
-      width: '260px',
+      width: '320px',
       render: (val) => (
         <span style={{ color: val ? 'var(--neutral-800)' : 'var(--neutral-400)', fontSize: '13px' }}>
           {val || '—'}
@@ -252,64 +229,76 @@ const ItemCategoryList = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: canDelete ? '250px' : '180px',
-      render: (_, row) => (
-        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={Eye}
-            onClick={() => {
-              setSelectedCategory(row);
-              setIsDetailOpen(true);
-            }}
-          >
-            View
-          </Button>
-          {canEdit && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={Edit}
-                onClick={() => {
-                  setEditingCategory(row);
-                  setIsFormOpen(true);
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={Power}
-                loading={actionLoading === row._id}
-                onClick={() => handleStatusToggle(row)}
-                title={row.status === 'active' ? 'Deactivate Category' : 'Activate Category'}
-                style={{
-                  color: row.status === 'active' ? 'var(--danger-600)' : 'var(--success-600)',
-                }}
-              >
-                {row.status === 'active' ? 'Deactivate' : 'Activate'}
-              </Button>
-            </>
-          )}
-          {canDelete && (
+      width: canDelete ? '240px' : '180px',
+      render: (_, row) => {
+        const isFixed = FIXED_CODES.includes(String(row.categoryCode).toUpperCase());
+        return (
+          <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
             <Button
               variant="ghost"
               size="sm"
-              icon={Trash2}
-              onClick={() => handleDeleteClick(row)}
-              title="Delete Category"
-              style={{
-                color: 'var(--danger-600)',
+              icon={Eye}
+              onClick={() => {
+                setSelectedCategory(row);
+                setIsDetailOpen(true);
               }}
             >
-              Delete
+              View
             </Button>
-          )}
-        </div>
-      ),
+            {canEdit && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Edit}
+                  onClick={() => {
+                    setEditingCategory(row);
+                    setIsFormOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Power}
+                  loading={actionLoading === row._id}
+                  onClick={() => handleStatusToggle(row)}
+                  title={row.status === 'active' ? 'Deactivate Category' : 'Activate Category'}
+                  style={{
+                    color: row.status === 'active' ? 'var(--danger-600)' : 'var(--success-600)',
+                  }}
+                >
+                  {row.status === 'active' ? 'Deactivate' : 'Activate'}
+                </Button>
+              </>
+            )}
+            {canDelete && (
+              isFixed ? (
+                <span
+                  className="text-[11px] text-slate-400 italic px-2 py-1"
+                  title="Fixed system categories cannot be deleted"
+                >
+                  System
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={() => handleDeleteClick(row)}
+                  title="Delete Category"
+                  style={{
+                    color: 'var(--danger-600)',
+                  }}
+                >
+                  Delete
+                </Button>
+              )
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -317,7 +306,7 @@ const ItemCategoryList = () => {
     <div>
       <PageHeader
         title="Item Categories"
-        description="Manage sub-classifications and material categories under master Item Groups."
+        description="Predefined system categories (Raw, Filter, Coil, AHU) and category technical specifications."
         breadcrumbs={[
           { label: 'Home', path: '/dashboard' },
           { label: 'Item Master' },
@@ -382,8 +371,8 @@ const ItemCategoryList = () => {
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-[220px]">
             <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input className="pl-8"
-              placeholder="Search by category code, name, group, or description..."
+            <Input className="pl-8"
+              placeholder="Search by category code, name, or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -391,19 +380,6 @@ const ItemCategoryList = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Filter size={16} className="text-muted" />
-
-            <Select
-              value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value)}
-              style={{ width: '180px' }}
-            >
-              <option value="all">All Item Groups</option>
-              {itemGroups.filter(g => g.groupType !== 'SYSTEM' && !g.groupCode?.startsWith('GP-')).map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.groupCode} — {g.groupName}
-                </option>
-              ))}
-            </Select>
 
             <Select
               value={statusFilter}
@@ -424,9 +400,9 @@ const ItemCategoryList = () => {
           loading={loading}
           emptyTitle="No Item Categories found"
           emptyDescription={
-            searchTerm || statusFilter !== 'all' || groupFilter !== 'all'
+            searchTerm || statusFilter !== 'all'
               ? 'Try adjusting your search query or filters.'
-              : 'Click "Add Category" above to create your first item category record.'
+              : 'Click "Add Category" above to create an item category record.'
           }
         />
 
@@ -443,7 +419,6 @@ const ItemCategoryList = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSuccess={refetchCategories}
-        initialItemGroups={itemGroups}
       />
 
       <ItemCategoryDetailModal

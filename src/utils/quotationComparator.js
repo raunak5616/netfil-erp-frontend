@@ -121,7 +121,8 @@ export const extractTechnicalDetails = (item) => {
   const customSpecs = {};
   const knownKeys = [
     'moc', 'material', 'framematerial', 'casingmaterial', 'casingmoc',
-    'temperature', 'temp', 'maxtemp', 'operatingtemp', 'temperaturerating',
+    'temperature', 'temp', 'maxtemp', 'operatingtemp', 'temperaturerating', 'ratedoperatingtemperature',
+    'overallboxconstruction', 'boxconstruction',
     'efficiency', 'eff', 'filtrationefficiency', 'efficiencyrating', 'rating',
     'pressuredrop', 'initialpressuredrop', 'finalpressuredrop', 'pd', 'initialpd', 'finalpd',
     'filtergrade', 'bonding', 'bondingtype', 'facevelocity', 'velocity', 'cfm'

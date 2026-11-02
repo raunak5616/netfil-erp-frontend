@@ -24,20 +24,26 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
   if (!isOpen || !item) return null;
 
   const isFilterItem = item.productType === 'FILTER' || !!item.constructionType || !!item.filterLength || !!item.filterGrade;
+  const isFlangeItem = (item.constructionType || '').toUpperCase() === 'FLANGE';
+  const itemOverallL = item.overallLength ?? (item.filterLength ? (isFlangeItem ? Number(item.filterLength) + 60 : Number(item.filterLength)) : null);
+  const itemOverallW = item.overallWidth ?? (item.filterWidth ? (isFlangeItem ? Number(item.filterWidth) + 60 : Number(item.filterWidth)) : null);
+  const itemOverallD = item.overallDepth ?? item.filterDepth;
 
   const filterSpecsList = isFilterItem ? [
-    item.filterLength ? { label: 'BOX Length', value: `${item.filterLength} mm` } : null,
-    item.filterWidth ? { label: 'BOX Width', value: `${item.filterWidth} mm` } : null,
-    item.filterDepth ? { label: 'BOX Depth', value: `${item.filterDepth} mm` } : null,
-    item.constructionType === 'FLANGE' && item.overallFlangeLength ? { label: 'Overall Flange Length', value: `${item.overallFlangeLength} mm (+60mm)` } : null,
-    item.constructionType === 'FLANGE' && item.overallFlangeWidth ? { label: 'Overall Flange Width', value: `${item.overallFlangeWidth} mm (+60mm)` } : null,
+    item.filterLength ? { label: 'Body Length', value: `${item.filterLength} mm` } : null,
+    item.filterWidth ? { label: 'Body Width', value: `${item.filterWidth} mm` } : null,
+    item.filterDepth ? { label: 'Body Depth', value: `${item.filterDepth} mm` } : null,
+    (itemOverallL && itemOverallW && itemOverallD) ? {
+      label: 'Overall Box Dimensions',
+      value: `${itemOverallL} × ${itemOverallW} × ${itemOverallD} mm${isFlangeItem ? ' (+60mm Flange)' : ' (Box)'}`
+    } : ((item.overallBoxConstruction || item.boxConstruction) ? { label: 'Overall Box Dimensions', value: item.overallBoxConstruction || item.boxConstruction } : null),
     item.cfm ? { label: 'Airflow Capacity', value: `${item.cfm} CFM` } : null,
     item.faceVelocity ? { label: 'Face Velocity', value: `${item.faceVelocity} FPM` } : null,
     item.constructionType ? { label: 'Construction', value: item.constructionType } : null,
     item.flangeType ? { label: 'Flange Profile', value: item.flangeType?.designName || item.flangeType?.designCode } : null,
     item.moc ? { label: 'MOC', value: item.moc } : null,
     item.bonding ? { label: 'Bonding Adhesive', value: item.bonding } : null,
-    item.temperatureRating ? { label: 'Operating Temp', value: `${item.temperatureRating} °C` } : null,
+    (item.temperatureRating !== null && item.temperatureRating !== undefined) ? { label: 'Rated Operating Temp', value: `${item.temperatureRating} °C` } : null,
     item.filterGrade?.filterGrade ? { label: 'Filter Grade', value: item.filterGrade.filterGrade } : null
   ].filter(Boolean) : [];
 
@@ -334,9 +340,9 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
               const boxL = item.filterLength ?? item.grade_items?.height;
               const boxW = item.filterWidth ?? item.grade_items?.width;
               const boxD = item.filterDepth ?? item.grade_items?.length;
-              const ofL = item.overallFlangeLength || (boxL ? Number(boxL) + 60 : null);
-              const ofW = item.overallFlangeWidth || (boxW ? Number(boxW) + 60 : null);
-              const ofD = item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : boxD;
+              const ofL = item.overallLength ?? (item.overallFlangeLength || (boxL ? (isFlange ? Number(boxL) + 60 : Number(boxL)) : null));
+              const ofW = item.overallWidth ?? (item.overallFlangeWidth || (boxW ? (isFlange ? Number(boxW) + 60 : Number(boxW)) : null));
+              const ofD = item.overallDepth ?? (item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : boxD);
 
               return (
                 <div className="border border-blue-200 bg-blue-50/50 rounded-md p-3.5">
@@ -350,15 +356,15 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {/* BOX Dimensions */}
+                    {/* Body Dimensions */}
                     <div className="bg-white p-2.5 rounded border border-blue-100">
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                        Authoritative BOX Dimensions
+                        Body Dimensions (MM)
                       </span>
                       <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
                         {boxL || '—'} × {boxW || '—'} × {boxD || '—'} mm
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Length × Width × Depth</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Body Length × Width × Depth</span>
                     </div>
 
                     {/* Overall Dimensions */}
@@ -366,7 +372,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                       <div className="bg-white p-2.5 rounded border border-blue-200 bg-blue-50/30">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-blue-700">
-                            Overall Flange Dimensions
+                            Overall Box Dimensions
                           </span>
                           <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
                             +60 mm Total (+30 mm/side)
@@ -376,24 +382,24 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                           {ofL || '—'} × {ofW || '—'} × {ofD || '—'} mm
                         </div>
                         <span className="text-[10px] text-blue-600 block mt-0.5">
-                          (Flange Length × Flange Width × Depth)
+                          Overall Length × Overall Width × Depth
                         </span>
                       </div>
                     ) : (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-slate-600">
-                            Overall Dimensions
+                            Overall Box Dimensions
                           </span>
                           <span className="text-[9.5px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                            Equal to BOX (No Flange)
+                            Equal to Body (No Flange)
                           </span>
                         </div>
                         <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                          {boxL || '—'} × {boxW || '—'} × {boxD || '—'} mm
+                          {ofL || boxL || '—'} × {ofW || boxW || '—'} × {ofD || boxD || '—'} mm
                         </div>
                         <span className="text-[10px] text-slate-400 block mt-0.5">
-                          No flange projection added
+                          Equal to body dimensions
                         </span>
                       </div>
                     )}
@@ -419,16 +425,22 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             })()}
 
             {/* Materials & Thermal on Tab 1 */}
-            {(item.moc || item.bonding || (item.temperatureRating !== null && item.temperatureRating !== undefined)) && (
+            {(item.moc || item.bonding || item.overallBoxConstruction || item.boxConstruction || (item.temperatureRating !== null && item.temperatureRating !== undefined)) && (
               <div className="border border-slate-200 rounded-md p-3 bg-white">
                 <div className="text-[11px] text-slate-700 uppercase font-bold mb-2 flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-slate-600" /> Materials & Thermal Specifications
+                  <ShieldCheck size={14} className="text-slate-600" /> Construction, Materials & Thermal Specifications
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   {item.moc && (
                     <div className="bg-slate-50 p-2 rounded border border-slate-200">
                       <span className="text-[10px] uppercase font-semibold text-slate-500">Material (MOC)</span>
                       <div className="font-bold text-slate-800 mt-0.5">{item.moc}</div>
+                    </div>
+                  )}
+                  {(item.overallBoxConstruction || item.boxConstruction) && (
+                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500">Overall Box Dimensions</span>
+                      <div className="font-bold text-slate-800 mt-0.5">{item.overallBoxConstruction || item.boxConstruction}</div>
                     </div>
                   )}
                   {item.bonding && (
@@ -439,7 +451,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   )}
                   {item.temperatureRating !== null && item.temperatureRating !== undefined && (
                     <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                      <span className="text-[10px] uppercase font-semibold text-slate-500">Operating Temperature</span>
+                      <span className="text-[10px] uppercase font-semibold text-slate-500">Rated Operating Temp</span>
                       <div className="font-bold text-slate-800 mt-0.5">{item.temperatureRating} °C</div>
                     </div>
                   )}
@@ -558,17 +570,21 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                 <div className="text-[11px] text-slate-800 uppercase font-bold mb-2.5 flex items-center gap-1.5">
                   <ShieldCheck size={14} className="text-slate-700" /> Construction, Materials & Thermal Specifications
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Material (MOC)</span>
                     <div className="font-bold text-slate-800 mt-0.5">{item.moc || '—'}</div>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                    <span className="text-[10px] uppercase font-semibold text-slate-500">Overall Box Dimensions</span>
+                    <div className="font-bold text-slate-800 mt-0.5">{item.overallBoxConstruction || item.boxConstruction || '—'}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Bonding Adhesive</span>
                     <div className="font-bold text-slate-800 mt-0.5">{item.bonding || '—'}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                    <span className="text-[10px] uppercase font-semibold text-slate-500">Operating Temperature</span>
+                    <span className="text-[10px] uppercase font-semibold text-slate-500">Rated Operating Temp</span>
                     <div className="font-bold text-slate-800 mt-0.5">
                       {item.temperatureRating !== null && item.temperatureRating !== undefined ? `${item.temperatureRating} °C` : '—'}
                     </div>

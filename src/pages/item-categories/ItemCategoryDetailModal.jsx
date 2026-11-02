@@ -242,11 +242,18 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
 
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>
-                  Item Group
+                  Category Type
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--neutral-800)' }}>
-                  <Layers size={14} color="var(--primary-600)" />
-                  <span>{groupName ? `${groupCode} (${groupName})` : groupCode || '—'}</span>
+                  {['RAW', 'FILTER', 'COIL', 'AHU'].includes(category.categoryCode?.toUpperCase()) ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      Predefined Fixed Category
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                      Custom Category
+                    </span>
+                  )}
                 </div>
               </div>
 

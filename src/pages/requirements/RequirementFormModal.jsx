@@ -12,6 +12,7 @@ import { useGetEmployeesQuery } from '../../features/employees/employeesApi';
 import { useGetItemsQuery } from '../../features/products/productsApi';
 import { useGetHoleConfigurationsQuery } from '../../features/drawingMaster/drawingMasterApi';
 import DrawingSelector from '../../components/drawing/DrawingSelector';
+import ItemFormModal from '../items/ItemFormModal';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
@@ -185,7 +186,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
     { typeFilter: 'MASTER', approvalStatus: 'APPROVED', status: 'active' },
     { skip: !isOpen }
   );
-  const { data: itemsData, isLoading: loadingItems } = useGetItemsQuery(
+  const { data: itemsData, isLoading: loadingItems, refetch: refetchItems } = useGetItemsQuery(
     { typeFilter: 'MASTER', all: true },
     { skip: !isOpen }
   );
@@ -301,6 +302,11 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Quick Catalog Item creation modal states
+  const [isItemCatalogModalOpen, setIsItemCatalogModalOpen] = useState(false);
+  const [catalogCreationIndex, setCatalogCreationIndex] = useState(null);
+  const [catalogCreationName, setCatalogCreationName] = useState('');
 
   // Populate form data when editing or creating
   useEffect(() => {
@@ -754,6 +760,18 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       };
       return { ...prev, items: updated };
     });
+  };
+
+  const handleCatalogItemCreated = (newlyCreatedItem) => {
+    if (catalogCreationIndex !== null && newlyCreatedItem) {
+      handleSelectItemForIndex(catalogCreationIndex, newlyCreatedItem);
+    }
+    if (typeof refetchItems === 'function') {
+      refetchItems();
+    }
+    setIsItemCatalogModalOpen(false);
+    setCatalogCreationIndex(null);
+    setCatalogCreationName('');
   };
 
   const addItemSpecificationRow = (index) => {
@@ -1329,7 +1347,41 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
                           {/* Searchable Item Selector */}
                           <div style={{ gridColumn: 'span 2' }}>
-                            <FormField label="Required Item / Air Filter" helperText="Select standard catalog item from Item Master (Optional if custom filter requirement)">
+                            <FormField
+                              label={
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <span>Required Item / Air Filter</span>
+                                  {canCreateItem && !itemObj.item && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCatalogCreationIndex(itemIndex);
+                                        setCatalogCreationName(itemObj.itemSearch || '');
+                                        setIsItemCatalogModalOpen(true);
+                                      }}
+                                      style={{
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        color: '#2563eb',
+                                        backgroundColor: '#eff6ff',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: '4px',
+                                        padding: '2px 8px',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                      }}
+                                      title="Open Add New Item dialog pre-filled with current search term"
+                                    >
+                                      <Plus size={11} />
+                                      <span>+ Add New Item to Catalog</span>
+                                    </button>
+                                  )}
+                                </div>
+                              }
+                              helperText="Select standard catalog item from Item Master (Optional if custom filter requirement)"
+                            >
                               <div style={{ position: 'relative' }}>
                                 <div className="relative flex-1 min-w-[220px]" style={{ width: '100%' }}>
                                   <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -1423,39 +1475,40 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         <span style={{ fontSize: '12px', color: 'var(--neutral-500)' }}>
                                           No active items found matching <strong style={{ color: 'var(--neutral-700)' }}>"{itemObj.itemSearch}"</strong>
                                         </span>
-                                        {canCreateItem && !itemObj.saveToCatalog && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setFormData((prev) => {
-                                                const updated = [...prev.items];
-                                                updated[itemIndex] = {
-                                                  ...updated[itemIndex],
-                                                  saveToCatalog: true,
-                                                  newItemName: itemObj.itemSearch || '',
-                                                  isItemDropdownOpen: false,
-                                                };
-                                                return { ...prev, items: updated };
-                                              });
-                                            }}
-                                            style={{
-                                              flexShrink: 0,
-                                              fontSize: '11.5px',
-                                              fontWeight: 700,
-                                              color: '#1e40af',
-                                              backgroundColor: '#eff6ff',
-                                              border: '1px solid #bfdbfe',
-                                              borderRadius: '5px',
-                                              padding: '4px 10px',
-                                              cursor: 'pointer',
-                                              whiteSpace: 'nowrap',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                            }}
-                                          >
-                                            + Save Item
-                                          </button>
+                                        {canCreateItem && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setCatalogCreationIndex(itemIndex);
+                                                setCatalogCreationName(itemObj.itemSearch || '');
+                                                setIsItemCatalogModalOpen(true);
+                                                setFormData((prev) => {
+                                                  const updated = [...prev.items];
+                                                  updated[itemIndex] = { ...updated[itemIndex], isItemDropdownOpen: false };
+                                                  return { ...prev, items: updated };
+                                                });
+                                              }}
+                                              style={{
+                                                flexShrink: 0,
+                                                fontSize: '11.5px',
+                                                fontWeight: 700,
+                                                color: '#1e40af',
+                                                backgroundColor: '#eff6ff',
+                                                border: '1px solid #bfdbfe',
+                                                borderRadius: '5px',
+                                                padding: '4px 10px',
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                              }}
+                                            >
+                                              <Plus size={12} />
+                                              Create New Item
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
                                     )}
@@ -2245,6 +2298,25 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           </div>
         </div>
       </form>
+
+      {/* Quick Add Catalog Item Modal */}
+      {isItemCatalogModalOpen && (
+        <ItemFormModal
+          isOpen={isItemCatalogModalOpen}
+          initialItemName={catalogCreationName}
+          initialProductType={
+            catalogCreationIndex !== null && formData.items[catalogCreationIndex]?.dimensions
+              ? 'FILTER'
+              : 'RAW_ITEM'
+          }
+          onClose={() => {
+            setIsItemCatalogModalOpen(false);
+            setCatalogCreationIndex(null);
+            setCatalogCreationName('');
+          }}
+          onSuccess={handleCatalogItemCreated}
+        />
+      )}
     </Modal>
   );
 };
