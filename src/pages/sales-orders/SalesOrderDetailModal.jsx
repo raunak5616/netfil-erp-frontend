@@ -7,12 +7,14 @@ import {
   getSalesOrderItemDrawing, 
   getSalesOrderDrawings,
 } from '../../services/salesOrderService';
+import { printWorkOrderPdf } from '../../services/workOrderService';
 import {
   useGetSalesOrderByIdQuery,
   useGetSalesOrderReferencesQuery,
   useGetSalesOrderAttachmentsQuery,
   useUpdateSalesOrderStatusMutation,
 } from '../../features/salesOrders/salesOrdersApi';
+import { useGetWorkOrdersQuery } from '../../features/workOrders/workOrdersApi';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FileText, 
@@ -30,24 +32,34 @@ import {
   Ban,
   Image as ImageIcon,
   Printer,
-  Paperclip
+  Paperclip,
+  Wrench,
+  Eye
 } from 'lucide-react';
 
 import TechnicalDrawingModal from './TechnicalDrawingModal';
 import SalesOrderDrawingWorkspaceModal from './SalesOrderDrawingWorkspaceModal';
 import SalesOrderAttachmentsSection from './components/SalesOrderAttachmentsSection';
+import SalesOrderWorkOrderCreateModal from './SalesOrderWorkOrderCreateModal';
+import WorkOrderDetailModal from '../work-orders/WorkOrderDetailModal';
 
 const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatusUpdated, initialTab = 'details' }) => {
   const { hasPermission } = useAuth();
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
+  const canCreateWO = hasPermission('WORK_ORDER_CREATE');
 
-  const [activeTab, setActiveTab] = useState(initialTab || 'details'); // 'details' | 'attachments' | 'traceability'
+  const [activeTab, setActiveTab] = useState(initialTab || 'details'); // 'details' | 'attachments' | 'traceability' | 'work-orders'
 
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   const [drawingTargetItem, setDrawingTargetItem] = useState(null);
   const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
   const [drawingWorkspaceInitialItemId, setDrawingWorkspaceInitialItemId] = useState(null);
+
+  // Direct Work Order Creation & Detail Modals
+  const [isCreateWOOpen, setIsCreateWOOpen] = useState(false);
+  const [selectedWOId, setSelectedWOId] = useState(null);
+  const [isWODetailOpen, setIsWODetailOpen] = useState(false);
 
   const [actionError, setActionError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -75,12 +87,21 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
     { skip: !isOpen || !salesOrderId }
   );
 
+  const {
+    data: woRes,
+    refetch: refetchWorkOrders,
+  } = useGetWorkOrdersQuery(
+    { salesOrder: salesOrderId },
+    { skip: !isOpen || !salesOrderId }
+  );
+
   const [updateStatusMutation, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
 
   const salesOrder = soRes?.salesOrder || null;
   const items = soRes?.items || [];
   const references = refRes?.references || null;
   const attachments = attRes?.attachments || [];
+  const workOrders = woRes?.workOrders || [];
   const error = actionError || (soError ? (soError?.data?.message || 'Failed to load Sales Order details') : '');
   const setError = setActionError;
 
@@ -281,6 +302,18 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                     <Printer size={14} style={{ marginRight: '6px' }} /> Drawing Print
                   </Button>
                 )}
+
+                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsCreateWOOpen(true)}
+                    title="Generate Direct Work Order from this Sales Order"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                  >
+                    <Wrench size={14} style={{ marginRight: '6px' }} /> Create Work Order
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -347,6 +380,37 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
               }}
             >
               Traceability & References
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('work-orders')}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                background: 'none',
+                borderBottom: activeTab === 'work-orders' ? '2px solid var(--primary-600)' : 'none',
+                fontWeight: activeTab === 'work-orders' ? 600 : 400,
+                color: activeTab === 'work-orders' ? 'var(--primary-700)' : 'var(--neutral-600)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Work Orders</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  background: workOrders.length > 0 ? '#ecfdf5' : '#f1f5f9',
+                  color: workOrders.length > 0 ? '#047857' : '#64748b',
+                  border: workOrders.length > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
+                }}
+              >
+                {workOrders.length}
+              </span>
             </button>
           </div>
 
@@ -531,6 +595,131 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
             </div>
           )}
 
+          {/* TAB 4: WORK ORDERS TAB */}
+          {activeTab === 'work-orders' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Wrench size={16} className="text-blue-600" />
+                    Work Orders for Sales Order {salesOrder.salesOrderNo}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Customer PO Reference: <strong className="text-slate-700">{salesOrder.customerPoNumber || 'N/A'}</strong>
+                  </p>
+                </div>
+                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsCreateWOOpen(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  >
+                    <Wrench size={14} className="mr-1.5" /> Create Work Order
+                  </Button>
+                )}
+              </div>
+
+              {workOrders.length === 0 ? (
+                <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 rounded-lg">
+                  <Wrench size={32} className="mx-auto text-slate-300 mb-2" />
+                  <div className="font-semibold text-slate-700 text-sm">No Work Orders Generated Yet</div>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                    Create a direct Work Order from this Sales Order and customer PO reference without needing a BOM.
+                  </p>
+                  {canCreateWO && salesOrder.status !== 'cancelled' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setIsCreateWOOpen(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Wrench size={14} className="mr-1.5" /> Create First Work Order
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-bold text-[11px]">
+                      <tr>
+                        <th className="p-2.5">Work Order No</th>
+                        <th className="p-2.5">Date</th>
+                        <th className="p-2.5">Customer PO No</th>
+                        <th className="p-2.5 text-center">Items</th>
+                        <th className="p-2.5 text-center">Production Qty</th>
+                        <th className="p-2.5 text-center">Status</th>
+                        <th className="p-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {workOrders.map((wo) => {
+                        const itemsCount = Array.isArray(wo.items) && wo.items.length > 0 ? wo.items.length : 1;
+                        return (
+                          <tr key={wo._id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-2.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWOId(wo._id);
+                                  setIsWODetailOpen(true);
+                                }}
+                                className="font-mono font-bold text-blue-700 hover:underline flex items-center gap-1"
+                              >
+                                {wo.workOrderNo}
+                              </button>
+                            </td>
+                            <td className="p-2.5 text-slate-600">
+                              {new Date(wo.workOrderDate || wo.createdAt).toLocaleDateString('en-GB')}
+                            </td>
+                            <td className="p-2.5 font-semibold text-slate-800">
+                              {wo.customerPoNumber || salesOrder.customerPoNumber || '—'}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[11px]">
+                                {itemsCount} {itemsCount === 1 ? 'item' : 'items'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-center font-bold text-slate-900">
+                              {wo.productionQuantity} Nos
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <StatusBadge status={wo.status} />
+                            </td>
+                            <td className="p-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => printWorkOrderPdf(wo._id, wo.workOrderNo)}
+                                  title="Print Client-Format Work Order PDF"
+                                  className="text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Printer size={13} className="mr-1" /> Print PDF
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => {
+                                    setSelectedWOId(wo._id);
+                                    setIsWODetailOpen(true);
+                                  }}
+                                  title="View Work Order Details"
+                                >
+                                  <Eye size={13} className="mr-1" /> View
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 2: DOCUMENTS & ATTACHMENTS */}
           {activeTab === 'attachments' && (
             <SalesOrderAttachmentsSection
@@ -602,6 +791,131 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
             </div>
           )}
 
+          {/* TAB 4: WORK ORDERS TAB */}
+          {activeTab === 'work-orders' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Wrench size={16} className="text-blue-600" />
+                    Work Orders for Sales Order {salesOrder.salesOrderNo}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Customer PO Reference: <strong className="text-slate-700">{salesOrder.customerPoNumber || 'N/A'}</strong>
+                  </p>
+                </div>
+                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsCreateWOOpen(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  >
+                    <Wrench size={14} className="mr-1.5" /> Create Work Order
+                  </Button>
+                )}
+              </div>
+
+              {workOrders.length === 0 ? (
+                <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 rounded-lg">
+                  <Wrench size={32} className="mx-auto text-slate-300 mb-2" />
+                  <div className="font-semibold text-slate-700 text-sm">No Work Orders Generated Yet</div>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                    Create a direct Work Order from this Sales Order and customer PO reference without needing a BOM.
+                  </p>
+                  {canCreateWO && salesOrder.status !== 'cancelled' && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setIsCreateWOOpen(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Wrench size={14} className="mr-1.5" /> Create First Work Order
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-bold text-[11px]">
+                      <tr>
+                        <th className="p-2.5">Work Order No</th>
+                        <th className="p-2.5">Date</th>
+                        <th className="p-2.5">Customer PO No</th>
+                        <th className="p-2.5 text-center">Items</th>
+                        <th className="p-2.5 text-center">Production Qty</th>
+                        <th className="p-2.5 text-center">Status</th>
+                        <th className="p-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {workOrders.map((wo) => {
+                        const itemsCount = Array.isArray(wo.items) && wo.items.length > 0 ? wo.items.length : 1;
+                        return (
+                          <tr key={wo._id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-2.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWOId(wo._id);
+                                  setIsWODetailOpen(true);
+                                }}
+                                className="font-mono font-bold text-blue-700 hover:underline flex items-center gap-1"
+                              >
+                                {wo.workOrderNo}
+                              </button>
+                            </td>
+                            <td className="p-2.5 text-slate-600">
+                              {new Date(wo.workOrderDate || wo.createdAt).toLocaleDateString('en-GB')}
+                            </td>
+                            <td className="p-2.5 font-semibold text-slate-800">
+                              {wo.customerPoNumber || salesOrder.customerPoNumber || '—'}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[11px]">
+                                {itemsCount} {itemsCount === 1 ? 'item' : 'items'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-center font-bold text-slate-900">
+                              {wo.productionQuantity} Nos
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <StatusBadge status={wo.status} />
+                            </td>
+                            <td className="p-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => printWorkOrderPdf(wo._id, wo.workOrderNo)}
+                                  title="Print Client-Format Work Order PDF"
+                                  className="text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Printer size={13} className="mr-1" /> Print PDF
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => {
+                                    setSelectedWOId(wo._id);
+                                    setIsWODetailOpen(true);
+                                  }}
+                                  title="View Work Order Details"
+                                >
+                                  <Eye size={13} className="mr-1" /> View
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Footer Close */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '12px', borderTop: '1px solid var(--neutral-200)' }}>
             <Button variant="secondary" onClick={onClose}>
@@ -634,6 +948,32 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                 setDrawingWorkspaceInitialItemId(null);
                 fetchDetails();
               }}
+            />
+          )}
+
+          {/* Direct Sales Order Work Order Create Modal */}
+          {isCreateWOOpen && (
+            <SalesOrderWorkOrderCreateModal
+              isOpen={isCreateWOOpen}
+              salesOrderId={salesOrderId}
+              onClose={() => setIsCreateWOOpen(false)}
+              onSuccess={() => {
+                refetchWorkOrders();
+              }}
+            />
+          )}
+
+          {/* Work Order Detail Modal */}
+          {isWODetailOpen && selectedWOId && (
+            <WorkOrderDetailModal
+              isOpen={isWODetailOpen}
+              workOrderId={selectedWOId}
+              onClose={() => {
+                setIsWODetailOpen(false);
+                setSelectedWOId(null);
+                refetchWorkOrders();
+              }}
+              onWorkOrderUpdated={refetchWorkOrders}
             />
           )}
         </div>

@@ -40,6 +40,46 @@ export const cancelWorkOrder = async (workOrderId, data = {}) => {
   return response.data;
 };
 
+export const getWorkOrderSalesOrderPreview = async (salesOrderId) => {
+  const response = await api.get(`/work-orders/sales-order-preview/${salesOrderId}`);
+  return response.data;
+};
+
+export const printWorkOrderPdf = async (workOrderId, workOrderNo = null) => {
+  try {
+    const response = await api.get(`/work-orders/${workOrderId}/pdf`, {
+      responseType: 'blob'
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    console.error('Failed to open Work Order PDF:', error);
+    throw error;
+  }
+};
+
+export const downloadWorkOrderPdf = async (workOrderId, workOrderNo = 'WorkOrder') => {
+  try {
+    const response = await api.get(`/work-orders/${workOrderId}/pdf`, {
+      responseType: 'blob'
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${workOrderNo}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Failed to download Work Order PDF:', error);
+    throw error;
+  }
+};
+
 // ===================================================
 // WORK ORDER DOCUMENT ATTACHMENT ENDPOINTS
 // ===================================================

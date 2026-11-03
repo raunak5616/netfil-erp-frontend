@@ -27,6 +27,13 @@ export const workOrdersApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'WorkOrders', id }],
     }),
+    getWorkOrderSalesOrderPreview: builder.query({
+      query: (salesOrderId) => ({
+        url: `/work-orders/sales-order-preview/${salesOrderId}`,
+        method: 'get',
+      }),
+      providesTags: (result, error, salesOrderId) => [{ type: 'WorkOrders', id: `PREVIEW_${salesOrderId}` }],
+    }),
     createWorkOrder: builder.mutation({
       query: (data) => ({
         url: '/work-orders',
@@ -127,6 +134,7 @@ export const workOrdersApi = apiSlice.injectEndpoints({
 export const {
   useGetWorkOrdersQuery,
   useGetWorkOrderByIdQuery,
+  useGetWorkOrderSalesOrderPreviewQuery,
   useCreateWorkOrderMutation,
   useUpdateWorkOrderMutation,
   useReleaseWorkOrderMutation,

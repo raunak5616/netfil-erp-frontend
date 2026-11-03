@@ -20,6 +20,7 @@ import SalesOrderCreateModal from './SalesOrderCreateModal';
 import SalesOrderDetailModal from './SalesOrderDetailModal';
 import SalesOrderEditModal from './SalesOrderEditModal';
 import SalesOrderDrawingWorkspaceModal from './SalesOrderDrawingWorkspaceModal';
+import SalesOrderWorkOrderCreateModal from './SalesOrderWorkOrderCreateModal';
 
 import {
   Plus,
@@ -40,7 +41,8 @@ import {
   ChevronUp,
   ChevronDown,
   X,
-  Truck
+  Truck,
+  Wrench
 } from 'lucide-react';
 
 const SalesOrderList = () => {
@@ -52,6 +54,7 @@ const SalesOrderList = () => {
   const canCreate = hasPermission('SALES_ORDER_CREATE');
   const canEdit = hasPermission('SALES_ORDER_EDIT');
   const canConfirm = hasPermission('SALES_ORDER_CONFIRM');
+  const canCreateWO = hasPermission('WORK_ORDER_CREATE');
 
   const [actionLoading, setActionLoading] = useState(null);
   const [customError, setCustomError] = useState('');
@@ -84,6 +87,8 @@ const SalesOrderList = () => {
   const [editingSO, setEditingSO] = useState(null);
   const [isDrawingWorkspaceOpen, setIsDrawingWorkspaceOpen] = useState(false);
   const [drawingWorkspaceSOId, setDrawingWorkspaceSOId] = useState(null);
+  const [isCreateWOOpen, setIsCreateWOOpen] = useState(false);
+  const [selectedSOForWO, setSelectedSOForWO] = useState(null);
 
   // Auto-open detail modal if navigated with ?id=
   useEffect(() => {
@@ -456,6 +461,16 @@ const SalesOrderList = () => {
               }
             },
             {
+              label: 'Create Work Order',
+              icon: Wrench,
+              color: 'var(--success-700)',
+              show: canCreateWO && row.status !== 'cancelled',
+              onClick: () => {
+                setSelectedSOForWO(row._id);
+                setIsCreateWOOpen(true);
+              }
+            },
+            {
               label: 'Edit Order',
               icon: Edit,
               show: canEdit && !['cancelled', 'completed'].includes(row.status),
@@ -527,7 +542,7 @@ const SalesOrderList = () => {
         }
       }
     ],
-    [canEdit, canConfirm, actionLoading]
+    [canEdit, canConfirm, canCreateWO, actionLoading]
   );
 
   return (
@@ -972,6 +987,23 @@ const SalesOrderList = () => {
           onClose={() => {
             setIsDrawingWorkspaceOpen(false);
             setDrawingWorkspaceSOId(null);
+          }}
+        />
+      )}
+
+      {/* Direct Work Order Creation Modal */}
+      {isCreateWOOpen && selectedSOForWO && (
+        <SalesOrderWorkOrderCreateModal
+          isOpen={isCreateWOOpen}
+          salesOrderId={selectedSOForWO}
+          onClose={() => {
+            setIsCreateWOOpen(false);
+            setSelectedSOForWO(null);
+          }}
+          onSuccess={() => {
+            setIsCreateWOOpen(false);
+            setSelectedSOForWO(null);
+            refetchSalesOrders();
           }}
         />
       )}

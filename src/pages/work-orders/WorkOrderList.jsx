@@ -28,8 +28,10 @@ import {
   CheckCircle2,
   XCircle,
   Wrench,
-  FileText
+  FileText,
+  Printer
 } from 'lucide-react';
+import { printWorkOrderPdf } from '../../services/workOrderService';
 
 const WorkOrderList = () => {
   const { hasPermission } = useAuth();
@@ -122,6 +124,8 @@ const WorkOrderList = () => {
       const woNo = (w.workOrderNo || '').toLowerCase();
       const obomCode = (w.orderBOM?.orderBOMCode || '').toLowerCase();
       const soNo = (w.salesOrder?.salesOrderNo || '').toLowerCase();
+      const custPo = (w.customerPoNumber || w.salesOrder?.customerPoNumber || '').toLowerCase();
+      const custName = (w.customerName || w.salesOrder?.client?.companyName || '').toLowerCase();
       const parentCode = (w.parentItem?.itemCode || '').toLowerCase();
       const parentName = (w.parentItem?.itemName || '').toLowerCase();
       const remarks = (w.remarks || '').toLowerCase();
@@ -129,6 +133,8 @@ const WorkOrderList = () => {
         woNo.includes(term) ||
         obomCode.includes(term) ||
         soNo.includes(term) ||
+        custPo.includes(term) ||
+        custName.includes(term) ||
         parentCode.includes(term) ||
         parentName.includes(term) ||
         remarks.includes(term)
@@ -174,12 +180,28 @@ const WorkOrderList = () => {
       },
       {
         key: 'orderBOM',
-        header: 'Order BOM Source',
+        header: 'Source / BOM',
         sortable: true,
         render: (_, row) => (
-          <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }} className="font-mono">
-            {row.orderBOM?.orderBOMCode || 'N/A'}
-          </span>
+          row.source === 'SALES_ORDER' ? (
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 7px',
+                borderRadius: '4px',
+                background: '#e0f2fe',
+                color: '#0369a1',
+                fontWeight: 600
+              }}
+              title="Generated directly from Sales Order without mandatory BOM"
+            >
+              Direct SO
+            </span>
+          ) : (
+            <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }} className="font-mono">
+              {row.orderBOM?.orderBOMCode || 'N/A'}
+            </span>
+          )
         )
       },
       {
@@ -187,27 +209,77 @@ const WorkOrderList = () => {
         header: 'Sales Order',
         sortable: true,
         render: (_, row) => (
-          <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-            {row.salesOrder?.salesOrderNo || 'N/A'}
-          </span>
-        )
-      },
-      {
-        key: 'parentItem',
-        header: 'Parent Finished Product',
-        sortable: true,
-        render: (_, row) => (
           <div>
-            <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-              {row.parentItem?.itemName || 'N/A'}
-            </div>
-            {row.parentItem?.itemCode && (
-              <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }} className="font-mono">
-                {row.parentItem.itemCode}
+            <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+              {row.salesOrder?.salesOrderNo || 'N/A'}
+            </span>
+            {(row.customerName || row.salesOrder?.client?.companyName) && (
+              <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.customerName || row.salesOrder?.client?.companyName}
               </div>
             )}
           </div>
         )
+      },
+      {
+        key: 'customerPo',
+        header: 'Customer PO',
+        sortable: true,
+        render: (_, row) => {
+          const poNo = row.customerPoNumber || row.salesOrder?.customerPoNumber;
+          return poNo ? (
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }} className="font-mono">
+                {poNo}
+              </div>
+              {row.customerPoDate && (
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
+                  {new Date(row.customerPoDate).toLocaleDateString('en-GB')}
+                </div>
+              )}
+            </div>
+          ) : (
+            <span style={{ color: 'var(--neutral-400)' }}>—</span>
+          );
+        }
+      },
+      {
+        key: 'parentItem',
+        header: 'Products / Items',
+        sortable: true,
+        render: (_, row) => {
+          const itemCount = Array.isArray(row.items) ? row.items.length : 0;
+          const mainName = row.parentItem?.itemName || (itemCount > 0 ? row.items[0]?.itemName : 'Direct SO Items');
+          const mainCode = row.parentItem?.itemCode || (itemCount > 0 ? row.items[0]?.itemCode : '');
+
+          return (
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
+                {mainName}
+                {itemCount > 1 && (
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      marginLeft: '5px',
+                      fontWeight: 700
+                    }}
+                  >
+                    +{itemCount - 1} more
+                  </span>
+                )}
+              </div>
+              {mainCode && (
+                <div style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }} className="font-mono">
+                  {mainCode}
+                </div>
+              )}
+            </div>
+          );
+        }
       },
       {
         key: 'productionQuantity',
@@ -251,7 +323,7 @@ const WorkOrderList = () => {
         key: 'actions',
         header: 'Actions',
         align: 'right',
-        width: '240px',
+        width: '280px',
         render: (_, row) => (
           <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
             <Button
@@ -265,6 +337,15 @@ const WorkOrderList = () => {
               title="View Work Order Detail"
             >
               <Eye size={14} style={{ marginRight: '3px' }} /> View
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => printWorkOrderPdf(row._id, row.workOrderNo)}
+              title="Download or Print Client Work Order PDF"
+            >
+              <Printer size={14} style={{ marginRight: '3px' }} /> PDF
             </Button>
 
             <Button

@@ -49,6 +49,8 @@ const UploadedFlangeDrawingViewer = ({
   pictorialViewUrl,
   drawingCode,
   drawingName,
+  filterType = 'FLANGE',
+  isBox = false,
   holeCount,
   L,
   M,
@@ -64,10 +66,10 @@ const UploadedFlangeDrawingViewer = ({
 
   useEffect(() => {
     setImageError(false);
-  }, [drawingUrl, frontViewUrl, sideViewUrl, pictorialViewUrl]);
+  }, [drawingUrl, frontViewUrl, sideViewUrl, pictorialViewUrl, isBox]);
 
   const effectiveFront = frontViewUrl || drawingUrl;
-  const hasThreeViews = Boolean(sideViewUrl || pictorialViewUrl);
+  const hasThreeViews = !isBox && Boolean(sideViewUrl || pictorialViewUrl);
   const hasValidFile = Boolean(effectiveFront || sideViewUrl || pictorialViewUrl) && !imageError;
   const isPdf = Boolean(effectiveFront) && (effectiveFront.toLowerCase().endsWith('.pdf') || effectiveFront.includes('application/pdf'));
 
@@ -76,12 +78,16 @@ const UploadedFlangeDrawingViewer = ({
       {/* Title & Inspection Control */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <FileText size={15} className="text-blue-700" />
+          {isBox ? <Box size={15} className="text-purple-700" /> : <FileText size={15} className="text-blue-700" />}
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            {hasThreeViews ? 'Three-View Filter Drawings' : 'Uploaded Technical Drawing'}
+            {hasThreeViews ? 'Three-View Filter Drawings' : (isBox ? 'Filter Front View Drawing (Box Type)' : 'Uploaded Technical Drawing')}
           </span>
           {drawingCode && (
-            <span className="font-mono text-[11px] font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200">
+            <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${
+              isBox 
+                ? 'text-purple-800 bg-purple-100/80 border-purple-200' 
+                : 'text-blue-800 bg-blue-100/80 border-blue-200'
+            }`}>
               {drawingCode}
             </span>
           )}
@@ -215,22 +221,26 @@ const UploadedFlangeDrawingViewer = ({
           </div>
           <div className="space-y-1">
             <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
-              Uploaded Technical Drawing Missing
+              {isBox ? 'Front View Drawing Missing' : 'Uploaded Technical Drawing Missing'}
             </h4>
             <p className="text-xs text-amber-800 max-w-sm">
-              No uploaded technical drawing file was found in Drawing Master for pattern <strong className="font-mono">{drawingCode || 'configuration'}</strong>.
+              {isBox
+                ? `No uploaded Front View drawing file was found in Drawing Master for ${drawingCode || 'this box filter'}.`
+                : `No uploaded technical drawing file was found in Drawing Master for pattern ${drawingCode || 'configuration'}.`}
             </p>
             <p className="text-[11px] text-amber-700 max-w-sm">
-              Please upload the filter flange drawing file in <strong>Drawing Master &rarr; Hole Image Management</strong> to display it here and embed it into the production PDF.
+              {isBox
+                ? 'Please ensure the filter\'s Front View image is uploaded in Drawing Master to display it here and embed it into the production PDF.'
+                : 'Please upload the filter flange drawing file in Drawing Master \u2192 Hole Image Management to display it here and embed it into the production PDF.'}
             </p>
           </div>
           <a
-            href="/drawing-master?tab=hole_images"
+            href={isBox ? "/drawing-master" : "/drawing-master?tab=hole_images"}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-sm transition-colors mt-2"
           >
-            <ExternalLink size={13} /> Open Hole Image Management
+            <ExternalLink size={13} /> {isBox ? 'Open Drawing Master' : 'Open Hole Image Management'}
           </a>
         </div>
       )}
@@ -238,20 +248,34 @@ const UploadedFlangeDrawingViewer = ({
       {/* Confirmed Engineering Dimension Badges */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 text-center text-xs">
         <div className="bg-white p-2 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 block uppercase font-medium">Flange (A × B)</span>
+          <span className="text-[10px] text-slate-500 block uppercase font-medium">
+            {isBox ? 'Body Size (A × B)' : 'Flange (A × B)'}
+          </span>
           <strong className="text-xs font-bold text-slate-800">{A || 610} × {B || 610} mm</strong>
         </div>
         <div className="bg-purple-50 p-2 rounded-lg border border-purple-200">
-          <span className="text-[10px] text-purple-700 block uppercase font-semibold">Hole Pattern</span>
-          <strong className="text-xs font-bold text-purple-900">{holeCount || 0} Holes</strong>
+          <span className="text-[10px] text-purple-700 block uppercase font-semibold">
+            {isBox ? 'Filter Type' : 'Hole Pattern'}
+          </span>
+          <strong className="text-xs font-bold text-purple-900">
+            {isBox ? 'BOX (No Holes)' : `${holeCount || 0} Holes`}
+          </strong>
         </div>
         <div className="bg-blue-50 p-2 rounded-lg border border-blue-200">
-          <span className="text-[10px] text-blue-700 block uppercase font-semibold">Pitch / Spacing</span>
-          <strong className="text-xs font-bold text-blue-900">L={L} | M={M} mm</strong>
+          <span className="text-[10px] text-blue-700 block uppercase font-semibold">
+            {isBox ? 'Mounting Holes' : 'Pitch / Spacing'}
+          </span>
+          <strong className="text-xs font-bold text-blue-900">
+            {isBox ? 'No Holes (Box Type)' : `L=${L} | M=${M} mm`}
+          </strong>
         </div>
         <div className="bg-white p-2 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 block uppercase font-medium">Hole Size (Ø)</span>
-          <strong className="text-xs font-bold text-slate-800">Ø{dia} mm {X && X !== '-' ? `(${X})` : ''}</strong>
+          <span className="text-[10px] text-slate-500 block uppercase font-medium">
+            {isBox ? 'Hole Diameter' : 'Hole Size (Ø)'}
+          </span>
+          <strong className="text-xs font-bold text-slate-800">
+            {isBox ? 'N/A' : `Ø${dia} mm ${X && X !== '-' ? `(${X})` : ''}`}
+          </strong>
         </div>
         <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200 col-span-2 sm:col-span-1">
           <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Tolerance</span>
@@ -275,6 +299,7 @@ const SalesOrderDrawingWorkspaceModal = ({
 
   // Item form states
   const [holeForm, setHoleForm] = useState({
+    filterType: 'FLANGE',
     L: 100,
     M: 100,
     dia: 12,
@@ -452,20 +477,23 @@ const SalesOrderDrawingWorkspaceModal = ({
   // Populate hole form when active item changes
   const populateHoleForm = (item) => {
     if (!item) return;
+    const filterType = (item.filterType || item.constructionType || (item.holeCount > 0 ? 'FLANGE' : 'FLANGE')).toUpperCase();
+    const isBox = filterType === 'BOX';
     const confirmed = item.confirmedHoleDetails || {};
     const rawCount = (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount)))
       ? Number(item.holeCount)
       : (item.flangeHoleConfig ? parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10) : 12) || 12;
 
-    const count = rawCount === 16 ? 12 : rawCount;
-    const identifier = (item.flangeHoleConfig && !item.flangeHoleConfig.includes('16'))
+    const count = isBox ? 0 : (rawCount === 16 ? 12 : rawCount);
+    const identifier = isBox ? '' : ((item.flangeHoleConfig && !item.flangeHoleConfig.includes('16'))
       ? item.flangeHoleConfig
-      : `HOLE-${count}H`;
+      : `HOLE-${count}H`);
 
     setHoleForm({
-      L: confirmed.L !== undefined && confirmed.L !== null ? confirmed.L : 100,
-      M: confirmed.M !== undefined && confirmed.M !== null ? confirmed.M : 100,
-      dia: confirmed.dia !== undefined && confirmed.dia !== null ? confirmed.dia : 12,
+      filterType: isBox ? 'BOX' : 'FLANGE',
+      L: confirmed.L !== undefined && confirmed.L !== null ? confirmed.L : (isBox ? '-' : 100),
+      M: confirmed.M !== undefined && confirmed.M !== null ? confirmed.M : (isBox ? '-' : 100),
+      dia: confirmed.dia !== undefined && confirmed.dia !== null ? confirmed.dia : (isBox ? '-' : 12),
       X: confirmed.X !== undefined && confirmed.X !== null ? confirmed.X : '-',
       Y: confirmed.Y !== undefined && confirmed.Y !== null ? confirmed.Y : '-',
       holeCount: count,
@@ -482,7 +510,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     setPreviewLoading(true);
     setError('');
     try {
-      const blob = await getSalesOrderItemDrawing(salesOrderId, item._id, false);
+      const fType = item.filterType || item.constructionType || holeForm.filterType || 'FLANGE';
+      const blob = await getSalesOrderItemDrawing(salesOrderId, item._id, false, {
+        filterType: fType,
+        constructionType: fType
+      });
       if (pdfBlobUrl) {
         window.URL.revokeObjectURL(pdfBlobUrl);
       }
@@ -517,17 +549,21 @@ const SalesOrderDrawingWorkspaceModal = ({
     setError('');
     setSuccessMsg('');
 
+    const isBox = holeForm.filterType === 'BOX';
+
     try {
       const payload = {
-        confirmedHoleDetails: {
+        filterType: isBox ? 'BOX' : 'FLANGE',
+        constructionType: isBox ? 'BOX' : 'FLANGE',
+        confirmedHoleDetails: isBox ? { L: '-', M: '-', dia: '-', X: '-', Y: '-' } : {
           L: Number(holeForm.L),
           M: Number(holeForm.M),
           dia: Number(holeForm.dia),
           X: holeForm.X,
           Y: holeForm.Y
         },
-        holeCount: Number(holeForm.holeCount),
-        flangeHoleConfig: holeForm.flangeHoleConfig,
+        holeCount: isBox ? 0 : Number(holeForm.holeCount),
+        flangeHoleConfig: isBox ? '' : holeForm.flangeHoleConfig,
         tolerance: holeForm.tolerance || '± 2 mm',
         drawingStatus: 'READY_FOR_PREVIEW'
       };
@@ -539,13 +575,13 @@ const SalesOrderDrawingWorkspaceModal = ({
       }).unwrap();
 
       if (res.success || res.config || res.items) {
-        setSuccessMsg(`Hole details confirmed for Item #${activeItem.lineNumber || activeItem.itemNumber || 1}!`);
+        setSuccessMsg(`Drawing details confirmed for Item #${activeItem.lineNumber || activeItem.itemNumber || 1}!`);
         setActiveTab('preview');
         if (pdfBlobUrl) {
           window.URL.revokeObjectURL(pdfBlobUrl);
           setPdfBlobUrl(null);
         }
-        loadItemPreview({ ...activeItem, ...payload });
+        loadItemPreview({ ...activeItem, ...payload, filterType: payload.filterType, constructionType: payload.constructionType });
       } else {
         setError(res.message || 'Failed to save hole details');
       }
@@ -578,7 +614,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     if (!activeItem) return;
     setActionLoading(true);
     try {
-      const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, false);
+      const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
+      const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, false, {
+        filterType: fType,
+        constructionType: fType
+      });
       const url = window.URL.createObjectURL(blob);
       const printWindow = window.open(url, '_blank');
       if (printWindow) {
@@ -596,7 +636,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     if (!activeItem) return;
     setActionLoading(true);
     try {
-      const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, true);
+      const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
+      const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, true, {
+        filterType: fType,
+        constructionType: fType
+      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -905,7 +949,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                       : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <Settings size={14} /> Filter Flange with Hole / Slot Details (Mandatory Confirmation)
+                  <Settings size={14} /> {holeForm.filterType === 'BOX' ? 'Filter Box Details & Drawing' : 'Filter Flange with Hole / Slot Details'}
                 </button>
                 <button
                   type="button"
@@ -962,19 +1006,25 @@ const SalesOrderDrawingWorkspaceModal = ({
                   </div>
                 )}
 
-                {/* TAB 2: FILTER FLANGE WITH HOLE / SLOT DETAILS */}
+                {/* TAB 2: FILTER FLANGE / BOX WITH HOLE / SLOT DETAILS */}
                 {activeTab === 'holes' && (
                   <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3 text-xs text-blue-900">
-                      <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div className={`border rounded-xl p-4 flex items-start gap-3 text-xs transition-colors ${
+                      holeForm.filterType === 'BOX'
+                        ? 'bg-purple-50 border-purple-200 text-purple-900'
+                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                    }`}>
+                      <Info size={18} className={`shrink-0 mt-0.5 ${holeForm.filterType === 'BOX' ? 'text-purple-600' : 'text-blue-600'}`} />
                       <div>
                         <strong className="block font-bold mb-0.5">
-                          Pre-Printing Confirmation: Filter Flange with Hole / Slot Details
+                          {holeForm.filterType === 'BOX'
+                            ? 'Pre-Printing Confirmation: Box Type Filter (Front View Drawing)'
+                            : 'Pre-Printing Confirmation: Filter Flange with Hole / Slot Details'}
                         </strong>
                         <span>
-                          The client drawing requires explicit mounting hole positions, spacing, and diameters.
-                          Confirm or update the parameters below. Changes are saved directly to this Sales Order line item
-                          without modifying the master product or enquiry records.
+                          {holeForm.filterType === 'BOX'
+                            ? 'Box type filters have no flange mounting holes. The filter\'s existing Front View drawing from Drawing Master is displayed in the drawing section and embedded into the production PDF.'
+                            : 'The client drawing requires explicit mounting hole positions, spacing, and diameters. Confirm or update the parameters below. Changes are saved directly to this Sales Order line item without modifying the master product or enquiry records.'}
                         </span>
                       </div>
                     </div>
@@ -984,188 +1034,250 @@ const SalesOrderDrawingWorkspaceModal = ({
                       <form onSubmit={handleSaveHoleDetails} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
                         <div className="border-b border-slate-100 pb-2">
                           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                            Mounting Parameters (mm)
+                            Filter Configuration & Mounting Parameters
                           </h4>
                         </div>
 
-                        {/* Hole Count Selector */}
+                        {/* Filter Type Selector (BOX vs FLANGE) */}
                         <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Hole Count
-                            </label>
-                            {loadingHoleImages && (
-                              <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                                <RefreshCw size={10} className="animate-spin" /> Fetching from Drawing Master...
-                              </span>
-                            )}
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Filter Type
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setHoleForm(prev => ({
+                                ...prev,
+                                filterType: 'BOX',
+                                holeCount: 0,
+                                flangeHoleConfig: '',
+                                L: '-',
+                                M: '-',
+                                dia: '-',
+                                X: '-',
+                                Y: '-'
+                              }))}
+                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                holeForm.filterType === 'BOX'
+                                  ? 'bg-purple-700 text-white border-purple-700 shadow-sm ring-2 ring-purple-300'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                              }`}
+                            >
+                              <Box size={14} /> Box Type (No Holes)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setHoleForm(prev => ({
+                                ...prev,
+                                filterType: 'FLANGE',
+                                holeCount: prev.holeCount && prev.holeCount > 0 ? prev.holeCount : 12,
+                                flangeHoleConfig: prev.flangeHoleConfig || 'HOLE-12H',
+                                L: prev.L && prev.L !== '-' ? prev.L : 100,
+                                M: prev.M && prev.M !== '-' ? prev.M : 100,
+                                dia: prev.dia && prev.dia !== '-' ? prev.dia : 12
+                              }))}
+                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                holeForm.filterType === 'FLANGE'
+                                  ? 'bg-blue-700 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                              }`}
+                            >
+                              <Layers size={14} /> Flange Type
+                            </button>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {availableHoleCounts.map((cnt) => {
-                              const matchingPattern = drawingMasterHolePatterns.find(p => Number(p.holes) === Number(cnt));
-                              const targetCode = matchingPattern?.drawingCode || `HOLE-${cnt}H`;
-                              const isSelected = Number(holeForm.holeCount) === cnt;
-                              return (
-                                <button
-                                  key={cnt}
-                                  type="button"
-                                  onClick={() => setHoleForm(prev => ({
-                                    ...prev,
-                                    holeCount: cnt,
-                                    flangeHoleConfig: targetCode
-                                  }))}
-                                  className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
-                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                                  }`}
-                                >
-                                  {cnt} Holes
-                                </button>
-                              );
-                            })}
+                        </div>
+
+                        {holeForm.filterType === 'BOX' ? (
+                          <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg text-xs text-purple-900 space-y-1">
+                            <strong className="block font-bold text-purple-950 flex items-center gap-1">
+                              <Box size={13} className="text-purple-700" />
+                              Box Construction Confirmed
+                            </strong>
+                            <p className="text-[11px] text-purple-800">
+                              Box filters do not have mounting flange holes. The Filter's existing Front View image from Drawing Master is loaded in the drawing area and no holes drawing will be displayed.
+                            </p>
                           </div>
-
-                          {/* Pattern Variant selector if multiple variants exist in Drawing Master for this hole count */}
-                          {(() => {
-                            const variantsForCount = drawingMasterHolePatterns.filter(
-                              p => Number(p.holes) === Number(holeForm.holeCount)
-                            );
-                            if (variantsForCount.length <= 1) return null;
-
-                            return (
-                              <div className="mt-2.5 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg">
-                                <label className="block text-[11px] font-bold text-blue-900 mb-1">
-                                  Hole Pattern Variant for {holeForm.holeCount} Holes:
+                        ) : (
+                          <>
+                            {/* Hole Count Selector */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-xs font-semibold text-slate-700">
+                                  Hole Count
                                 </label>
-                                <select
-                                  value={holeForm.flangeHoleConfig}
-                                  onChange={(e) => {
-                                    const selectedCode = e.target.value;
-                                    setHoleForm(prev => ({
-                                      ...prev,
-                                      flangeHoleConfig: selectedCode
-                                    }));
-                                  }}
-                                  className="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                  {variantsForCount.map(v => (
-                                    <option key={v.drawingCode} value={v.drawingCode}>
-                                      {v.drawingCode} {v.description ? `(${v.description})` : (v.drawingName ? `(${v.drawingName})` : '')}
-                                    </option>
-                                  ))}
-                                </select>
+                                {loadingHoleImages && (
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    <RefreshCw size={10} className="animate-spin" /> Fetching from Drawing Master...
+                                  </span>
+                                )}
                               </div>
-                            );
-                          })()}
-                        </div>
+                              <div className="flex flex-wrap gap-2">
+                                {availableHoleCounts.map((cnt) => {
+                                  const matchingPattern = drawingMasterHolePatterns.find(p => Number(p.holes) === Number(cnt));
+                                  const targetCode = matchingPattern?.drawingCode || `HOLE-${cnt}H`;
+                                  const isSelected = Number(holeForm.holeCount) === cnt;
+                                  return (
+                                    <button
+                                      key={cnt}
+                                      type="button"
+                                      onClick={() => setHoleForm(prev => ({
+                                        ...prev,
+                                        holeCount: cnt,
+                                        flangeHoleConfig: targetCode
+                                      }))}
+                                      className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                        isSelected
+                                          ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
+                                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      {cnt} Holes
+                                    </button>
+                                  );
+                                })}
+                              </div>
 
-                        {/* L, M, Ø Inputs */}
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                              L (Pitch/Offset)
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              value={holeForm.L}
-                              onChange={(e) => setHoleForm({ ...holeForm, L: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="100"
-                            />
-                            <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
-                          </div>
+                              {/* Pattern Variant selector if multiple variants exist in Drawing Master for this hole count */}
+                              {(() => {
+                                const variantsForCount = drawingMasterHolePatterns.filter(
+                                  p => Number(p.holes) === Number(holeForm.holeCount)
+                                );
+                                if (variantsForCount.length <= 1) return null;
 
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                              M (Spacing)
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              value={holeForm.M}
-                              onChange={(e) => setHoleForm({ ...holeForm, M: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="100"
-                            />
-                            <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
-                          </div>
+                                return (
+                                  <div className="mt-2.5 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg">
+                                    <label className="block text-[11px] font-bold text-blue-900 mb-1">
+                                      Hole Pattern Variant for {holeForm.holeCount} Holes:
+                                    </label>
+                                    <select
+                                      value={holeForm.flangeHoleConfig}
+                                      onChange={(e) => {
+                                        const selectedCode = e.target.value;
+                                        setHoleForm(prev => ({
+                                          ...prev,
+                                          flangeHoleConfig: selectedCode
+                                        }));
+                                      }}
+                                      className="w-full px-2.5 py-1.5 text-xs font-mono bg-white border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                      {variantsForCount.map(v => (
+                                        <option key={v.drawingCode} value={v.drawingCode}>
+                                          {v.drawingCode} {v.description ? `(${v.description})` : (v.drawingName ? `(${v.drawingName})` : '')}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              })()}
+                            </div>
 
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                              Ø (Hole Dia)
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              value={holeForm.dia}
-                              onChange={(e) => setHoleForm({ ...holeForm, dia: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="12"
-                            />
-                            <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
-                          </div>
-                        </div>
+                            {/* L, M, Ø Inputs */}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  L (Pitch/Offset)
+                                </label>
+                                <input
+                                  type="number"
+                                  required
+                                  value={holeForm.L}
+                                  onChange={(e) => setHoleForm({ ...holeForm, L: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="100"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                              </div>
 
-                        {/* X and Y Slot Inputs */}
-                        <div className="grid grid-cols-2 gap-3 pt-1">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              X (Slot Width or -)
-                            </label>
-                            <input
-                              type="text"
-                              value={holeForm.X}
-                              onChange={(e) => setHoleForm({ ...holeForm, X: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="-"
-                            />
-                          </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  M (Spacing)
+                                </label>
+                                <input
+                                  type="number"
+                                  required
+                                  value={holeForm.M}
+                                  onChange={(e) => setHoleForm({ ...holeForm, M: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="100"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                              </div>
 
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              Y (Slot Length or -)
-                            </label>
-                            <input
-                              type="text"
-                              value={holeForm.Y}
-                              onChange={(e) => setHoleForm({ ...holeForm, Y: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="-"
-                            />
-                          </div>
-                        </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Ø (Hole Dia)
+                                </label>
+                                <input
+                                  type="number"
+                                  required
+                                  value={holeForm.dia}
+                                  onChange={(e) => setHoleForm({ ...holeForm, dia: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="12"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                              </div>
+                            </div>
 
-                        {/* Flange Hole Config Code and Tolerance */}
-                        <div className="grid grid-cols-2 gap-3 pt-1">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              Configuration Identifier
-                            </label>
-                            <input
-                              type="text"
-                              value={holeForm.flangeHoleConfig}
-                              onChange={(e) => setHoleForm({ ...holeForm, flangeHoleConfig: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="HOLE-12H"
-                            />
-                            <span className="text-[10px] text-slate-400 mt-0.5 block">Hole pattern ID</span>
-                          </div>
+                            {/* X and Y Slot Inputs */}
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                  X (Slot Width or -)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={holeForm.X}
+                                  onChange={(e) => setHoleForm({ ...holeForm, X: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="-"
+                                />
+                              </div>
 
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              Tolerance (mm)
-                            </label>
-                            <input
-                              type="text"
-                              value={holeForm.tolerance}
-                              onChange={(e) => setHoleForm({ ...holeForm, tolerance: e.target.value })}
-                              className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="± 2 mm"
-                            />
-                            <span className="text-[10px] text-slate-400 mt-0.5 block">Shown on Drawing PDF</span>
-                          </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                  Y (Slot Length or -)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={holeForm.Y}
+                                  onChange={(e) => setHoleForm({ ...holeForm, Y: e.target.value })}
+                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="-"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Flange Hole Config Code */}
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                Configuration Identifier
+                              </label>
+                              <input
+                                type="text"
+                                value={holeForm.flangeHoleConfig}
+                                onChange={(e) => setHoleForm({ ...holeForm, flangeHoleConfig: e.target.value })}
+                                className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="HOLE-12H"
+                              />
+                              <span className="text-[10px] text-slate-400 mt-0.5 block">Hole pattern ID</span>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Tolerance input (always editable) */}
+                        <div className="pt-1">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                            Tolerance (mm)
+                          </label>
+                          <input
+                            type="text"
+                            value={holeForm.tolerance}
+                            onChange={(e) => setHoleForm({ ...holeForm, tolerance: e.target.value })}
+                            className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="± 2 mm"
+                          />
+                          <span className="text-[10px] text-slate-400 mt-0.5 block">Shown on Drawing PDF</span>
                         </div>
 
                         {/* Action buttons */}
@@ -1184,7 +1296,11 @@ const SalesOrderDrawingWorkspaceModal = ({
                             variant="primary"
                             size="sm"
                             disabled={savingHoles}
-                            className="text-xs font-bold px-4 bg-blue-700 hover:bg-blue-800"
+                            className={`text-xs font-bold px-4 ${
+                              holeForm.filterType === 'BOX'
+                                ? 'bg-purple-700 hover:bg-purple-800'
+                                : 'bg-blue-700 hover:bg-blue-800'
+                            }`}
                           >
                             <CheckCircle2 size={14} className="mr-1.5" />
                             {savingHoles ? 'Saving...' : 'Save & Confirm Details'}
@@ -1192,74 +1308,103 @@ const SalesOrderDrawingWorkspaceModal = ({
                         </div>
                       </form>
 
-                      {/* Right Side: Actual Uploaded Flange Drawing Preview */}
+                      {/* Right Side: Actual Uploaded Drawing Preview */}
                       <div>
                         {(() => {
-                          const matchingHolePattern = drawingMasterHolePatterns.find(
-                            p => p.drawingCode === holeForm.flangeHoleConfig
-                          ) || drawingMasterHolePatterns.find(
-                            p => Number(p.holes) === Number(holeForm.holeCount)
-                          ) || (configData?.availableHoleConfigurations || []).find(
-                            p => p.drawingCode === holeForm.flangeHoleConfig || Number(p.holes) === Number(holeForm.holeCount)
-                          ) || activeItem?.holePattern;
+                          const filterType = (holeForm.filterType || activeItem?.filterType || activeItem?.constructionType || 'FLANGE').toUpperCase();
+                          const isBox = filterType === 'BOX';
 
-                          const rawDrawingUrl = matchingHolePattern?.fileUrl 
-                            || matchingHolePattern?.holeImageUrl 
-                            || activeItem?.drawingFileUrl
-                            || activeItem?.selectedDrawing?.fileUrl 
-                            || activeItem?.selectedDrawing?.holeImageUrl
-                            || activeItem?.drawingSnapshot?.fileUrl 
-                            || '';
+                          let currentDrawingUrl = '';
+                          let currentDrawingCode = '';
+                          let currentDrawingName = '';
+                          let frontUrl = '';
+                          let matchingHolePattern = null;
 
-                          const currentDrawingUrl = getVersionedImageUrl(
-                            rawDrawingUrl,
-                            matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt
-                          );
+                          if (isBox) {
+                            // 1. Box Type Selection:
+                            // Box type has no flange holes. Do not display a Holes Drawing.
+                            // Instead, display the Filter's existing Front View image in the same drawing area.
+                            frontUrl = activeItem?.frontViewImage?.url 
+                              || activeItem?.selectedDrawing?.frontViewImage?.url 
+                              || activeItem?.selectedDrawing?.fileUrl 
+                              || activeItem?.drawingSnapshot?.frontViewImage?.url 
+                              || activeItem?.drawingSnapshot?.fileUrl 
+                              || activeItem?.drawingFileUrl 
+                              || '';
 
-                          const currentDrawingCode = matchingHolePattern?.drawingCode 
-                            || activeItem?.drawingCode 
-                            || activeItem?.selectedDrawing?.drawingCode 
-                            || activeItem?.drawingSnapshot?.drawingCode 
-                            || holeForm.flangeHoleConfig 
-                            || 'DRAWING';
+                            currentDrawingUrl = getVersionedImageUrl(
+                              frontUrl,
+                              activeItem?.selectedDrawing?.updatedAt || activeItem?.updatedAt
+                            );
 
-                          const currentDrawingName = matchingHolePattern?.drawingName 
-                            || activeItem?.drawingName 
-                            || activeItem?.selectedDrawing?.drawingName 
-                            || activeItem?.drawingSnapshot?.drawingName 
-                            || 'Filter Flange Technical Drawing';
+                            currentDrawingCode = activeItem?.selectedDrawing?.drawingCode 
+                              || activeItem?.drawingSnapshot?.drawingCode 
+                              || activeItem?.drawingCode 
+                              || 'BOX-FILTER';
 
-                          const frontUrl = matchingHolePattern?.frontViewImage?.url 
-                            || activeItem?.drawingSnapshot?.frontViewImage?.url 
-                            || activeItem?.selectedDrawing?.frontViewImage?.url 
-                            || currentDrawingUrl;
+                            currentDrawingName = activeItem?.selectedDrawing?.drawingName 
+                              || activeItem?.drawingSnapshot?.drawingName 
+                              || activeItem?.drawingName 
+                              || `${activeItem?.description || 'Box Filter'} - Front View`;
+                          } else {
+                            // 2. Flange Type Selection:
+                            // Continue displaying the existing Holes Drawing.
+                            matchingHolePattern = drawingMasterHolePatterns.find(
+                              p => p.drawingCode === holeForm.flangeHoleConfig
+                            ) || drawingMasterHolePatterns.find(
+                              p => Number(p.holes) === Number(holeForm.holeCount)
+                            ) || (configData?.availableHoleConfigurations || []).find(
+                              p => p.drawingCode === holeForm.flangeHoleConfig || Number(p.holes) === Number(holeForm.holeCount)
+                            ) || activeItem?.holePattern;
 
-                          const sideUrl = matchingHolePattern?.sideViewImage?.url 
-                            || activeItem?.drawingSnapshot?.sideViewImage?.url 
-                            || activeItem?.selectedDrawing?.sideViewImage?.url 
-                            || '';
+                            const rawDrawingUrl = matchingHolePattern?.fileUrl 
+                              || matchingHolePattern?.holeImageUrl 
+                              || activeItem?.drawingFileUrl
+                              || activeItem?.selectedDrawing?.fileUrl 
+                              || activeItem?.selectedDrawing?.holeImageUrl
+                              || activeItem?.drawingSnapshot?.fileUrl 
+                              || '';
 
-                          const picUrl = matchingHolePattern?.pictorialViewImage?.url 
-                            || activeItem?.drawingSnapshot?.pictorialViewImage?.url 
-                            || activeItem?.selectedDrawing?.pictorialViewImage?.url 
-                            || '';
+                            currentDrawingUrl = getVersionedImageUrl(
+                              rawDrawingUrl,
+                              matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt
+                            );
+
+                            currentDrawingCode = matchingHolePattern?.drawingCode 
+                              || activeItem?.drawingCode 
+                              || activeItem?.selectedDrawing?.drawingCode 
+                              || activeItem?.drawingSnapshot?.drawingCode 
+                              || holeForm.flangeHoleConfig 
+                              || 'DRAWING';
+
+                            currentDrawingName = matchingHolePattern?.drawingName 
+                              || activeItem?.drawingName 
+                              || activeItem?.selectedDrawing?.drawingName 
+                              || activeItem?.drawingSnapshot?.drawingName 
+                              || 'Filter Flange Technical Drawing';
+
+                            frontUrl = matchingHolePattern?.frontViewImage?.url 
+                              || currentDrawingUrl;
+                          }
 
                           return (
                             <UploadedFlangeDrawingViewer
                               drawingUrl={currentDrawingUrl}
                               frontViewUrl={frontUrl}
-                              sideViewUrl={sideUrl}
-                              pictorialViewUrl={picUrl}
+                              sideViewUrl={isBox ? '' : (matchingHolePattern?.sideViewImage?.url || '')}
+                              pictorialViewUrl={isBox ? '' : (matchingHolePattern?.pictorialViewImage?.url || '')}
                               drawingCode={currentDrawingCode}
                               drawingName={currentDrawingName}
-                              holeCount={holeForm.holeCount}
-                              L={holeForm.L}
-                              M={holeForm.M}
-                              dia={holeForm.dia}
+                              filterType={filterType}
+                              isBox={isBox}
+                              holeCount={isBox ? 0 : holeForm.holeCount}
+                              L={isBox ? '-' : holeForm.L}
+                              M={isBox ? '-' : holeForm.M}
+                              dia={isBox ? '-' : holeForm.dia}
                               A={activeItem.dimensions?.A || 610}
                               B={activeItem.dimensions?.B || 610}
-                              X={holeForm.X}
-                              Y={holeForm.Y}
+                              X={isBox ? '-' : holeForm.X}
+                              Y={isBox ? '-' : holeForm.Y}
                               tolerance={holeForm.tolerance || activeItem.tolerance || '± 2 mm'}
                               onInspectFull={(url, code, name) => setInspectDrawingModal({ url, code, name })}
                             />

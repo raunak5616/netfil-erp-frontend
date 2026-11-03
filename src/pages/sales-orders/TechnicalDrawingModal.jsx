@@ -57,9 +57,14 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
     setError('');
 
     try {
-      const url = selectedDrawingId
-        ? `/sales-orders/${salesOrderId}/items/${item._id}/drawing?drawingId=${selectedDrawingId}`
-        : `/sales-orders/${salesOrderId}/items/${item._id}/drawing`;
+      const queryParams = new URLSearchParams();
+      if (selectedDrawingId) queryParams.append('drawingId', selectedDrawingId);
+      if (constructionType) {
+        queryParams.append('constructionType', constructionType);
+        queryParams.append('filterType', constructionType);
+      }
+      const qs = queryParams.toString();
+      const url = `/sales-orders/${salesOrderId}/items/${item._id}/drawing${qs ? `?${qs}` : ''}`;
 
       const response = await api.get(url, {
         responseType: 'blob'
