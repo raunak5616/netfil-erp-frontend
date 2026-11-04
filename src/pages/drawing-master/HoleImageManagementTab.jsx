@@ -209,7 +209,6 @@ const HoleImageManagementTab = () => {
       return;
     }
 
-    setIsSubmitting(true);
     setFormError('');
 
     try {
