@@ -12,15 +12,27 @@ import {
   Edit, 
   Phone, 
   Mail, 
-  MapPin,
-  Tag,
-  Maximize2,
-  Image as ImageIcon,
-  ChevronDown,
-  ChevronUp
+  MapPin, 
+  Tag, 
+  Maximize2, 
+  Image as ImageIcon, 
+  ChevronDown, 
+  ChevronUp,
+  FileDiff,
+  ExternalLink,
+  Eye
 } from 'lucide-react';
 
-const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreateQuotation, canEdit }) => {
+const RequirementDetailModal = ({
+  requirement,
+  isOpen,
+  onClose,
+  onEdit,
+  onCreateQuotation,
+  onViewQuotation,
+  onAmendQuotation,
+  canEdit
+}) => {
   if (!isOpen || !requirement) return null;
 
   const party = typeof requirement.client === 'object' ? requirement.client : null;
@@ -74,6 +86,8 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
         return { label: 'Quotation Pending', badgeStatus: 'pending' };
       case 'quoted':
         return { label: 'Quoted', badgeStatus: 'info' };
+      case 'under_revision':
+        return { label: 'Under Revision', badgeStatus: 'warning' };
       case 'follow_up':
         return { label: 'Follow Up', badgeStatus: 'warning' };
       case 'won':
@@ -82,8 +96,26 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
         return { label: 'Lost', badgeStatus: 'inactive' };
       case 'cancelled':
         return { label: 'Cancelled', badgeStatus: 'cancelled' };
+      case 'closed':
+        return { label: 'Closed', badgeStatus: 'neutral' };
       default:
         return { label: st || 'Unknown', badgeStatus: 'neutral' };
+    }
+  };
+
+  const getQuotationBadgeStatus = (st) => {
+    switch (st) {
+      case 'draft': return 'draft';
+      case 'sent':
+      case 'released': return 'info';
+      case 'won':
+      case 'accepted':
+      case 'converted': return 'active';
+      case 'lost':
+      case 'rejected': return 'inactive';
+      case 'cancelled': return 'cancelled';
+      case 'completed': return 'success';
+      default: return 'neutral';
     }
   };
 
@@ -120,17 +152,46 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
       maxWidth="780px"
       footer={
         <>
-          {onCreateQuotation && (
-            <Button
-              variant="primary"
-              icon={FileText}
-              onClick={() => {
-                onClose();
-                onCreateQuotation(requirement);
-              }}
-            >
-              Create Quotation
-            </Button>
+          {requirement.linkedQuotation ? (
+            <>
+              {onViewQuotation && (
+                <Button
+                  variant="primary"
+                  icon={Eye}
+                  onClick={() => {
+                    onClose();
+                    onViewQuotation(requirement.linkedQuotation);
+                  }}
+                >
+                  View Quotation ({requirement.linkedQuotation.quotationNo})
+                </Button>
+              )}
+              {onAmendQuotation && requirement.linkedQuotation.status === 'released' && (
+                <Button
+                  variant="secondary"
+                  icon={FileDiff}
+                  onClick={() => {
+                    onClose();
+                    onAmendQuotation(requirement.linkedQuotation);
+                  }}
+                >
+                  Amend Quotation
+                </Button>
+              )}
+            </>
+          ) : (
+            onCreateQuotation && (
+              <Button
+                variant="primary"
+                icon={FileText}
+                onClick={() => {
+                  onClose();
+                  onCreateQuotation(requirement);
+                }}
+              >
+                Create Quotation
+              </Button>
+            )
           )}
           {canEdit && (
             <Button
@@ -193,6 +254,62 @@ const RequirementDetailModal = ({ requirement, isOpen, onClose, onEdit, onCreate
             </div>
           </div>
         </div>
+
+        {/* SECTION: LINKED QUOTATION & REVISION (IF GENERATED) */}
+        {requirement.linkedQuotation && (
+          <div style={{ border: '1px solid #bfdbfe', backgroundColor: '#f8fafc', borderRadius: '6px', overflow: 'hidden' }}>
+            <div style={{ backgroundColor: '#eff6ff', padding: '8px 12px', fontSize: '12px', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #dbeafe' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileText size={15} color="#2563eb" /> LINKED QUOTATION & REVISION DETAILS
+              </div>
+              <span className="font-mono" style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+                {requirement.linkedQuotation.revisionLabel || 'Rev 00'}
+              </span>
+            </div>
+
+            <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Quotation Number</div>
+                <div className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: '#1d4ed8' }}>
+                  {requirement.linkedQuotation.quotationNo}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginBottom: '2px' }}>Quotation Status</div>
+                <StatusBadge status={getQuotationBadgeStatus(requirement.linkedQuotation.status)} label={requirement.linkedQuotation.status?.toUpperCase()} />
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Quotation Date</div>
+                <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
+                  {formatDate(requirement.linkedQuotation.quotationDate)}
+                </div>
+              </div>
+
+              {requirement.linkedQuotation.updatedAt && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>Last Revised / Updated</div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--neutral-800)' }}>
+                    {formatDate(requirement.linkedQuotation.updatedAt)}
+                  </div>
+                </div>
+              )}
+
+              {requirement.linkedQuotation.salesOrder && (
+                <div style={{ gridColumn: 'span 2', marginTop: '6px', padding: '8px 12px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, display: 'block' }}>RELATED SALES ORDER</span>
+                    <span className="font-mono" style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>
+                      {requirement.linkedQuotation.salesOrder.salesOrderNo}
+                    </span>
+                  </div>
+                  <StatusBadge status={requirement.linkedQuotation.salesOrder.status === 'confirmed' ? 'active' : 'info'} label={requirement.linkedQuotation.salesOrder.status?.toUpperCase()} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* SECTION 1: PARTY / CLIENT INFORMATION */}
         <div style={{ border: '1px solid var(--neutral-200)', borderRadius: '6px', overflow: 'hidden' }}>

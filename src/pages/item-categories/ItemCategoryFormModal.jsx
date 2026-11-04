@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   useCreateItemCategoryMutation,
   useUpdateItemCategoryMutation,
+  useGetItemGroupsQuery,
 } from '../../features/masterData/masterDataApi';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -22,9 +23,20 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
   const [createItemCategoryMutation] = useCreateItemCategoryMutation();
   const [updateItemCategoryMutation] = useUpdateItemCategoryMutation();
 
+  const { data: groupsRes, isLoading: loadingGroups } = useGetItemGroupsQuery(
+    { typeFilter: 'MASTER', status: 'active' },
+    { skip: !isOpen }
+  );
+
+  const itemGroups = useMemo(() => {
+    const list = groupsRes?.itemGroups || groupsRes?.groups || [];
+    return Array.isArray(list) ? list.filter((g) => g.status === 'active') : [];
+  }, [groupsRes]);
+
   const [formData, setFormData] = useState({
     categoryCode: '',
     categoryName: '',
+    itemGroup: '',
     description: '',
     status: 'active',
   });
@@ -38,6 +50,7 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
       setFormData({
         categoryCode: category.categoryCode || '',
         categoryName: category.categoryName || '',
+        itemGroup: category.itemGroup?._id || category.itemGroup || '',
         description: category.description || '',
         status: category.status || 'active',
       });
@@ -45,6 +58,7 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
       setFormData({
         categoryCode: '',
         categoryName: '',
+        itemGroup: '',
         description: '',
         status: 'active',
       });
@@ -64,10 +78,17 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
   };
 
   const handleSelectPreset = (preset) => {
+    const matchedGroup = itemGroups.find(
+      (g) =>
+        (g.groupName || '').toUpperCase() === preset.name.toUpperCase() ||
+        (g.groupCode || '').toUpperCase() === preset.code.toUpperCase()
+    );
+
     setFormData((prev) => ({
       ...prev,
       categoryCode: preset.code,
       categoryName: preset.name,
+      itemGroup: matchedGroup?._id || prev.itemGroup,
       description: prev.description || preset.desc,
     }));
   };
@@ -78,6 +99,9 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
     }
     if (!formData.categoryName.trim()) {
       return 'Category Name is required.';
+    }
+    if (!formData.itemGroup) {
+      return 'Please select an Item Group.';
     }
     if (!['active', 'inactive'].includes(formData.status)) {
       return 'Status must be active or inactive.';
@@ -166,11 +190,10 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
                     key={preset.code}
                     type="button"
                     onClick={() => handleSelectPreset(preset)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border ${
-                      isSelected
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border ${isSelected
                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                         : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
-                    }`}
+                      }`}
                   >
                     {preset.name} ({preset.code})
                   </button>
@@ -179,6 +202,23 @@ const ItemCategoryFormModal = ({ category, isOpen, onClose, onSuccess }) => {
             </div>
           </div>
         )}
+
+        {/* Item Group Select */}
+        <FormField label="Item Group" required fullWidth helperText="Assign this category to an Item Group (Raw, Filter, Coil, AHU)">
+          <Select
+            name="itemGroup"
+            value={formData.itemGroup}
+            onChange={handleChange}
+            disabled={submitting || loadingGroups}
+          >
+            <option value="">-- Select Item Group --</option>
+            {itemGroups.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.groupName} ({g.groupCode})
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
         {/* Category Code Input */}
         <FormField label="Category Code" required fullWidth helperText="Unique code identifier (e.g. RAW, FILTER, COIL, AHU)">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useGetRequirementsQuery, useUpdateRequirementStatusMutation } from '../../features/requirements/requirementsApi';
+import { useGetRequirementsQuery } from '../../features/requirements/requirementsApi';
 import { useGetClientsQuery } from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
@@ -11,21 +11,17 @@ import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 import RequirementFormModal from './RequirementFormModal';
 import RequirementDetailModal from './RequirementDetailModal';
 import QuotationFormModal from '../quotations/QuotationFormModal';
+import QuotationDetailModal from '../quotations/QuotationDetailModal';
+import QuotationAmendmentModal from '../quotations/QuotationAmendmentModal';
 import { 
   Plus, 
   Search, 
   Filter, 
   Eye, 
   Edit, 
-  RefreshCw,
-  FileText,
-  Calendar,
-  Building2,
-  Package,
-  Layers,
-  CheckCircle2,
-  XCircle,
-  Clock
+  RefreshCw, 
+  FileText, 
+  FileDiff
 } from 'lucide-react';
 
 const RequirementList = () => {
@@ -36,11 +32,9 @@ const RequirementList = () => {
 
   const { data: reqsData, isLoading: reqsLoading, error: reqsError, refetch: refetchReqs } = useGetRequirementsQuery();
   const { data: clientsData, isLoading: clientsLoading } = useGetClientsQuery();
-  const [updateRequirementStatusMutation] = useUpdateRequirementStatusMutation();
 
   const loading = reqsLoading || clientsLoading;
   const [error, setError] = useState('');
-  const [actionLoading, setActionLoading] = useState(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +51,10 @@ const RequirementList = () => {
   // Quotation Modal state
   const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
   const [quotationRequirement, setQuotationRequirement] = useState(null);
+  const [selectedQuotationId, setSelectedQuotationId] = useState(null);
+  const [isQuotationDetailOpen, setIsQuotationDetailOpen] = useState(false);
+  const [amendmentTargetQuotation, setAmendmentTargetQuotation] = useState(null);
+  const [isAmendmentOpen, setIsAmendmentOpen] = useState(false);
 
   const requirements = useMemo(() => {
     return reqsData?.requirements || (Array.isArray(reqsData) ? reqsData : []);
@@ -65,23 +63,6 @@ const RequirementList = () => {
   const clients = useMemo(() => {
     return clientsData?.clients || (Array.isArray(clientsData) ? clientsData : []);
   }, [clientsData]);
-
-  const handleStatusChange = async (requirement, newStatus) => {
-    if (requirement.status === newStatus) return;
-
-    const confirmMsg = `Are you sure you want to update status of Enquiry "${requirement.requirementNo}" to ${newStatus.replace('_', ' ').toUpperCase()}?`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setActionLoading(requirement._id);
-    try {
-      await updateRequirementStatusMutation({ id: requirement._id, status: newStatus }).unwrap();
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      setError(err?.data?.message || err?.message || 'Failed to update requirement status');
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   // Filter logic
   const filteredRequirements = useMemo(() => {
@@ -121,19 +102,17 @@ const RequirementList = () => {
   }, [requirements, searchTerm, statusFilter, typeFilter, partyFilter]);
 
   const loadClientOptions = async (inputValue) => {
-    try {
-      const res = await getClients({ search: inputValue, limit: 15, status: 'active', approvalStatus: 'APPROVED' });
-      if (res.success && Array.isArray(res.clients)) {
-        return res.clients.map((c) => ({
-          value: c._id,
-          label: c.companyName,
-          secondaryLabel: c.clientCode,
-        }));
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    const term = (inputValue || '').toLowerCase();
+    const filtered = clients.filter((c) => {
+      const name = (c.companyName || '').toLowerCase();
+      const code = (c.clientCode || '').toLowerCase();
+      return !term || name.includes(term) || code.includes(term);
+    });
+    return filtered.map((c) => ({
+      value: c._id,
+      label: c.companyName,
+      secondaryLabel: c.clientCode,
+    }));
   };
 
   const formatDate = (dateStr) => {
@@ -157,6 +136,8 @@ const RequirementList = () => {
         return { label: 'Quotation Pending', badgeStatus: 'pending' };
       case 'quoted':
         return { label: 'Quoted', badgeStatus: 'info' };
+      case 'under_revision':
+        return { label: 'Under Revision', badgeStatus: 'warning' };
       case 'follow_up':
         return { label: 'Follow Up', badgeStatus: 'warning' };
       case 'won':
@@ -165,8 +146,26 @@ const RequirementList = () => {
         return { label: 'Lost', badgeStatus: 'inactive' };
       case 'cancelled':
         return { label: 'Cancelled', badgeStatus: 'cancelled' };
+      case 'closed':
+        return { label: 'Closed', badgeStatus: 'neutral' };
       default:
         return { label: st || 'Unknown', badgeStatus: 'neutral' };
+    }
+  };
+
+  const getQuotationBadgeStatus = (st) => {
+    switch (st) {
+      case 'draft': return 'draft';
+      case 'sent':
+      case 'released': return 'info';
+      case 'won':
+      case 'accepted':
+      case 'converted': return 'active';
+      case 'lost':
+      case 'rejected': return 'inactive';
+      case 'cancelled': return 'cancelled';
+      case 'completed': return 'success';
+      default: return 'neutral';
     }
   };
 
@@ -174,9 +173,10 @@ const RequirementList = () => {
     {
       key: 'requirementNo',
       header: 'Enquiry No',
-      width: '140px',
+      width: '125px',
+      minWidth: '125px',
       render: (val) => (
-        <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-700)' }}>
+        <span className="font-mono font-bold whitespace-nowrap text-blue-700 text-xs">
           {val}
         </span>
       ),
@@ -184,9 +184,10 @@ const RequirementList = () => {
     {
       key: 'requirementDate',
       header: 'Date',
-      width: '110px',
+      width: '100px',
+      minWidth: '100px',
       render: (val) => (
-        <span style={{ color: 'var(--neutral-700)', fontSize: '12.5px' }}>
+        <span className="whitespace-nowrap text-slate-600 text-xs">
           {formatDate(val)}
         </span>
       ),
@@ -194,17 +195,21 @@ const RequirementList = () => {
     {
       key: 'client',
       header: 'Party / Customer',
-      width: '220px',
+      width: '200px',
+      minWidth: '190px',
       render: (val) => {
         const partyObj = typeof val === 'object' ? val : null;
-        if (!partyObj) return <span className="text-muted">—</span>;
+        if (!partyObj) return <span className="text-slate-400 italic text-xs">—</span>;
 
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <strong style={{ color: 'var(--neutral-900)' }}>{partyObj.companyName}</strong>
-            <span style={{ fontSize: '11.5px', color: 'var(--neutral-500)' }} className="font-mono">
-              {partyObj.clientCode} {partyObj.city ? `• ${partyObj.city}` : ''}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-slate-900 font-semibold text-xs leading-snug">
+              {partyObj.companyName}
             </span>
+            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500 font-mono">
+              <span className="whitespace-nowrap">{partyObj.clientCode}</span>
+              {partyObj.city && <span className="whitespace-nowrap">• {partyObj.city}</span>}
+            </div>
           </div>
         );
       },
@@ -212,104 +217,95 @@ const RequirementList = () => {
     {
       key: 'requirement',
       header: 'Requirement Summary',
-      width: '300px',
+      minWidth: '220px',
       render: (_, row) => {
         if (row.type === 'service') {
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontWeight: 600, color: 'var(--primary-900)' }}>Service Enquiry</span>
-              <span style={{ fontSize: '12px', color: 'var(--neutral-600)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '260px' }}>
-                {row.serviceDescription || 'Custom service requested'}
-              </span>
-            </div>
+            <span className="text-xs text-slate-800 leading-snug font-medium" title={row.serviceDescription || 'Service Enquiry'}>
+              {row.serviceDescription || 'Service Enquiry'}
+            </span>
           );
         }
 
         const itemsArr = Array.isArray(row.items) && row.items.length > 0 ? row.items : null;
-        const itemCount = itemsArr ? itemsArr.length : 1;
+
+        if (itemsArr && itemsArr.length > 1) {
+          return (
+            <div className="flex flex-col gap-1 py-0.5">
+              {itemsArr.map((it, idx) => {
+                const name = (typeof it.item === 'object' ? it.item?.itemName : null) || it.itemName || it.description || `Item #${idx + 1}`;
+                return (
+                  <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-800 leading-snug">
+                    <span className="font-semibold text-slate-400 shrink-0">{idx + 1}.</span>
+                    <span className="font-medium text-slate-900">{name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        // Single item
         const firstItem = itemsArr ? itemsArr[0] : row;
-        const itemObj = typeof firstItem?.item === 'object' ? firstItem.item : (typeof row.item === 'object' ? row.item : null);
-        const uomObj = typeof firstItem?.uom === 'object' ? firstItem.uom : (typeof row.uom === 'object' ? row.uom : null);
+        const name = (typeof firstItem?.item === 'object' ? firstItem.item?.itemName : null) || firstItem?.itemName || firstItem?.description || (typeof row.item === 'object' ? row.item?.itemName : null) || 'Air Filter Requirement';
 
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {itemCount > 1 ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">
-                  {itemCount} ITEMS
-                </span>
-              ) : itemObj ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                  CATALOG ITEM
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                  CUSTOM
-                </span>
-              )}
-
-              <span style={{ fontWeight: 600, color: 'var(--neutral-900)' }}>
-                {itemObj ? itemObj.itemName : (itemCount > 1 ? `Multi-Item Enquiry (${itemCount} items)` : 'Air Filter Requirement')}
-              </span>
-            </div>
-
-            {itemObj && (
-              <div style={{ fontSize: '11.5px', color: 'var(--neutral-600)' }} className="font-mono">
-                Code: <strong>{itemObj.itemCode}</strong>
-                {itemObj.filterGrade?.filterGrade && (
-                  <span className="ml-2 text-slate-700 font-sans font-semibold">
-                    • Grade: {itemObj.filterGrade.filterGrade}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div style={{ fontSize: '12px', color: 'var(--neutral-600)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {firstItem?.quantity !== null && firstItem?.quantity !== undefined && (
-                <span>
-                  Qty: <strong>{firstItem.quantity}</strong> {uomObj ? uomObj.uomCode : ''}
-                  {itemCount > 1 ? ` (Item 1 of ${itemCount})` : ''}
-                </span>
-              )}
-              {firstItem?.dimensions && (firstItem.dimensions.bodyWidth || firstItem.dimensions.width) && (
-                <span style={{ fontSize: '11px', color: 'var(--neutral-500)' }}>
-                  Dim: {firstItem.dimensions.bodyWidth || firstItem.dimensions.width}×{firstItem.dimensions.bodyHeight || firstItem.dimensions.height}×{firstItem.dimensions.depth || firstItem.dimensions.length || '0'} {firstItem.dimensions.unit || 'mm'}
-                </span>
-              )}
-            </div>
-          </div>
+          <span className="text-xs font-medium text-slate-900 leading-snug">
+            {name}
+          </span>
         );
       },
     },
     {
       key: 'status',
       header: 'Status',
-      width: '140px',
-      render: (val, row) => {
+      width: '115px',
+      minWidth: '115px',
+      render: (val) => {
         const config = getStatusBadgeConfig(val);
-
-        if (!canEdit) {
-          return <StatusBadge status={config.badgeStatus} label={config.label} />;
-        }
-
         return (
-          <div className="w-[130px]">
-            <Select
-              size="sm"
-              value={val}
-              onChange={(e) => handleStatusChange(row, e.target.value)}
-              disabled={actionLoading === row._id}
-              title="Quick status transition"
-              required
-            >
-              <option value="draft">Draft</option>
-              <option value="quotation_pending">Quotation Pending</option>
-              <option value="quoted">Quoted</option>
-              <option value="follow_up">Follow Up</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
+          <div className="whitespace-nowrap">
+            <StatusBadge status={config.badgeStatus} label={config.label} />
+          </div>
+        );
+      },
+    },
+    {
+      key: 'linkedQuotation',
+      header: 'Linked Quotation',
+      width: '160px',
+      minWidth: '160px',
+      render: (_, row) => {
+        const lq = row.linkedQuotation;
+        if (!lq) {
+          return <span className="text-slate-400 text-xs whitespace-nowrap italic">— Not Quoted</span>;
+        }
+        return (
+          <div className="flex flex-col gap-1 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedQuotationId(lq._id);
+                  setIsQuotationDetailOpen(true);
+                }}
+                className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline text-xs cursor-pointer bg-transparent border-0 p-0 text-left whitespace-nowrap inline-block"
+                title="View Quotation Details"
+              >
+                {lq.quotationNo}
+              </button>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-300 whitespace-nowrap inline-flex items-center">
+                {lq.revisionLabel || 'Rev 00'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <StatusBadge status={getQuotationBadgeStatus(lq.status)} label={lq.status?.toUpperCase()} />
+              {lq.salesOrder && (
+                <span className="font-mono text-[10px] text-emerald-700 font-semibold whitespace-nowrap bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  SO: {lq.salesOrder.salesOrderNo}
+                </span>
+              )}
+            </div>
           </div>
         );
       },
@@ -318,9 +314,10 @@ const RequirementList = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '210px',
+      width: '180px',
+      minWidth: '180px',
       render: (_, row) => (
-        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <Button
             variant="ghost"
             size="sm"
@@ -332,7 +329,7 @@ const RequirementList = () => {
           >
             View
           </Button>
-          {hasPermission('QUOTATION_CREATE') && (
+          {!row.linkedQuotation && hasPermission('QUOTATION_CREATE') && (
             <Button
               variant="outline"
               size="sm"
@@ -343,7 +340,21 @@ const RequirementList = () => {
               }}
               title="Create Quotation from this Enquiry"
             >
-              Quotation
+              Quote
+            </Button>
+          )}
+          {row.linkedQuotation && row.linkedQuotation.status === 'released' && hasPermission('QUOTATION_AMEND') && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={FileDiff}
+              onClick={() => {
+                setAmendmentTargetQuotation(row.linkedQuotation);
+                setIsAmendmentOpen(true);
+              }}
+              title="Amend Quotation"
+            >
+              Amend
             </Button>
           )}
           {canEdit && (
@@ -400,10 +411,10 @@ const RequirementList = () => {
       <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5">
         {/* Toolbar Controls & Filtering */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <div className="relative flex-1 min-w-[260px]">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <Input
-              className="pl-8"
+              className="pl-9 h-9 text-xs rounded-md"
               placeholder="Search by Enquiry No, Party name/code, item name, or service description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -411,10 +422,10 @@ const RequirementList = () => {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
-            <Filter size={16} className="text-slate-400 shrink-0" />
+            <Filter size={16} className="text-slate-400 shrink-0 hidden sm:block" />
 
             {/* Party Filter Dropdown */}
-            <div className="w-[200px] sm:w-[220px]">
+            <div className="w-full sm:w-[220px]">
               <AsyncSelect
                 value={partyFilter}
                 onChange={(e) => setPartyFilter(e.target.value || 'all')}
@@ -446,10 +457,12 @@ const RequirementList = () => {
                 <option value="draft">Draft</option>
                 <option value="quotation_pending">Quotation Pending</option>
                 <option value="quoted">Quoted</option>
+                <option value="under_revision">Under Revision</option>
                 <option value="follow_up">Follow Up</option>
                 <option value="won">Won</option>
                 <option value="lost">Lost</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="closed">Closed</option>
               </Select>
             </div>
           </div>
@@ -499,6 +512,14 @@ const RequirementList = () => {
           setQuotationRequirement(req);
           setIsQuotationFormOpen(true);
         }}
+        onViewQuotation={(quote) => {
+          setSelectedQuotationId(quote._id);
+          setIsQuotationDetailOpen(true);
+        }}
+        onAmendQuotation={(quote) => {
+          setAmendmentTargetQuotation(quote);
+          setIsAmendmentOpen(true);
+        }}
         canEdit={canEdit}
       />
 
@@ -513,6 +534,38 @@ const RequirementList = () => {
           onSuccess={() => {
             setIsQuotationFormOpen(false);
             setQuotationRequirement(null);
+            refetchReqs();
+          }}
+        />
+      )}
+
+      {/* Quotation Detail Modal */}
+      {isQuotationDetailOpen && selectedQuotationId && (
+        <QuotationDetailModal
+          isOpen={isQuotationDetailOpen}
+          quotationId={selectedQuotationId}
+          onClose={() => {
+            setIsQuotationDetailOpen(false);
+            setSelectedQuotationId(null);
+          }}
+          canEdit={hasPermission('QUOTATION_EDIT')}
+          canRelease={hasPermission('QUOTATION_RELEASE')}
+          canAmend={hasPermission('QUOTATION_AMEND')}
+        />
+      )}
+
+      {/* Quotation Amendment Modal */}
+      {isAmendmentOpen && amendmentTargetQuotation && (
+        <QuotationAmendmentModal
+          isOpen={isAmendmentOpen}
+          quotation={amendmentTargetQuotation}
+          onClose={() => {
+            setIsAmendmentOpen(false);
+            setAmendmentTargetQuotation(null);
+          }}
+          onSuccess={() => {
+            setIsAmendmentOpen(false);
+            setAmendmentTargetQuotation(null);
             refetchReqs();
           }}
         />

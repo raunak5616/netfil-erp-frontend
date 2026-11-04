@@ -344,31 +344,32 @@ const QuotationList = () => {
         key: 'quotationNo',
         header: 'Quotation No',
         sortable: true,
-        render: (val, row) => (
-          <div>
-            <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-700)' }}>
-              {val}
-            </span>
-            {row.amendmentCount > 0 && (
+        render: (val, row) => {
+          const revLabel = row.revisionLabel || (row.amendmentCount > 0 ? `Rev ${String(row.amendmentCount).padStart(2, '0')}` : 'Rev 00');
+          const isAmended = row.amendmentCount > 0;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-700)' }}>
+                {val}
+              </span>
               <span
                 style={{
-                  marginLeft: '6px',
                   fontSize: '10.5px',
                   padding: '1px 5px',
                   borderRadius: '3px',
-                  background: '#fef3c7',
-                  color: '#92400e',
-                  border: '1px solid #fde68a',
+                  background: isAmended ? '#fef3c7' : '#f1f5f9',
+                  color: isAmended ? '#92400e' : '#475569',
+                  border: isAmended ? '1px solid #fde68a' : '1px solid #cbd5e1',
                   fontWeight: 700,
                   fontFamily: 'monospace',
                 }}
-                title={`Quotation Revision ${row.amendmentCount}`}
+                title={isAmended ? `Quotation Revision ${row.amendmentCount}` : 'Original Quotation'}
               >
-                Rev {String(row.amendmentCount).padStart(2, '0')}
+                {revLabel}
               </span>
-            )}
-          </div>
-        ),
+            </div>
+          );
+        },
       },
       {
         key: 'quotationDate',

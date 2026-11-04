@@ -9,6 +9,7 @@ import {
   useRemoveItemImageMutation,
 } from '../../features/products/productsApi';
 import {
+  useGetItemGroupsQuery,
   useGetItemCategoriesQuery,
   useGetCategorySpecificationsQuery,
   useGetUOMsQuery,
@@ -93,6 +94,7 @@ const ItemFormModal = ({
         : ''
   );
 
+  const [selectedItemGroupId, setSelectedItemGroupId] = useState('');
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState('');
@@ -102,6 +104,7 @@ const ItemFormModal = ({
   const [formData, setFormData] = useState({
     itemCode: 'AUTO',
     itemName: initialItemName || '',
+    itemGroup: '',
     itemCategory: '',
     inventoryUom: '',
     purchaseUom: '',
@@ -143,6 +146,10 @@ const ItemFormModal = ({
   const [specsData, setSpecsData] = useState({});
 
   // RTK Query Master Data
+  const { data: groupsRes, isLoading: loadingGroups } = useGetItemGroupsQuery(
+    { typeFilter: 'MASTER', status: 'active' },
+    { skip: !isOpen }
+  );
   const { data: catsRes, isLoading: loadingCats } = useGetItemCategoriesQuery({ typeFilter: 'MASTER' }, { skip: !isOpen });
   const { data: uomsRes, isLoading: loadingUoms } = useGetUOMsQuery({}, { skip: !isOpen });
   const { data: binsRes, isLoading: loadingBins } = useGetBinsQuery({}, { skip: !isOpen });
@@ -175,6 +182,11 @@ const ItemFormModal = ({
     );
   };
 
+  const itemGroups = useMemo(() => {
+    const raw = groupsRes?.itemGroups || groupsRes?.groups || [];
+    return Array.isArray(raw) ? raw.filter((g) => g.status === 'active' && !isSystemCode(g.groupCode)) : [];
+  }, [groupsRes]);
+
   const itemCategories = useMemo(() => {
     const raw = catsRes?.itemCategories || catsRes?.categories || [];
     return Array.isArray(raw) ? raw.filter((c) => c.status === 'active' && !isSystemCode(c.categoryCode)) : [];
@@ -195,7 +207,7 @@ const ItemFormModal = ({
     return Array.isArray(raw) ? raw.filter((f) => f.status === 'active') : [];
   }, [fgsRes]);
 
-  const loadingData = loadingCats || loadingUoms || loadingBins || loadingFgs;
+  const loadingData = loadingGroups || loadingCats || loadingUoms || loadingBins || loadingFgs;
 
   // RTK Query Mutations
   const [createItemMutation] = useCreateItemMutation();
@@ -279,9 +291,13 @@ const ItemFormModal = ({
           ? item.constructionType
           : '';
 
+      const initGroupId = item.itemGroup?._id || item.itemGroup || item.itemCategory?.itemGroup?._id || item.itemCategory?.itemGroup || '';
+      setSelectedItemGroupId(initGroupId);
+
       setFormData({
         itemCode: item.itemCode || '',
         itemName: item.itemName || '',
+        itemGroup: initGroupId,
         itemCategory: item.itemCategory?._id || item.itemCategory || '',
         inventoryUom: item.inventoryUom?._id || item.inventoryUom || '',
         purchaseUom: item.purchaseUom?._id || item.purchaseUom || '',
@@ -324,6 +340,7 @@ const ItemFormModal = ({
       setFormData({
         itemCode: 'AUTO',
         itemName: initialItemName || '',
+        itemGroup: '',
         itemCategory: '',
         inventoryUom: '',
         purchaseUom: '',
@@ -369,9 +386,57 @@ const ItemFormModal = ({
     setSuccessMessage('');
   }, [item, isOpen, initialProductType, initialItemName]);
 
-  // Available categories: sort fixed categories (Raw, Filter, Coil, AHU) first
+  // Sync selected Item Group on modal open or when itemGroups load
+  useEffect(() => {
+    if (itemGroups.length === 0 || !isOpen) return;
+
+    if (item) {
+      const initGrp = item.itemGroup?._id || item.itemGroup || item.itemCategory?.itemGroup?._id || item.itemCategory?.itemGroup;
+      if (initGrp) {
+        setSelectedItemGroupId(initGrp);
+        return;
+      }
+      const pType = item.productType || (item.filterGrade ? 'FILTER' : 'RAW_ITEM');
+      const matched = itemGroups.find((g) =>
+        (g.applicableProductTypes || []).includes(pType) ||
+        (g.groupName || '').toUpperCase() === (pType === 'RAW_ITEM' ? 'RAW' : pType)
+      );
+      if (matched) setSelectedItemGroupId(matched._id);
+    } else if (!selectedItemGroupId) {
+      const pType = initialProductType || 'RAW_ITEM';
+      const matched = itemGroups.find((g) =>
+        (g.applicableProductTypes || []).includes(pType) ||
+        (g.groupName || '').toUpperCase() === (pType === 'RAW_ITEM' ? 'RAW' : pType)
+      );
+      if (matched) {
+        setSelectedItemGroupId(matched._id);
+        setFormData((prev) => ({ ...prev, itemGroup: matched._id }));
+      } else if (itemGroups[0]) {
+        setSelectedItemGroupId(itemGroups[0]._id);
+        setFormData((prev) => ({ ...prev, itemGroup: itemGroups[0]._id }));
+      }
+    }
+  }, [itemGroups, item, initialProductType, isOpen, selectedItemGroupId]);
+
+  // Available categories: strictly filter by selected Item Group
   const availableCategories = useMemo(() => {
-    return [...itemCategories].sort((a, b) => {
+    let list = [...itemCategories];
+    if (selectedItemGroupId) {
+      list = list.filter((cat) => {
+        const catGroupId = typeof cat.itemGroup === 'object' ? cat.itemGroup?._id : cat.itemGroup;
+        if (catGroupId && String(catGroupId) === String(selectedItemGroupId)) return true;
+        // Fallback matching if category has no itemGroup yet
+        const selectedGroup = itemGroups.find((g) => String(g._id) === String(selectedItemGroupId));
+        if (!catGroupId && selectedGroup) {
+          const gNorm = (selectedGroup.groupName || selectedGroup.groupCode || '').toUpperCase();
+          const cNorm = (cat.categoryName || cat.categoryCode || '').toUpperCase();
+          return cNorm.includes(gNorm) || gNorm.includes(cNorm);
+        }
+        return false;
+      });
+    }
+
+    return list.sort((a, b) => {
       const aFixed = FIXED_CATEGORY_CODES.indexOf(a.categoryCode?.toUpperCase());
       const bFixed = FIXED_CATEGORY_CODES.indexOf(b.categoryCode?.toUpperCase());
       if (aFixed !== -1 && bFixed !== -1) return aFixed - bFixed;
@@ -379,21 +444,21 @@ const ItemFormModal = ({
       if (bFixed !== -1) return 1;
       return (a.categoryName || '').localeCompare(b.categoryName || '');
     });
-  }, [itemCategories]);
+  }, [itemCategories, selectedItemGroupId, itemGroups]);
 
-  // Auto-match category based on productType when creating a new item
+  // Auto-match category based on selectedItemGroupId when creating a new item
   useEffect(() => {
-    if (!isEditMode && itemCategories.length > 0 && !formData.itemCategory) {
-      const targetCode = formData.productType === 'RAW_ITEM' ? 'RAW' : formData.productType;
-      const matched = itemCategories.find(c => c.categoryCode?.toUpperCase() === targetCode);
+    if (!isEditMode && availableCategories.length > 0 && !formData.itemCategory && selectedItemGroupId) {
+      const matched = availableCategories[0];
       if (matched) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           itemCategory: matched._id,
+          itemGroup: selectedItemGroupId,
         }));
       }
     }
-  }, [formData.productType, itemCategories, isEditMode, formData.itemCategory]);
+  }, [selectedItemGroupId, availableCategories, isEditMode, formData.itemCategory]);
 
   // Filter core specs identification (handled by dedicated filter inputs)
   const isFilterCoreSpec = (spec) => {
@@ -496,6 +561,79 @@ const ItemFormModal = ({
       return { key, label, variant: v };
     });
   }, [selectedFg, filterType]);
+
+  const handleItemGroupSelect = (group) => {
+    const groupId = group?._id;
+    setSelectedItemGroupId(groupId);
+
+    let pType = 'RAW_ITEM';
+    if (group.applicableProductTypes && group.applicableProductTypes.length > 0) {
+      pType = group.applicableProductTypes[0];
+    } else {
+      const gNorm = (group.groupName || group.groupCode || '').toUpperCase();
+      if (gNorm.includes('FILTER')) pType = 'FILTER';
+      else if (gNorm.includes('COIL')) pType = 'COIL';
+      else if (gNorm.includes('AHU')) pType = 'AHU';
+      else pType = 'RAW_ITEM';
+    }
+
+    const nextItemType = PRODUCT_TYPE_TO_ITEM_TYPE[pType] || 'raw_material';
+
+    // Find categories belonging to this newly selected group
+    const groupCategories = itemCategories.filter((c) => {
+      const catGrpId = typeof c.itemGroup === 'object' ? c.itemGroup?._id : c.itemGroup;
+      if (catGrpId && String(catGrpId) === String(groupId)) return true;
+      const gNorm = (group.groupName || group.groupCode || '').toUpperCase();
+      const cNorm = (c.categoryName || c.categoryCode || '').toUpperCase();
+      return cNorm.includes(gNorm) || gNorm.includes(cNorm);
+    });
+
+    const isCurrentCatInGroup = groupCategories.some((c) => String(c._id) === String(formData.itemCategory));
+    const nextCategory = isCurrentCatInGroup ? formData.itemCategory : (groupCategories[0]?._id || '');
+
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        itemGroup: groupId,
+        productType: pType,
+        itemType: nextItemType,
+        itemCategory: nextCategory,
+      };
+
+      if (pType !== 'FILTER') {
+        setFilterType('');
+        next.filterType = '';
+        next.constructionType = '';
+        next.flangeType = '';
+        next.filterGrade = '';
+        next.filterGradeVariant = '';
+        next.filterLength = '';
+        next.filterWidth = '';
+        next.filterDepth = '';
+        next.faceVelocity = 500;
+        next.temperatureRating = '';
+        next.bonding = '';
+      }
+
+      return next;
+    });
+  };
+
+  const handleCategoryChange = (e) => {
+    const catId = e.target.value;
+    const catObj = itemCategories.find((c) => String(c._id) === String(catId));
+    const linkedGroupId = typeof catObj?.itemGroup === 'object' ? catObj.itemGroup?._id : catObj?.itemGroup;
+
+    if (linkedGroupId) {
+      setSelectedItemGroupId(linkedGroupId);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      itemCategory: catId,
+      itemGroup: linkedGroupId || selectedItemGroupId || prev.itemGroup,
+    }));
+  };
 
   const handleProductTypeChange = (newType) => {
     setFormData((prev) => {
@@ -712,7 +850,7 @@ const ItemFormModal = ({
         itemName: formData.itemName.trim(),
         productType: formData.productType,
         itemCategory: formData.itemCategory,
-        itemGroup: derivedGroupId,
+        itemGroup: derivedGroupId || formData.itemGroup || selectedItemGroupId || null,
         itemType: PRODUCT_TYPE_TO_ITEM_TYPE[formData.productType] || 'raw_material',
         inventoryUom: formData.inventoryUom,
         purchaseUom: resolvedPurchaseUom,
@@ -941,19 +1079,24 @@ const ItemFormModal = ({
 
         {/* 1. BASIC INFORMATION */}
         <div className="space-y-3.5">
-          {/* Product Type Segmented Buttons */}
+          {/* Item Group (Select Item Group First) */}
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-              Product Type <span className="text-red-500 font-bold">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-700">
+                Item Group <span className="text-red-500 font-bold">*</span>
+              </label>
+              <span className="text-[11px] text-slate-500">
+                Select Item Group first to filter available categories
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {PRODUCT_TYPES.map((pt) => {
-                const isSelected = formData.productType === pt.value;
+              {itemGroups.map((group) => {
+                const isSelected = String(selectedItemGroupId) === String(group._id);
                 return (
                   <button
-                    key={pt.value}
+                    key={group._id}
                     type="button"
-                    onClick={() => handleProductTypeChange(pt.value)}
+                    onClick={() => handleItemGroupSelect(group)}
                     disabled={submitting}
                     className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg border text-center transition-all cursor-pointer ${
                       isSelected
@@ -961,9 +1104,9 @@ const ItemFormModal = ({
                         : 'bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50/40'
                     }`}
                   >
-                    <span className="text-xs font-bold">{pt.label}</span>
+                    <span className="text-xs font-bold">{group.groupName}</span>
                     <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                      {pt.desc}
+                      {group.groupCode}
                     </span>
                   </button>
                 );
@@ -993,15 +1136,15 @@ const ItemFormModal = ({
 
           {/* 3-Column Basic Info Row: Category, Item Code, Inventory UOM */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <FormField label="Item Category" required helperText="System category for this item.">
+            <FormField label="Item Category" required helperText="Filtered by selected Item Group.">
               <Select
                 name="itemCategory"
                 value={formData.itemCategory}
-                onChange={handleChange}
+                onChange={handleCategoryChange}
                 disabled={submitting || loadingData || availableCategories.length === 0}
               >
                 <option value="">
-                  {availableCategories.length === 0 ? '-- No Categories --' : '-- Select Category --'}
+                  {availableCategories.length === 0 ? '-- No Categories In This Group --' : '-- Select Category --'}
                 </option>
                 {availableCategories.map((c) => (
                   <option key={c._id} value={c._id}>

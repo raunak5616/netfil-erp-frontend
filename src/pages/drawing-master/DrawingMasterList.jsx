@@ -301,7 +301,7 @@ const DrawingMasterList = () => {
         width: '130px',
         render: (_, row) => {
           const isPdf = row.format === 'pdf' || row.fileUrl?.toLowerCase().endsWith('.pdf');
-          const frontRaw = row.frontViewImage?.url || row.fileUrl || row.holeImageUrl;
+          const frontRaw = row.frontViewImage?.url || row.fileUrl;
           const frontSrc = getVersionedImageUrl(frontRaw, row.updatedAt);
           const sideSrc = getVersionedImageUrl(row.sideViewImage?.url, row.updatedAt);
           const picSrc = getVersionedImageUrl(row.pictorialViewImage?.url, row.updatedAt);

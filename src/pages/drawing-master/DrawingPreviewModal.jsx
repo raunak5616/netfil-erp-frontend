@@ -111,7 +111,7 @@ const DrawingPreviewModal = ({ isOpen, onClose, drawing }) => {
 
         {/* Drawing Preview Screen */}
         {(() => {
-          const frontUrl = drawing.frontViewImage?.url || drawing.fileUrl || drawing.holeImageUrl || '';
+          const frontUrl = drawing.frontViewImage?.url || drawing.fileUrl || '';
           const sideUrl = drawing.sideViewImage?.url || '';
           const picUrl = drawing.pictorialViewImage?.url || '';
           const hasMultiViews = Boolean(sideUrl || picUrl);

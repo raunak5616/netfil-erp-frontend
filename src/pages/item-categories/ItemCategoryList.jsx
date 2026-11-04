@@ -196,7 +196,7 @@ const ItemCategoryList = () => {
     {
       key: 'categoryName',
       header: 'Category Name',
-      width: '240px',
+      width: '200px',
       render: (val, row) => {
         const isFixed = FIXED_CODES.includes(String(row.categoryCode).toUpperCase());
         return (
@@ -210,9 +210,24 @@ const ItemCategoryList = () => {
       },
     },
     {
+      key: 'itemGroup',
+      header: 'Item Group',
+      width: '150px',
+      render: (_, row) => {
+        const grp = row.itemGroup;
+        if (!grp) return <span className="text-slate-400 italic text-xs">—</span>;
+        const name = typeof grp === 'object' ? grp.groupName : grp;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+            {name}
+          </span>
+        );
+      },
+    },
+    {
       key: 'description',
       header: 'Description',
-      width: '320px',
+      width: '260px',
       render: (val) => (
         <span style={{ color: val ? 'var(--neutral-800)' : 'var(--neutral-400)', fontSize: '13px' }}>
           {val || '—'}

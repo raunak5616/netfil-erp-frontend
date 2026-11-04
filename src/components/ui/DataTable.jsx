@@ -45,10 +45,12 @@ const DataTable = ({
                 {columns.map((col) => (
                   <th
                     key={col.key || col.header}
-                    className="bg-slate-50 text-slate-700 font-semibold px-3 py-2 border-b border-slate-200 text-[11px] uppercase tracking-wider whitespace-nowrap"
+                    className={`bg-slate-50 text-slate-700 font-semibold px-3 py-2.5 border-b border-slate-200 text-[11px] uppercase tracking-wider whitespace-nowrap ${col.headerClassName || ''}`}
                     style={{
                       textAlign: col.align || 'left',
                       width: col.width || 'auto',
+                      minWidth: col.minWidth || col.width || undefined,
+                      maxWidth: col.maxWidth || undefined,
                     }}
                   >
                     {col.header}
@@ -75,8 +77,13 @@ const DataTable = ({
                       return (
                         <td
                           key={colKey || col.header}
-                          className="px-3 py-2.5 border-b border-slate-200 text-slate-800 align-middle"
-                          style={{ textAlign: col.align || 'left' }}
+                          className={`px-3 py-3 border-b border-slate-200 text-slate-800 align-middle ${col.className || ''}`}
+                          style={{
+                            textAlign: col.align || 'left',
+                            width: col.width || 'auto',
+                            minWidth: col.minWidth || col.width || undefined,
+                            maxWidth: col.maxWidth || undefined,
+                          }}
                         >
                           {renderedContent}
                         </td>

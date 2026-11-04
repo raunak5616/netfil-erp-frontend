@@ -457,6 +457,21 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   };
 
   // Filter available requirements for selected client
+  const selectedRequirementObj = useMemo(() => {
+    return requirements.find((r) => r._id === formData.requirement) || initialReqObj;
+  }, [requirements, formData.requirement, initialReqObj]);
+
+  const isRequirementAlreadyQuoted = useMemo(() => {
+    if (isEdit) return false;
+    return Boolean(selectedRequirementObj?.linkedQuotation);
+  }, [isEdit, selectedRequirementObj]);
+
+  useEffect(() => {
+    if (isOpen && !isEdit && initialReqObj?.linkedQuotation) {
+      setError("A quotation has already been generated for this enquiry. Please use the Amend Quotation option to make changes.");
+    }
+  }, [isOpen, isEdit, initialReqObj]);
+
   const availableRequirements = useMemo(() => {
     if (!formData.client) return [];
     return requirements.filter((r) => {
@@ -467,9 +482,14 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
   // Handle Requirement Selection from dropdown
   const handleRequirementChange = (reqId) => {
-    const selectedReq = requirements.find((r) => r._id === reqId);
-    if (selectedReq) {
-      populateLineItemsFromRequirement(selectedReq);
+    const targetReq = requirements.find((r) => r._id === reqId);
+    if (!isEdit && targetReq?.linkedQuotation) {
+      setError("A quotation has already been generated for this enquiry. Please use the Amend Quotation option to make changes.");
+    } else {
+      setError('');
+    }
+    if (targetReq) {
+      populateLineItemsFromRequirement(targetReq);
     } else {
       setFormData((prev) => ({ ...prev, requirement: reqId }));
     }
@@ -685,6 +705,10 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       setError('Please select a Requirement reference');
       return;
     }
+    if (!isEdit && isRequirementAlreadyQuoted) {
+      setError("A quotation has already been generated for this enquiry. Please use the Amend Quotation option to make changes.");
+      return;
+    }
 
     if (lineItems.length === 0) {
       setError('At least 1 line item is required');
@@ -856,11 +880,15 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                   <option value="">
                     {formData.client ? 'Select Requirement' : 'Select Party First'}
                   </option>
-                  {availableRequirements.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.requirementNo} ({r.type === 'product' ? 'Product' : 'Service'})
-                    </option>
-                  ))}
+                  {availableRequirements.map((r) => {
+                    const alreadyQuoted = !isEdit && Boolean(r.linkedQuotation);
+                    return (
+                      <option key={r._id} value={r._id} disabled={alreadyQuoted}>
+                        {r.requirementNo} ({r.type === 'product' ? 'Product' : 'Service'})
+                        {alreadyQuoted ? ` — [Quotation ${r.linkedQuotation.quotationNo} Already Generated]` : ''}
+                      </option>
+                    );
+                  })}
                 </Select>
               </div>
 
@@ -1564,7 +1592,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
             <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={submitting}>
+            <Button type="submit" variant="primary" disabled={submitting || (!isEdit && isRequirementAlreadyQuoted)}>
               {submitting ? 'Saving...' : isEdit ? 'Update Quotation' : 'Create Quotation'}
             </Button>
           </div>

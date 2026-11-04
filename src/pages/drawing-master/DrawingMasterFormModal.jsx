@@ -209,7 +209,7 @@ const DrawingMasterFormModal = ({
       });
 
       // Populate Three Views
-      const frontUrl = initialData.frontViewImage?.url || initialData.fileUrl || initialData.holeImageUrl || initialData.referenceImage || initialData.referenceDrawing || null;
+      const frontUrl = initialData.frontViewImage?.url || initialData.fileUrl || initialData.referenceImage || initialData.referenceDrawing || null;
       const sideUrl = initialData.sideViewImage?.url || null;
       const picUrl = initialData.pictorialViewImage?.url || null;
 
@@ -432,7 +432,7 @@ const DrawingMasterFormModal = ({
   const handleRemoveViewFile = (viewKey) => {
     if (viewKey === 'front') {
       setFrontFile(null);
-      const existing = initialData?.frontViewImage?.url || initialData?.fileUrl || initialData?.holeImageUrl || initialData?.referenceImage || null;
+      const existing = initialData?.frontViewImage?.url || initialData?.fileUrl || initialData?.referenceImage || null;
       setFrontPreview(isEdit ? existing : null);
       if (frontInputRef.current) frontInputRef.current.value = '';
     } else if (viewKey === 'side') {

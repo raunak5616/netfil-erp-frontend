@@ -241,6 +241,15 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
               </div>
 
               <div>
+                <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Item Group
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--neutral-900)', marginTop: '2px' }}>
+                  {category.itemGroup?.groupName ? `${category.itemGroup.groupName} (${category.itemGroup.groupCode})` : '—'}
+                </div>
+              </div>
+
+              <div>
                 <div style={{ fontSize: '11px', color: 'var(--neutral-500)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>
                   Category Type
                 </div>
