@@ -38,6 +38,22 @@ import {
   X
 } from 'lucide-react';
 
+const isRealGuardValue = (val) => {
+  if (!val) return false;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    return s !== '' && s !== '-' && s !== 'no' && s !== 'none' && s !== 'false' && s !== 'no protection grid' && s !== 'no guard' && s !== 'no protection guard' && s !== 'null' && s !== 'undefined';
+  }
+  if (typeof val === 'object') {
+    if (val.hasGuard === true || val.enabled === true) return true;
+    if (val.hasGuard === false) return false;
+    if (val.material && String(val.material).trim().toUpperCase() !== 'NO' && String(val.material).trim().toUpperCase() !== 'NONE') {
+      return true;
+    }
+  }
+  return false;
+};
+
 /**
  * Displays the actual uploaded technical CAD drawing from Drawing Master / Hole Image Management.
  * Preserves true proportions and aspect ratio without stretching, distortion, or cropping.
@@ -479,18 +495,18 @@ const SalesOrderDrawingWorkspaceModal = ({
 
   // Initialize selected item when configData loads
   useEffect(() => {
-    if (configData?.items && configData.items.length > 0) {
+    if (isOpen && configData?.items && configData.items.length > 0) {
       const items = configData.items;
       const targetItem = initialItemId
         ? items.find(it => String(it._id) === String(initialItemId)) || items[0]
         : (selectedItemId ? items.find(it => String(it._id) === String(selectedItemId)) || items[0] : items[0]);
 
-      if (targetItem && targetItem._id !== selectedItemId) {
+      if (targetItem) {
         setSelectedItemId(targetItem._id);
         populateHoleForm(targetItem);
       }
     }
-  }, [configData, initialItemId]);
+  }, [configData, initialItemId, isOpen]);
 
   useEffect(() => {
     if (!isOpen && pdfBlobUrl) {
@@ -520,9 +536,20 @@ const SalesOrderDrawingWorkspaceModal = ({
 
     const isZero = isBox || count === 0;
 
-    const guardObj = item.guard || item.dimensions?.guard || {};
-    const hasGuard = Boolean(guardObj.hasGuard ?? guardObj.enabled);
-    let initialProtMoc = item.protectionGuardMoc;
+    const candidateGuards = [
+      item.guard,
+      item.dimensions?.guard
+    ].filter(Boolean);
+    const positiveGuard = candidateGuards.find(g => g && (
+      g.hasGuard === true || 
+      g.enabled === true || 
+      (g.material && String(g.material).trim().toUpperCase() !== 'NO' && String(g.material).trim().toUpperCase() !== 'NONE')
+    ));
+    const guardObj = positiveGuard || item.guard || item.dimensions?.guard || {};
+    const hasRealProtMoc = isRealGuardValue(item.protectionGuardMoc);
+    const hasGuard = Boolean(positiveGuard || hasRealProtMoc || guardObj.hasGuard === true || guardObj.enabled === true);
+
+    let initialProtMoc = hasRealProtMoc ? item.protectionGuardMoc : null;
     if (!initialProtMoc) {
       if (hasGuard) {
         const mat = guardObj.material === 'SS304' ? 'SS 304' : (guardObj.material === 'Alu' ? 'Aluminum' : (guardObj.material || 'SS 304'));
@@ -532,6 +559,9 @@ const SalesOrderDrawingWorkspaceModal = ({
         initialProtMoc = 'NO Protection Grid';
       }
     }
+
+    const resolvedMat = guardObj.material || (initialProtMoc.toUpperCase().includes('ALU') ? 'Alu' : (initialProtMoc.toUpperCase().includes('GI') ? 'GI' : 'SS304'));
+    const resolvedSides = guardObj.sides || (initialProtMoc.toLowerCase().includes('one side') ? 'One side' : 'Both side');
 
     setHoleForm({
       filterType: isBox ? 'BOX' : 'FLANGE',
@@ -546,8 +576,8 @@ const SalesOrderDrawingWorkspaceModal = ({
       protectionGuardMoc: initialProtMoc,
       guard: {
         hasGuard,
-        material: guardObj.material || 'SS304',
-        sides: guardObj.sides || 'Both side'
+        material: resolvedMat,
+        sides: resolvedSides
       }
     });
   };
@@ -561,11 +591,24 @@ const SalesOrderDrawingWorkspaceModal = ({
     setError('');
     try {
       const fType = item.filterType || item.constructionType || holeForm.filterType || 'FLANGE';
-      const protMoc = holeForm.protectionGuardMoc || item.protectionGuardMoc;
+      const hasGuard = Boolean(holeForm.guard?.hasGuard || isRealGuardValue(holeForm.protectionGuardMoc) || isRealGuardValue(item.protectionGuardMoc));
+      let protMoc = 'NO Protection Grid';
+      if (hasGuard) {
+        if (isRealGuardValue(holeForm.protectionGuardMoc)) {
+          protMoc = holeForm.protectionGuardMoc;
+        } else if (isRealGuardValue(item.protectionGuardMoc)) {
+          protMoc = item.protectionGuardMoc;
+        } else {
+          const mat = holeForm.guard?.material === 'SS304' ? 'SS 304' : (holeForm.guard?.material === 'Alu' ? 'Aluminum' : (holeForm.guard?.material || 'SS 304'));
+          const sides = holeForm.guard?.sides === 'Both side' ? 'Both Sides' : (holeForm.guard?.sides === 'One side' ? 'One Side' : (holeForm.guard?.sides || 'Both Sides'));
+          protMoc = `${mat} (${sides})`;
+        }
+      }
       const blob = await getSalesOrderItemDrawing(salesOrderId, item._id, false, {
         filterType: fType,
         constructionType: fType,
-        protectionGuardMoc: protMoc
+        protectionGuardMoc: protMoc,
+        hasGuard: hasGuard ? 'true' : 'false'
       });
       if (pdfBlobUrl) {
         window.URL.revokeObjectURL(pdfBlobUrl);
@@ -585,7 +628,7 @@ const SalesOrderDrawingWorkspaceModal = ({
     if (activeItem && activeTab === 'preview' && isOpen) {
       loadItemPreview(activeItem);
     }
-  }, [selectedItemId, activeTab]);
+  }, [selectedItemId, activeTab, isOpen]);
 
   // Handle switching active item
   const handleSelectItem = (item) => {
@@ -618,8 +661,14 @@ const SalesOrderDrawingWorkspaceModal = ({
         holeCount: isBox ? 0 : Number(holeForm.holeCount),
         flangeHoleConfig: isZeroHoles ? '' : (holeForm.flangeHoleConfig || `HOLE-${holeForm.holeCount}H`),
         tolerance: holeForm.tolerance || '± 2 mm',
-        protectionGuardMoc: holeForm.protectionGuardMoc || 'NO Protection Grid',
-        guard: holeForm.guard || null,
+        protectionGuardMoc: holeForm.guard?.hasGuard
+          ? (isRealGuardValue(holeForm.protectionGuardMoc) ? holeForm.protectionGuardMoc : 'SS 304 (Both Sides)')
+          : 'NO Protection Grid',
+        guard: holeForm.guard ? {
+          hasGuard: Boolean(holeForm.guard.hasGuard),
+          material: holeForm.guard.material || 'SS304',
+          sides: holeForm.guard.sides || 'Both side'
+        } : null,
         drawingStatus: 'READY_FOR_PREVIEW'
       };
 
@@ -670,11 +719,24 @@ const SalesOrderDrawingWorkspaceModal = ({
     setActionLoading(true);
     try {
       const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
-      const protMoc = holeForm.protectionGuardMoc || activeItem.protectionGuardMoc;
+      const hasGuard = Boolean(holeForm.guard?.hasGuard || isRealGuardValue(holeForm.protectionGuardMoc) || isRealGuardValue(activeItem.protectionGuardMoc));
+      let protMoc = 'NO Protection Grid';
+      if (hasGuard) {
+        if (isRealGuardValue(holeForm.protectionGuardMoc)) {
+          protMoc = holeForm.protectionGuardMoc;
+        } else if (isRealGuardValue(activeItem.protectionGuardMoc)) {
+          protMoc = activeItem.protectionGuardMoc;
+        } else {
+          const mat = holeForm.guard?.material === 'SS304' ? 'SS 304' : (holeForm.guard?.material === 'Alu' ? 'Aluminum' : (holeForm.guard?.material || 'SS 304'));
+          const sides = holeForm.guard?.sides === 'Both side' ? 'Both Sides' : (holeForm.guard?.sides === 'One side' ? 'One Side' : (holeForm.guard?.sides || 'Both Sides'));
+          protMoc = `${mat} (${sides})`;
+        }
+      }
       const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, false, {
         filterType: fType,
         constructionType: fType,
-        protectionGuardMoc: protMoc
+        protectionGuardMoc: protMoc,
+        hasGuard: hasGuard ? 'true' : 'false'
       });
       const url = window.URL.createObjectURL(blob);
       const printWindow = window.open(url, '_blank');
@@ -694,11 +756,24 @@ const SalesOrderDrawingWorkspaceModal = ({
     setActionLoading(true);
     try {
       const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
-      const protMoc = holeForm.protectionGuardMoc || activeItem.protectionGuardMoc;
+      const hasGuard = Boolean(holeForm.guard?.hasGuard || isRealGuardValue(holeForm.protectionGuardMoc) || isRealGuardValue(activeItem.protectionGuardMoc));
+      let protMoc = 'NO Protection Grid';
+      if (hasGuard) {
+        if (isRealGuardValue(holeForm.protectionGuardMoc)) {
+          protMoc = holeForm.protectionGuardMoc;
+        } else if (isRealGuardValue(activeItem.protectionGuardMoc)) {
+          protMoc = activeItem.protectionGuardMoc;
+        } else {
+          const mat = holeForm.guard?.material === 'SS304' ? 'SS 304' : (holeForm.guard?.material === 'Alu' ? 'Aluminum' : (holeForm.guard?.material || 'SS 304'));
+          const sides = holeForm.guard?.sides === 'Both side' ? 'Both Sides' : (holeForm.guard?.sides === 'One side' ? 'One Side' : (holeForm.guard?.sides || 'Both Sides'));
+          protMoc = `${mat} (${sides})`;
+        }
+      }
       const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, true, {
         filterType: fType,
         constructionType: fType,
-        protectionGuardMoc: protMoc
+        protectionGuardMoc: protMoc,
+        hasGuard: hasGuard ? 'true' : 'false'
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

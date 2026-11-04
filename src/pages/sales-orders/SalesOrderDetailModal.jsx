@@ -154,7 +154,18 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
 
   const handleGenerateItemDrawing = async (item) => {
     try {
-      const blob = await getSalesOrderItemDrawing(salesOrderId, item._id);
+      const candidateGuard = (item.guard?.hasGuard || item.guard?.material) ? item.guard : (item.dimensions?.guard || item.guard || {});
+      const hasGuard = Boolean(candidateGuard?.hasGuard || candidateGuard?.enabled || (candidateGuard?.material && candidateGuard.material !== 'NO') || (item.protectionGuardMoc && item.protectionGuardMoc !== 'NO Protection Grid'));
+      const rawMat = candidateGuard?.material || 'SS304';
+      const mat = rawMat === 'SS304' ? 'SS 304' : (rawMat === 'Alu' ? 'Aluminum' : rawMat);
+      const rawSides = candidateGuard?.sides || 'One side';
+      const sides = rawSides.toLowerCase().includes('both') ? 'Both Sides' : 'One Side';
+      const protMoc = hasGuard
+        ? (item.protectionGuardMoc && item.protectionGuardMoc !== 'NO Protection Grid' ? item.protectionGuardMoc : `${mat} (${sides})`)
+        : undefined;
+      const blob = await getSalesOrderItemDrawing(salesOrderId, item._id, false, {
+        ...(protMoc ? { protectionGuardMoc: protMoc } : {})
+      });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch (err) {
@@ -512,7 +523,13 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                             )}
                             {Boolean((it.protectionGuardMoc && it.protectionGuardMoc !== 'NO Protection Grid') || it.guard?.hasGuard || it.dimensions?.guard?.hasGuard) && (
                               <div style={{ fontSize: '11px', color: '#1d4ed8' }} className="font-semibold flex items-center gap-1 mt-0.5">
-                                <span>Guard: {it.protectionGuardMoc || `${it.guard?.material === 'SS304' ? 'SS 304' : (it.guard?.material || 'SS 304')} (${it.guard?.sides || 'One side'})`}</span>
+                                {(() => {
+                                  const g = (it.guard?.hasGuard || it.guard?.material) ? it.guard : (it.dimensions?.guard || it.guard || {});
+                                  const mat = g.material === 'SS304' ? 'SS 304' : (g.material === 'Alu' ? 'Aluminum' : (g.material || 'SS 304'));
+                                  const sides = g.sides ? (g.sides.toLowerCase().includes('both') ? 'Both Sides' : 'One Side') : 'One Side';
+                                  const label = (it.protectionGuardMoc && it.protectionGuardMoc !== 'NO Protection Grid') ? it.protectionGuardMoc : `${mat} (${sides})`;
+                                  return <span>Guard: {label}</span>;
+                                })()}
                               </div>
                             )}
                           </td>
