@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField';
-import { useCreateStoreMutation, useUpdateStoreMutation } from '../../features/stores/storesApi';
+import { useCreateStoreMutation, useUpdateStoreMutation, useGetNextStoreCodeQuery } from '../../features/stores/storesApi';
 import { Package } from 'lucide-react';
 
 const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
   const isEdit = !!store;
   const [createStoreMutation] = useCreateStoreMutation();
   const [updateStoreMutation] = useUpdateStoreMutation();
+
+  const { data: nextCodeData, isLoading: loadingNextCode } = useGetNextStoreCodeQuery(undefined, {
+    skip: isEdit || !isOpen,
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -79,6 +83,10 @@ const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
     }
   };
 
+  const displayCode = isEdit
+    ? (store?.storeCode || formData.storeCode)
+    : (nextCodeData?.nextStoreCode || (loadingNextCode ? 'Generating...' : 'NTF-ST-001'));
+
   return (
     <Modal
       isOpen={isOpen}
@@ -104,14 +112,23 @@ const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
           </div>
         )}
 
-        <FormField label="Store Code" required fullWidth>
+        <FormField
+          label="Store Code"
+          required
+          fullWidth
+          helperText={
+            isEdit
+              ? "Existing permanent Store Code (Read-only)."
+              : "Automatically generated sequential Store Code (Read-only)."
+          }
+        >
           <Input
             name="storeCode"
-            value={formData.storeCode}
-            onChange={handleChange}
-            placeholder="e.g. ST-01"
-            autoFocus
-            disabled={isEdit}
+            value={displayCode}
+            readOnly
+            disabled
+            tabIndex={-1}
+            className="font-mono font-bold bg-slate-100 text-slate-700 cursor-not-allowed select-none"
           />
         </FormField>
         
@@ -121,6 +138,7 @@ const StoreFormModal = ({ store, isOpen, onClose, onSuccess }) => {
             value={formData.storeName}
             onChange={handleChange}
             placeholder="e.g. Central Warehouse"
+            autoFocus={!isEdit}
           />
         </FormField>
 

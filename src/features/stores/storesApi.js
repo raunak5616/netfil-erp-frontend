@@ -27,13 +27,23 @@ export const storesApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'Stores', id }],
     }),
+    getNextStoreCode: builder.query({
+      query: () => ({
+        url: '/stores/next-code',
+        method: 'get',
+      }),
+      providesTags: [{ type: 'Stores', id: 'NEXT_CODE' }],
+    }),
     createStore: builder.mutation({
       query: (data) => ({
         url: '/stores',
         method: 'post',
         data,
       }),
-      invalidatesTags: [{ type: 'Stores', id: 'LIST' }],
+      invalidatesTags: [
+        { type: 'Stores', id: 'LIST' },
+        { type: 'Stores', id: 'NEXT_CODE' },
+      ],
     }),
     updateStore: builder.mutation({
       query: ({ id, ...data }) => ({
@@ -99,6 +109,8 @@ export const {
   useLazyGetStoresQuery,
   useGetStoreByIdQuery,
   useLazyGetStoreByIdQuery,
+  useGetNextStoreCodeQuery,
+  useLazyGetNextStoreCodeQuery,
   useCreateStoreMutation,
   useUpdateStoreMutation,
   useUpdateStoreStatusMutation,

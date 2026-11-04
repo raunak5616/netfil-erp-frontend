@@ -10,6 +10,11 @@ export const getStoreById = async (storeId) => {
   return response.data;
 };
 
+export const getNextStoreCode = async () => {
+  const response = await api.get('/stores/next-code');
+  return response.data;
+};
+
 export const createStore = async (storeData) => {
   const response = await api.post('/stores', storeData);
   return response.data;
