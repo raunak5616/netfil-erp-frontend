@@ -68,9 +68,14 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
     data: soRes,
     isLoading: loading,
     error: soError,
+    refetch: refetchSalesOrder,
   } = useGetSalesOrderByIdQuery(salesOrderId, {
     skip: !isOpen || !salesOrderId,
   });
+
+  const fetchDetails = () => {
+    refetchSalesOrder?.();
+  };
 
   const {
     data: refRes,
