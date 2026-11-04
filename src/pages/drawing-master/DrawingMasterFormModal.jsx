@@ -93,7 +93,7 @@ const DrawingMasterFormModal = ({
     status: 'active'
   });
 
-  const [availableHoleConfigs, setAvailableHoleConfigs] = useState(['12 Holes', '8 Holes', '4 Holes', '2 Holes']);
+  const [availableHoleConfigs, setAvailableHoleConfigs] = useState(['0 Holes', '4 Holes', '8 Holes', '12 Holes']);
   const [customHoleInput, setCustomHoleInput] = useState('');
   const [showAddCustomHole, setShowAddCustomHole] = useState(false);
 
@@ -468,8 +468,8 @@ const DrawingMasterFormModal = ({
     if (formData.drawingType === 'FLANGE') {
       if (formData.holes !== '' && formData.holes !== null && formData.holes !== undefined) {
         const parsedHoles = Number(formData.holes);
-        if (!Number.isInteger(parsedHoles) || parsedHoles <= 0) {
-          setError('Holes must be a valid positive integer.');
+        if (!Number.isInteger(parsedHoles) || parsedHoles < 0) {
+          setError('Holes must be a valid non-negative integer.');
           return false;
         }
       }

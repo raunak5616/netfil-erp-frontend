@@ -510,6 +510,11 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                                 Code: {it.item.itemCode} {it.hsnCode ? `| HSN: ${it.hsnCode}` : ''}
                               </div>
                             )}
+                            {Boolean((it.protectionGuardMoc && it.protectionGuardMoc !== 'NO Protection Grid') || it.guard?.hasGuard || it.dimensions?.guard?.hasGuard) && (
+                              <div style={{ fontSize: '11px', color: '#1d4ed8' }} className="font-semibold flex items-center gap-1 mt-0.5">
+                                <span>Guard: {it.protectionGuardMoc || `${it.guard?.material === 'SS304' ? 'SS 304' : (it.guard?.material || 'SS 304')} (${it.guard?.sides || 'One side'})`}</span>
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--neutral-600)' }}>

@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Info,
   ShieldCheck,
+  Shield,
   Sparkles,
   AlertTriangle,
   X
@@ -104,8 +105,28 @@ const UploadedFlangeDrawingViewer = ({
         )}
       </div>
 
-      {/* Main Drawing Viewport: Three-View horizontal layout or single view */}
-      {hasValidFile ? (
+      {/* Main Drawing Viewport: Solid flange, Three-View horizontal layout, or single view */}
+      {!isBox && Number(holeCount) === 0 ? (
+        <div className="relative w-full h-[320px] bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center p-6 shadow-inner">
+          <div className="relative w-52 h-52 border-4 border-slate-900 bg-slate-100 flex items-center justify-center rounded-sm shadow-md">
+            <div className="w-40 h-40 border-2 border-dashed border-slate-400 bg-white flex flex-col items-center justify-center p-3 text-center">
+              <span className="text-xs font-bold font-mono text-slate-900 tracking-wider uppercase">SOLID FLANGE</span>
+              <span className="text-[11px] text-slate-500 font-mono mt-0.5">(NO HOLES)</span>
+              <span className="text-[11px] text-blue-700 font-mono font-bold mt-2.5 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                {A || 610} × {B || 610} mm
+              </span>
+            </div>
+            <div className="absolute top-1 left-2 text-[8px] font-mono font-bold text-slate-500">SOLID PROFILE</div>
+            <div className="absolute bottom-1 right-2 text-[8px] font-mono text-slate-400">NO DRILLING</div>
+          </div>
+          <div className="mt-3.5 text-center">
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-300 shadow-2xs">
+              <CheckCircle size={13} className="text-emerald-700" /> Solid Flange Configuration Confirmed
+            </span>
+            <p className="text-[11px] text-slate-500 mt-1">Clean solid flange without hole markers. Subtable values (L, M, Ø, X, Y) will be displayed as '-'.</p>
+          </div>
+        </div>
+      ) : hasValidFile ? (
         hasThreeViews ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Front View */}
@@ -258,7 +279,7 @@ const UploadedFlangeDrawingViewer = ({
             {isBox ? 'Filter Type' : 'Hole Pattern'}
           </span>
           <strong className="text-xs font-bold text-purple-900">
-            {isBox ? 'BOX (No Holes)' : `${holeCount || 0} Holes`}
+            {isBox ? 'BOX (No Holes)' : (Number(holeCount) === 0 ? '0 Holes (Solid)' : `${holeCount} Holes`)}
           </strong>
         </div>
         <div className="bg-blue-50 p-2 rounded-lg border border-blue-200">
@@ -266,7 +287,7 @@ const UploadedFlangeDrawingViewer = ({
             {isBox ? 'Mounting Holes' : 'Pitch / Spacing'}
           </span>
           <strong className="text-xs font-bold text-blue-900">
-            {isBox ? 'No Holes (Box Type)' : `L=${L} | M=${M} mm`}
+            {(isBox || Number(holeCount) === 0) ? 'No Holes (Solid)' : `L=${L} | M=${M} mm`}
           </strong>
         </div>
         <div className="bg-white p-2 rounded-lg border border-slate-200">
@@ -274,7 +295,7 @@ const UploadedFlangeDrawingViewer = ({
             {isBox ? 'Hole Diameter' : 'Hole Size (Ø)'}
           </span>
           <strong className="text-xs font-bold text-slate-800">
-            {isBox ? 'N/A' : `Ø${dia} mm ${X && X !== '-' ? `(${X})` : ''}`}
+            {(isBox || Number(holeCount) === 0) ? 'N/A' : `Ø${dia} mm ${X && X !== '-' ? `(${X})` : ''}`}
           </strong>
         </div>
         <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200 col-span-2 sm:col-span-1">
@@ -307,7 +328,9 @@ const SalesOrderDrawingWorkspaceModal = ({
     Y: '-',
     holeCount: 12,
     flangeHoleConfig: 'HOLE-12H',
-    tolerance: '± 2 mm'
+    tolerance: '± 2 mm',
+    protectionGuardMoc: 'NO Protection Grid',
+    guard: { hasGuard: false, material: 'SS304', sides: 'Both side' }
   });
 
   // PDF Preview states
@@ -410,38 +433,40 @@ const SalesOrderDrawingWorkspaceModal = ({
   // Dynamically derive supported hole count numbers from backend Drawing Master Hole Tab
   const availableHoleCounts = useMemo(() => {
     const counts = new Set();
+    // 0 Holes is always supported for Flange filters
+    counts.add(0);
 
     // 1. From supportedHoleCounts returned by getHoleImages backend
     if (holeImagesData?.supportedHoleCounts && Array.isArray(holeImagesData.supportedHoleCounts)) {
       holeImagesData.supportedHoleCounts.forEach(c => {
         const num = Number(c);
-        if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+        if (!isNaN(num) && num >= 0 && num !== 16) counts.add(num);
       });
     }
 
     // 2. From all hole pattern records in drawingMasterHolePatterns
     drawingMasterHolePatterns.forEach(p => {
       const num = Number(p.holes);
-      if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+      if (!isNaN(num) && num >= 0 && num !== 16) counts.add(num);
     });
 
     // 3. From hole configurations options
     if (holeConfigData?.holeConfigurations && Array.isArray(holeConfigData.holeConfigurations)) {
       holeConfigData.holeConfigurations.forEach(c => {
         const num = Number(c.holes);
-        if (!isNaN(num) && num > 0 && num !== 16) counts.add(num);
+        if (!isNaN(num) && num >= 0 && num !== 16) counts.add(num);
       });
     }
 
-    // 4. Fallback baseline (4, 8, 12) if backend returned empty
+    // 4. Fallback baseline (0, 4, 8, 12) if backend returned empty
     if (counts.size === 0) {
-      [4, 8, 12].forEach(c => counts.add(c));
+      [0, 4, 8, 12].forEach(c => counts.add(c));
     }
 
     // 5. Ensure current item's holeCount is included if present (excluding 16)
-    if (holeForm.holeCount) {
+    if (holeForm.holeCount !== undefined && holeForm.holeCount !== null && holeForm.holeCount !== '') {
       const currentNum = Number(holeForm.holeCount);
-      if (!isNaN(currentNum) && currentNum > 0 && currentNum !== 16) counts.add(currentNum);
+      if (!isNaN(currentNum) && currentNum >= 0 && currentNum !== 16) counts.add(currentNum);
     }
 
     counts.delete(16);
@@ -477,28 +502,53 @@ const SalesOrderDrawingWorkspaceModal = ({
   // Populate hole form when active item changes
   const populateHoleForm = (item) => {
     if (!item) return;
-    const filterType = (item.filterType || item.constructionType || (item.holeCount > 0 ? 'FLANGE' : 'FLANGE')).toUpperCase();
+    const filterType = (item.filterType || item.constructionType || 'FLANGE').toUpperCase();
     const isBox = filterType === 'BOX';
     const confirmed = item.confirmedHoleDetails || {};
-    const rawCount = (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount)))
-      ? Number(item.holeCount)
-      : (item.flangeHoleConfig ? parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10) : 12) || 12;
+    
+    let rawCount = 12;
+    if (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount))) {
+      rawCount = Number(item.holeCount);
+    } else if (item.flangeHoleConfig && !isNaN(parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10))) {
+      rawCount = parseInt(String(item.flangeHoleConfig).replace(/\D/g, ''), 10);
+    }
 
     const count = isBox ? 0 : (rawCount === 16 ? 12 : rawCount);
-    const identifier = isBox ? '' : ((item.flangeHoleConfig && !item.flangeHoleConfig.includes('16'))
+    const identifier = (isBox || count === 0) ? '0 Holes' : ((item.flangeHoleConfig && !item.flangeHoleConfig.includes('16'))
       ? item.flangeHoleConfig
       : `HOLE-${count}H`);
 
+    const isZero = isBox || count === 0;
+
+    const guardObj = item.guard || item.dimensions?.guard || {};
+    const hasGuard = Boolean(guardObj.hasGuard ?? guardObj.enabled);
+    let initialProtMoc = item.protectionGuardMoc;
+    if (!initialProtMoc) {
+      if (hasGuard) {
+        const mat = guardObj.material === 'SS304' ? 'SS 304' : (guardObj.material === 'Alu' ? 'Aluminum' : (guardObj.material || 'SS 304'));
+        const sides = guardObj.sides === 'Both side' ? 'Both Sides' : (guardObj.sides === 'One side' ? 'One Side' : (guardObj.sides || 'Both Sides'));
+        initialProtMoc = `${mat} (${sides})`;
+      } else {
+        initialProtMoc = 'NO Protection Grid';
+      }
+    }
+
     setHoleForm({
       filterType: isBox ? 'BOX' : 'FLANGE',
-      L: confirmed.L !== undefined && confirmed.L !== null ? confirmed.L : (isBox ? '-' : 100),
-      M: confirmed.M !== undefined && confirmed.M !== null ? confirmed.M : (isBox ? '-' : 100),
-      dia: confirmed.dia !== undefined && confirmed.dia !== null ? confirmed.dia : (isBox ? '-' : 12),
+      L: confirmed.L !== undefined && confirmed.L !== null && confirmed.L !== '' ? confirmed.L : (isZero ? '-' : 100),
+      M: confirmed.M !== undefined && confirmed.M !== null && confirmed.M !== '' ? confirmed.M : (isZero ? '-' : 100),
+      dia: confirmed.dia !== undefined && confirmed.dia !== null && confirmed.dia !== '' ? confirmed.dia : (isZero ? '-' : 12),
       X: confirmed.X !== undefined && confirmed.X !== null ? confirmed.X : '-',
       Y: confirmed.Y !== undefined && confirmed.Y !== null ? confirmed.Y : '-',
       holeCount: count,
       flangeHoleConfig: identifier,
-      tolerance: item.tolerance || '± 2 mm'
+      tolerance: item.tolerance || '± 2 mm',
+      protectionGuardMoc: initialProtMoc,
+      guard: {
+        hasGuard,
+        material: guardObj.material || 'SS304',
+        sides: guardObj.sides || 'Both side'
+      }
     });
   };
 
@@ -511,9 +561,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     setError('');
     try {
       const fType = item.filterType || item.constructionType || holeForm.filterType || 'FLANGE';
+      const protMoc = holeForm.protectionGuardMoc || item.protectionGuardMoc;
       const blob = await getSalesOrderItemDrawing(salesOrderId, item._id, false, {
         filterType: fType,
-        constructionType: fType
+        constructionType: fType,
+        protectionGuardMoc: protMoc
       });
       if (pdfBlobUrl) {
         window.URL.revokeObjectURL(pdfBlobUrl);
@@ -550,12 +602,13 @@ const SalesOrderDrawingWorkspaceModal = ({
     setSuccessMsg('');
 
     const isBox = holeForm.filterType === 'BOX';
+    const isZeroHoles = isBox || Number(holeForm.holeCount) === 0;
 
     try {
       const payload = {
         filterType: isBox ? 'BOX' : 'FLANGE',
         constructionType: isBox ? 'BOX' : 'FLANGE',
-        confirmedHoleDetails: isBox ? { L: '-', M: '-', dia: '-', X: '-', Y: '-' } : {
+        confirmedHoleDetails: isZeroHoles ? { L: '-', M: '-', dia: '-', X: '-', Y: '-' } : {
           L: Number(holeForm.L),
           M: Number(holeForm.M),
           dia: Number(holeForm.dia),
@@ -563,8 +616,10 @@ const SalesOrderDrawingWorkspaceModal = ({
           Y: holeForm.Y
         },
         holeCount: isBox ? 0 : Number(holeForm.holeCount),
-        flangeHoleConfig: isBox ? '' : holeForm.flangeHoleConfig,
+        flangeHoleConfig: isZeroHoles ? '' : (holeForm.flangeHoleConfig || `HOLE-${holeForm.holeCount}H`),
         tolerance: holeForm.tolerance || '± 2 mm',
+        protectionGuardMoc: holeForm.protectionGuardMoc || 'NO Protection Grid',
+        guard: holeForm.guard || null,
         drawingStatus: 'READY_FOR_PREVIEW'
       };
 
@@ -615,9 +670,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     setActionLoading(true);
     try {
       const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
+      const protMoc = holeForm.protectionGuardMoc || activeItem.protectionGuardMoc;
       const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, false, {
         filterType: fType,
-        constructionType: fType
+        constructionType: fType,
+        protectionGuardMoc: protMoc
       });
       const url = window.URL.createObjectURL(blob);
       const printWindow = window.open(url, '_blank');
@@ -637,9 +694,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     setActionLoading(true);
     try {
       const fType = holeForm.filterType || activeItem.filterType || activeItem.constructionType || 'FLANGE';
+      const protMoc = holeForm.protectionGuardMoc || activeItem.protectionGuardMoc;
       const blob = await getSalesOrderItemDrawing(salesOrderId, activeItem._id, true, {
         filterType: fType,
-        constructionType: fType
+        constructionType: fType,
+        protectionGuardMoc: protMoc
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1120,11 +1179,19 @@ const SalesOrderDrawingWorkspaceModal = ({
                                     <button
                                       key={cnt}
                                       type="button"
-                                      onClick={() => setHoleForm(prev => ({
-                                        ...prev,
-                                        holeCount: cnt,
-                                        flangeHoleConfig: targetCode
-                                      }))}
+                                      onClick={() => {
+                                        const isZero = Number(cnt) === 0;
+                                        setHoleForm(prev => ({
+                                          ...prev,
+                                          holeCount: cnt,
+                                          flangeHoleConfig: isZero ? '0 Holes' : targetCode,
+                                          L: isZero ? '-' : (prev.L === '-' ? 100 : prev.L),
+                                          M: isZero ? '-' : (prev.M === '-' ? 100 : prev.M),
+                                          dia: isZero ? '-' : (prev.dia === '-' ? 12 : prev.dia),
+                                          X: isZero ? '-' : (prev.X === '-' ? '-' : prev.X),
+                                          Y: isZero ? '-' : (prev.Y === '-' ? '-' : prev.Y)
+                                        }));
+                                      }}
                                       className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                         isSelected
                                           ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
@@ -1137,8 +1204,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 })}
                               </div>
 
-                              {/* Pattern Variant selector if multiple variants exist in Drawing Master for this hole count */}
-                              {(() => {
+                              {/* Pattern Variant selector if multiple variants exist in Drawing Master for this hole count (excluding 0 holes) */}
+                              {Number(holeForm.holeCount) > 0 && (() => {
                                 const variantsForCount = drawingMasterHolePatterns.filter(
                                   p => Number(p.holes) === Number(holeForm.holeCount)
                                 );
@@ -1171,82 +1238,95 @@ const SalesOrderDrawingWorkspaceModal = ({
                               })()}
                             </div>
 
-                            {/* L, M, Ø Inputs */}
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  L (Pitch/Offset)
-                                </label>
-                                <input
-                                  type="number"
-                                  required
-                                  value={holeForm.L}
-                                  onChange={(e) => setHoleForm({ ...holeForm, L: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="100"
-                                />
-                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                            {Number(holeForm.holeCount) === 0 ? (
+                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-900 space-y-1">
+                                <div className="font-bold flex items-center gap-1.5 text-purple-800">
+                                  <CheckCircle size={14} className="text-purple-600" /> Solid Flange (0 Holes Selected)
+                                </div>
+                                <p className="text-[11px] text-purple-700">
+                                  This flange filter will be manufactured without holes. Hole pattern subtable coordinates (L, M, Ø, X, Y) will be displayed as <strong>'-'</strong>.
+                                </p>
                               </div>
+                            ) : (
+                              <>
+                                {/* L, M, Ø Inputs */}
+                                <div className="grid grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      L (Pitch/Offset)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      required
+                                      value={holeForm.L}
+                                      onChange={(e) => setHoleForm({ ...holeForm, L: e.target.value })}
+                                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="100"
+                                    />
+                                    <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                                  </div>
 
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  M (Spacing)
-                                </label>
-                                <input
-                                  type="number"
-                                  required
-                                  value={holeForm.M}
-                                  onChange={(e) => setHoleForm({ ...holeForm, M: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="100"
-                                />
-                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
-                              </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      M (Spacing)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      required
+                                      value={holeForm.M}
+                                      onChange={(e) => setHoleForm({ ...holeForm, M: e.target.value })}
+                                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="100"
+                                    />
+                                    <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                                  </div>
 
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  Ø (Hole Dia)
-                                </label>
-                                <input
-                                  type="number"
-                                  required
-                                  value={holeForm.dia}
-                                  onChange={(e) => setHoleForm({ ...holeForm, dia: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="12"
-                                />
-                                <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
-                              </div>
-                            </div>
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Ø (Hole Dia)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      required
+                                      value={holeForm.dia}
+                                      onChange={(e) => setHoleForm({ ...holeForm, dia: e.target.value })}
+                                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="12"
+                                    />
+                                    <span className="text-[10px] text-slate-400 mt-0.5 block">mm</span>
+                                  </div>
+                                </div>
 
-                            {/* X and Y Slot Inputs */}
-                            <div className="grid grid-cols-2 gap-3 pt-1">
-                              <div>
-                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                                  X (Slot Width or -)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={holeForm.X}
-                                  onChange={(e) => setHoleForm({ ...holeForm, X: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="-"
-                                />
-                              </div>
+                                {/* X and Y Slot Inputs */}
+                                <div className="grid grid-cols-2 gap-3 pt-1">
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                      X (Slot Width or -)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={holeForm.X}
+                                      onChange={(e) => setHoleForm({ ...holeForm, X: e.target.value })}
+                                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="-"
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                                  Y (Slot Length or -)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={holeForm.Y}
-                                  onChange={(e) => setHoleForm({ ...holeForm, Y: e.target.value })}
-                                  className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="-"
-                                />
-                              </div>
-                            </div>
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                      Y (Slot Length or -)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={holeForm.Y}
+                                      onChange={(e) => setHoleForm({ ...holeForm, Y: e.target.value })}
+                                      className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="-"
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            )}
 
                             {/* Flange Hole Config Code */}
                             <div>
@@ -1278,6 +1358,128 @@ const SalesOrderDrawingWorkspaceModal = ({
                             placeholder="± 2 mm"
                           />
                           <span className="text-[10px] text-slate-400 mt-0.5 block">Shown on Drawing PDF</span>
+                        </div>
+
+                        {/* Protection Guard (MOC) Configuration */}
+                        <div className="pt-2 border-t border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                              <Shield size={13} className={holeForm.guard?.hasGuard ? "text-blue-600" : "text-slate-400"} />
+                              <span>Protection Guard (MOC)</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-slate-600 select-none">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(holeForm.guard?.hasGuard)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  const currentMat = holeForm.guard?.material || 'SS304';
+                                  const currentSides = holeForm.guard?.sides || 'Both side';
+                                  const newGuard = {
+                                    hasGuard: checked,
+                                    material: currentMat,
+                                    sides: currentSides
+                                  };
+                                  const formattedMoc = checked
+                                    ? `${currentMat === 'SS304' ? 'SS 304' : (currentMat === 'Alu' ? 'Aluminum' : currentMat)} (${currentSides === 'Both side' ? 'Both Sides' : 'One Side'})`
+                                    : 'NO Protection Grid';
+                                  setHoleForm({
+                                    ...holeForm,
+                                    guard: newGuard,
+                                    protectionGuardMoc: formattedMoc
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded text-blue-600 border-slate-300 cursor-pointer"
+                              />
+                              <span className={holeForm.guard?.hasGuard ? "text-blue-700 font-bold" : "text-slate-500"}>
+                                {holeForm.guard?.hasGuard ? "Guard Included" : "No Guard"}
+                              </span>
+                            </label>
+                          </div>
+
+                          {holeForm.guard?.hasGuard ? (
+                            <div className="space-y-2 bg-blue-50/70 p-2.5 rounded-lg border border-blue-200">
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[10px] text-slate-600 block mb-1 font-semibold">Material</span>
+                                  <div className="flex gap-1">
+                                    {[
+                                      { id: 'SS304', label: 'SS 304' },
+                                      { id: 'Alu', label: 'Aluminum' },
+                                      { id: 'GI', label: 'GI' }
+                                    ].map(m => {
+                                      const isSel = (holeForm.guard?.material || 'SS304') === m.id;
+                                      return (
+                                        <button
+                                          key={m.id}
+                                          type="button"
+                                          onClick={() => {
+                                            const newMat = m.id;
+                                            const sides = holeForm.guard?.sides || 'Both side';
+                                            const newGuard = { ...holeForm.guard, material: newMat, hasGuard: true };
+                                            const formattedMoc = `${m.label} (${sides === 'Both side' ? 'Both Sides' : 'One Side'})`;
+                                            setHoleForm({ ...holeForm, guard: newGuard, protectionGuardMoc: formattedMoc });
+                                          }}
+                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${
+                                            isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {m.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <span className="text-[10px] text-slate-600 block mb-1 font-semibold">Placement</span>
+                                  <div className="flex gap-1">
+                                    {[
+                                      { id: 'Both side', label: 'Both Sides' },
+                                      { id: 'One side', label: 'One Side' }
+                                    ].map(s => {
+                                      const isSel = (holeForm.guard?.sides || 'Both side') === s.id;
+                                      return (
+                                        <button
+                                          key={s.id}
+                                          type="button"
+                                          onClick={() => {
+                                            const newSides = s.id;
+                                            const mat = holeForm.guard?.material || 'SS304';
+                                            const matLabel = mat === 'SS304' ? 'SS 304' : (mat === 'Alu' ? 'Aluminum' : mat);
+                                            const newGuard = { ...holeForm.guard, sides: newSides, hasGuard: true };
+                                            const formattedMoc = `${matLabel} (${s.label})`;
+                                            setHoleForm({ ...holeForm, guard: newGuard, protectionGuardMoc: formattedMoc });
+                                          }}
+                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${
+                                            isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {s.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-slate-500 block mb-0.5">Value on Drawing PDF:</label>
+                                <input
+                                  type="text"
+                                  value={holeForm.protectionGuardMoc || ''}
+                                  onChange={(e) => setHoleForm({ ...holeForm, protectionGuardMoc: e.target.value })}
+                                  className="w-full px-2 py-1 text-xs font-semibold border border-blue-300 rounded bg-white text-slate-800"
+                                  placeholder="SS 304 (Both Sides)"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400 italic bg-slate-50 p-2 rounded border border-slate-200 flex items-center justify-between">
+                              <span>NO Protection Grid</span>
+                              <span className="text-[10px] text-slate-400 not-italic">Check box to configure Guard</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Action buttons */}
@@ -1346,8 +1548,15 @@ const SalesOrderDrawingWorkspaceModal = ({
                               || activeItem?.drawingSnapshot?.drawingName 
                               || activeItem?.drawingName 
                               || `${activeItem?.description || 'Box Filter'} - Front View`;
+                          } else if (Number(holeForm.holeCount) === 0) {
+                            // 2. Flange Type with 0 Holes: Solid Flange
+                            matchingHolePattern = null;
+                            currentDrawingUrl = '';
+                            currentDrawingCode = 'HOLE-0H';
+                            currentDrawingName = 'Solid Flange (No Holes)';
+                            frontUrl = '';
                           } else {
-                            // 2. Flange Type Selection:
+                            // 3. Flange Type with Holes:
                             // Continue displaying the existing Holes Drawing.
                             matchingHolePattern = drawingMasterHolePatterns.find(
                               p => p.drawingCode === holeForm.flangeHoleConfig
@@ -1387,24 +1596,26 @@ const SalesOrderDrawingWorkspaceModal = ({
                               || currentDrawingUrl;
                           }
 
+                          const isZeroHoles = isBox || Number(holeForm.holeCount) === 0;
+
                           return (
                             <UploadedFlangeDrawingViewer
                               drawingUrl={currentDrawingUrl}
                               frontViewUrl={frontUrl}
-                              sideViewUrl={isBox ? '' : (matchingHolePattern?.sideViewImage?.url || '')}
-                              pictorialViewUrl={isBox ? '' : (matchingHolePattern?.pictorialViewImage?.url || '')}
+                              sideViewUrl={isZeroHoles ? '' : (matchingHolePattern?.sideViewImage?.url || '')}
+                              pictorialViewUrl={isZeroHoles ? '' : (matchingHolePattern?.pictorialViewImage?.url || '')}
                               drawingCode={currentDrawingCode}
                               drawingName={currentDrawingName}
                               filterType={filterType}
                               isBox={isBox}
-                              holeCount={isBox ? 0 : holeForm.holeCount}
-                              L={isBox ? '-' : holeForm.L}
-                              M={isBox ? '-' : holeForm.M}
-                              dia={isBox ? '-' : holeForm.dia}
+                              holeCount={isBox ? 0 : Number(holeForm.holeCount)}
+                              L={isZeroHoles ? '-' : holeForm.L}
+                              M={isZeroHoles ? '-' : holeForm.M}
+                              dia={isZeroHoles ? '-' : holeForm.dia}
                               A={activeItem.dimensions?.A || 610}
                               B={activeItem.dimensions?.B || 610}
-                              X={isBox ? '-' : holeForm.X}
-                              Y={isBox ? '-' : holeForm.Y}
+                              X={isZeroHoles ? '-' : holeForm.X}
+                              Y={isZeroHoles ? '-' : holeForm.Y}
                               tolerance={holeForm.tolerance || activeItem.tolerance || '± 2 mm'}
                               onInspectFull={(url, code, name) => setInspectDrawingModal({ url, code, name })}
                             />
@@ -1544,7 +1755,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Protection Guard (MOC):</span>
-                          <strong className="text-slate-900 font-semibold">{activeItem?.protectionGuardMoc || 'NO Protection Grid'}</strong>
+                          <strong className="text-slate-900 font-semibold">{holeForm.protectionGuardMoc || activeItem?.protectionGuardMoc || 'NO Protection Grid'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100 bg-emerald-50/50 px-2 rounded">
                           <span className="text-emerald-800 font-medium">Dimensional Tolerance:</span>

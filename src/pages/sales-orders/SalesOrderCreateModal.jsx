@@ -23,7 +23,8 @@ import {
   ChevronUp, 
   SlidersHorizontal,
   Plus,
-  Trash2
+  Trash2,
+  Shield
 } from 'lucide-react';
 import QuotationChangesModal from './components/QuotationChangesModal';
 import { compareQuotationWithSalesOrder } from '../../utils/quotationComparator';
@@ -238,6 +239,52 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
     });
   };
 
+  const handleGuardToggle = (index, hasGuard) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const item = { ...next[index] };
+      const currentGuard = item.guard || item.dimensions?.guard || {};
+      const newGuard = {
+        hasGuard: Boolean(hasGuard),
+        material: currentGuard.material || 'SS304',
+        sides: currentGuard.sides || 'One side'
+      };
+      const formattedMoc = hasGuard
+        ? `${newGuard.material === 'SS304' ? 'SS 304' : (newGuard.material === 'Alu' ? 'Aluminum' : newGuard.material)} (${newGuard.sides === 'Both side' ? 'Both Sides' : 'One Side'})`
+        : 'NO Protection Grid';
+      item.guard = newGuard;
+      item.protectionGuardMoc = formattedMoc;
+      item.dimensions = {
+        ...(item.dimensions || {}),
+        guard: newGuard
+      };
+      next[index] = item;
+      return next;
+    });
+  };
+
+  const handleGuardChange = (index, field, value) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const item = { ...next[index] };
+      const currentGuard = item.guard || item.dimensions?.guard || { hasGuard: true, material: 'SS304', sides: 'One side' };
+      const newGuard = {
+        ...currentGuard,
+        hasGuard: true,
+        [field]: value
+      };
+      const formattedMoc = `${newGuard.material === 'SS304' ? 'SS 304' : (newGuard.material === 'Alu' ? 'Aluminum' : newGuard.material)} (${newGuard.sides === 'Both side' ? 'Both Sides' : 'One Side'})`;
+      item.guard = newGuard;
+      item.protectionGuardMoc = formattedMoc;
+      item.dimensions = {
+        ...(item.dimensions || {}),
+        guard: newGuard
+      };
+      next[index] = item;
+      return next;
+    });
+  };
+
   // Item removal from Sales Order
   const handleRemoveItem = (index) => {
     if (lineItems.length <= 1) {
@@ -345,7 +392,12 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
         drawingSnapshot: it.drawingSnapshot || null,
         filterGrade: it.filterGrade?._id || it.filterGrade || it.item?.filterGrade?._id || it.item?.filterGrade || null,
         filterGradeName: it.filterGradeName || it.filterGrade?.filterGrade || it.item?.filterGrade?.filterGrade || it.item?.drawingSnapshot?.filterGradeName || it.drawingSnapshot?.filterGradeName || '',
-        dimensions: it.dimensions || {},
+        dimensions: {
+          ...(it.dimensions || {}),
+          guard: it.guard || it.dimensions?.guard || null
+        },
+        guard: it.guard || it.dimensions?.guard || null,
+        protectionGuardMoc: it.protectionGuardMoc || (it.guard?.hasGuard ? `${it.guard.material === 'SS304' ? 'SS 304' : (it.guard.material || 'SS 304')} (${it.guard.sides === 'Both side' ? 'Both Sides' : (it.guard.sides || 'One side')})` : null),
         specifications: it.specifications || [],
         remarks: it.remarks || '',
         hsnCode: it.hsnCode || '',
@@ -931,6 +983,96 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
                                           placeholder="Polyurethane"
                                         />
                                       </div>
+                                    </div>
+
+                                    {/* Protection Guard Option */}
+                                    <div className={`mt-3 p-3 rounded-lg border transition-all ${
+                                      item.guard?.hasGuard 
+                                        ? 'bg-blue-50/70 border-blue-200 shadow-2xs' 
+                                        : 'bg-slate-50/60 border-slate-200/80 hover:border-slate-300'
+                                    }`}>
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(item.guard?.hasGuard)}
+                                            onChange={(e) => handleGuardToggle(idx, e.target.checked)}
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                                          />
+                                          <div className="flex items-center gap-1.5">
+                                            <Shield size={14} className={item.guard?.hasGuard ? 'text-blue-600' : 'text-slate-400'} />
+                                            <span className="text-xs font-bold text-slate-800">
+                                              Protection Guard (Add-on Option)
+                                            </span>
+                                          </div>
+                                        </label>
+
+                                        {item.guard?.hasGuard ? (
+                                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-900 border border-blue-200">
+                                            <span>Guard: <strong className="font-bold">{item.guard.material === 'SS304' ? 'SS 304' : (item.guard.material || 'SS 304')}</strong> • {item.guard.sides || 'One side'}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[11px] text-slate-400 font-medium italic">
+                                            Click checkbox to add Guard (SS 304 / Alu, One side / Both side)
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {item.guard?.hasGuard && (
+                                        <div className="mt-2.5 pt-2.5 border-t border-blue-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-[10px] font-bold text-slate-700">1. Guard Material</span>
+                                              <span className="text-[10px] text-slate-400">Selected: <strong className="text-blue-700">{item.guard.material === 'SS304' ? 'SS 304' : (item.guard.material || 'SS 304')}</strong></span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {['SS304', 'Alu'].map((mat) => {
+                                                const isSelected = (item.guard.material || 'SS304') === mat;
+                                                return (
+                                                  <button
+                                                    key={mat}
+                                                    type="button"
+                                                    onClick={() => handleGuardChange(idx, 'material', mat)}
+                                                    className={`py-1 px-2.5 rounded text-xs font-semibold border transition-all ${
+                                                      isSelected
+                                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                                    }`}
+                                                  >
+                                                    {mat === 'SS304' ? 'SS 304' : 'Alu (Aluminum)'}
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+
+                                          <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-[10px] font-bold text-slate-700">2. Guard Placement</span>
+                                              <span className="text-[10px] text-slate-400">Selected: <strong className="text-blue-700">{item.guard.sides || 'One side'}</strong></span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {['One side', 'Both side'].map((side) => {
+                                                const isSelected = (item.guard.sides || 'One side') === side;
+                                                return (
+                                                  <button
+                                                    key={side}
+                                                    type="button"
+                                                    onClick={() => handleGuardChange(idx, 'sides', side)}
+                                                    className={`py-1 px-2.5 rounded text-xs font-semibold border transition-all ${
+                                                      isSelected
+                                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                                    }`}
+                                                  >
+                                                    {side}
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </td>
