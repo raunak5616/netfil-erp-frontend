@@ -10,6 +10,11 @@ export const getItemById = async (itemId) => {
   return response.data;
 };
 
+export const getNextItemCode = async (filterType = '') => {
+  const response = await api.get('/items/next-code', { params: { filterType } });
+  return response.data;
+};
+
 export const createItem = async (itemData) => {
   const response = await api.post('/items', itemData);
   return response.data;

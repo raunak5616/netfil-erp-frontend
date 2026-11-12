@@ -28,13 +28,21 @@ export const productsApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'Products', id }],
     }),
+    getNextItemCode: builder.query({
+      query: (params = {}) => ({
+        url: '/items/next-code',
+        method: 'get',
+        params,
+      }),
+      providesTags: ['ItemNextCode'],
+    }),
     createItem: builder.mutation({
       query: (itemData) => ({
         url: '/items',
         method: 'post',
         data: itemData,
       }),
-      invalidatesTags: [{ type: 'Products', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Products', id: 'LIST' }, 'ItemNextCode'],
     }),
     updateItem: builder.mutation({
       query: ({ id, ...itemData }) => ({
@@ -128,6 +136,7 @@ export const productsApi = apiSlice.injectEndpoints({
 export const {
   useGetItemsQuery,
   useGetItemByIdQuery,
+  useGetNextItemCodeQuery,
   useCreateItemMutation,
   useUpdateItemMutation,
   useUpdateItemStatusMutation,
