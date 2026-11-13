@@ -92,7 +92,9 @@ const SalesOrderCreateModal = ({ isOpen, onClose, onSuccess }) => {
     const uniqueMap = new Map();
     list.forEach((q) => {
       if (!q || !q._id) return;
-      if (q.salesOrder) return;
+      if (typeof q.salesOrder === 'object' && q.salesOrder && q.salesOrder.status && q.salesOrder.status !== 'cancelled') {
+        return;
+      }
       const statusLower = (q.status || '').toLowerCase();
       if (['won', 'converted', 'lost', 'cancelled'].includes(statusLower)) return;
       uniqueMap.set(q._id, q);

@@ -252,9 +252,17 @@ const DrawingSelector = ({
                     <FileText size={18} className="text-red-500" />
                   ) : (
                     <img
-                      src={currentDrawing.fileUrl}
+                      src={currentDrawing.fileUrl || currentDrawing.frontViewImage?.url}
                       alt={currentDrawing.drawingName}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        if (currentDrawing.frontViewImage?.url && e.currentTarget.src !== currentDrawing.frontViewImage.url) {
+                          e.currentTarget.src = currentDrawing.frontViewImage.url;
+                        } else {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement.innerHTML = '<span class="text-slate-400 text-xs font-mono">CAD</span>';
+                        }
+                      }}
                     />
                   )}
                 </div>

@@ -378,6 +378,12 @@ const QuotationDetailModal = ({
   const items = detailData?.items || [];
   const terms = detailData?.terms || [];
   const references = refData?.references || null;
+
+  const isLinkedSOCancelled = !quotation?.salesOrder || (typeof quotation?.salesOrder === 'object' && quotation?.salesOrder?.status === 'cancelled');
+  const isQuotationAmendable = quotation && (
+    !['won', 'converted', 'cancelled', 'lost'].includes(quotation.status) ||
+    (['won', 'converted'].includes(quotation.status) && isLinkedSOCancelled)
+  );
   const rawAmendments = detailData?.amendments || [];
   const error = actionError || (detailError ? (detailError?.data?.message || 'Failed to load quotation details') : '');
 
@@ -640,7 +646,7 @@ const QuotationDetailModal = ({
                   </Button>
                 )}
 
-                {quotation && !['won', 'converted', 'cancelled', 'lost'].includes(quotation.status) && canAmend && (
+                {isQuotationAmendable && canAmend && (
                   <Button
                     variant="outline"
                     onClick={() => setIsAmendModalOpen(true)}
@@ -1223,7 +1229,7 @@ const QuotationDetailModal = ({
                 </span>
               </div>
 
-              {!['won', 'converted', 'cancelled', 'lost'].includes(quotation.status) && canAmend && (
+              {isQuotationAmendable && canAmend && (
                 <Button
                   size="sm"
                   variant="outline"

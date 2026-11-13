@@ -359,6 +359,7 @@ const SalesOrderDrawingWorkspaceModal = ({
     data: configData,
     isLoading: loading,
     error: configError,
+    refetch: refetchWorkspaceConfig,
   } = useGetSalesOrderDrawingsConfigQuery(salesOrderId, {
     skip: !isOpen || !salesOrderId,
   });
@@ -366,12 +367,14 @@ const SalesOrderDrawingWorkspaceModal = ({
   const {
     data: holeImagesData,
     isLoading: loadingHoleImages,
+    refetch: refetchHoleImages,
   } = useGetHoleImagesQuery(undefined, {
     skip: !isOpen,
   });
 
   const {
     data: holeConfigData,
+    refetch: refetchHoleConfigs,
   } = useGetHoleConfigurationsQuery(undefined, {
     skip: !isOpen,
   });
@@ -620,6 +623,22 @@ const SalesOrderDrawingWorkspaceModal = ({
       setError(err.response?.data?.message || 'Failed to generate drawing preview for this item');
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  // Refresh entire workspace configuration and current item preview
+  const loadWorkspaceConfig = async () => {
+    try {
+      await Promise.allSettled([
+        refetchWorkspaceConfig ? refetchWorkspaceConfig() : Promise.resolve(),
+        refetchHoleImages ? refetchHoleImages() : Promise.resolve(),
+        refetchHoleConfigs ? refetchHoleConfigs() : Promise.resolve(),
+      ]);
+      if (activeItem) {
+        await loadItemPreview(activeItem);
+      }
+    } catch (err) {
+      console.error('Error refreshing workspace config:', err);
     }
   };
 
@@ -918,7 +937,7 @@ const SalesOrderDrawingWorkspaceModal = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => loadWorkspaceConfig()}
+              onClick={loadWorkspaceConfig}
               disabled={loading}
               title="Refresh drawings configuration"
               className="h-[34px] px-2 text-slate-500"

@@ -524,6 +524,9 @@ const RequirementDetailModal = ({
                                   src={reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage}
                                   alt="Reference Design Preview"
                                   style={{ maxHeight: '140px', objectFit: 'contain' }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
                                 />
                               </div>
                             )}
