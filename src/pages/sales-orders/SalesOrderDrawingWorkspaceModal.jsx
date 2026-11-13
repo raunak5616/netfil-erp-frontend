@@ -21,6 +21,7 @@ import {
   Download,
   Eye,
   Settings,
+  CheckCircle,
   CheckCircle2,
   AlertCircle,
   FileText,
