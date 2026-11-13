@@ -109,8 +109,8 @@ const UploadedFlangeDrawingViewer = ({
           </span>
           {drawingCode && (
             <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${isBox
-                ? 'text-purple-800 bg-purple-100/80 border-purple-200'
-                : 'text-blue-800 bg-blue-100/80 border-blue-200'
+              ? 'text-purple-800 bg-purple-100/80 border-purple-200'
+              : 'text-blue-800 bg-blue-100/80 border-blue-200'
               }`}>
               {drawingCode}
             </span>
@@ -612,8 +612,8 @@ const SalesOrderDrawingWorkspaceModal = ({
 
   const activeItem = (configData?.items && configData.items.length > 0)
     ? (configData.items.find(it => String(it._id) === String(selectedItemId))
-       || (initialItemId ? configData.items.find(it => String(it._id) === String(initialItemId)) : null)
-       || configData.items[0])
+      || (initialItemId ? configData.items.find(it => String(it._id) === String(initialItemId)) : null)
+      || configData.items[0])
     : null;
 
   // Load preview PDF for active item
@@ -1019,8 +1019,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                       key={it._id}
                       onClick={() => handleSelectItem(it)}
                       className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${isSelected
-                          ? 'bg-white border-blue-600 shadow-md ring-1 ring-blue-600/20'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 shadow-sm'
+                        ? 'bg-white border-blue-600 shadow-md ring-1 ring-blue-600/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 shadow-sm'
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -1114,8 +1114,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                   type="button"
                   onClick={() => setActiveTab('preview')}
                   className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'preview'
-                      ? 'border-blue-700 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-blue-700 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                 >
                   <Eye size={14} /> Drawing Sheet Preview (A4 Vector)
@@ -1124,8 +1124,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                   type="button"
                   onClick={() => setActiveTab('holes')}
                   className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'holes'
-                      ? 'border-blue-700 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-blue-700 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                 >
                   <Settings size={14} /> {holeForm.filterType === 'BOX' ? 'Filter Box Details & Drawing' : 'Filter Flange with Hole / Slot Details'}
@@ -1134,8 +1134,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                   type="button"
                   onClick={() => setActiveTab('templates')}
                   className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'templates'
-                      ? 'border-blue-700 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-blue-700 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                 >
                   <FileText size={14} /> Template & Specifications
@@ -1188,8 +1188,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                 {activeTab === 'holes' && (
                   <div className="max-w-4xl mx-auto space-y-6">
                     <div className={`border rounded-xl p-4 flex items-start gap-3 text-xs transition-colors ${holeForm.filterType === 'BOX'
-                        ? 'bg-purple-50 border-purple-200 text-purple-900'
-                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                      ? 'bg-purple-50 border-purple-200 text-purple-900'
+                      : 'bg-blue-50 border-blue-200 text-blue-900'
                       }`}>
                       <Info size={18} className={`shrink-0 mt-0.5 ${holeForm.filterType === 'BOX' ? 'text-purple-600' : 'text-blue-600'}`} />
                       <div>
@@ -1235,8 +1235,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 Y: '-'
                               }))}
                               className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${holeForm.filterType === 'BOX'
-                                  ? 'bg-purple-700 text-white border-purple-700 shadow-sm ring-2 ring-purple-300'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                ? 'bg-purple-700 text-white border-purple-700 shadow-sm ring-2 ring-purple-300'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                                 }`}
                             >
                               <Box size={14} /> Box Type (No Holes)
@@ -1253,8 +1253,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 dia: prev.dia && prev.dia !== '-' ? prev.dia : 12
                               }))}
                               className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${holeForm.filterType === 'FLANGE'
-                                  ? 'bg-blue-700 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                ? 'bg-blue-700 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                                 }`}
                             >
                               <Layers size={14} /> Flange Type
@@ -1309,8 +1309,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                         }));
                                       }}
                                       className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${isSelected
-                                          ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
-                                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                        ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                                         }`}
                                     >
                                       {cnt} Holes
@@ -1612,8 +1612,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                             size="sm"
                             disabled={savingHoles}
                             className={`text-xs font-bold px-4 ${holeForm.filterType === 'BOX'
-                                ? 'bg-purple-700 hover:bg-purple-800'
-                                : 'bg-blue-700 hover:bg-blue-800'
+                              ? 'bg-purple-700 hover:bg-purple-800'
+                              : 'bg-blue-700 hover:bg-blue-800'
                               }`}
                           >
                             <CheckCircle2 size={14} className="mr-1.5" />
@@ -1795,8 +1795,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 key={tpl._id}
                                 onClick={() => handleSelectTemplate(tpl._id)}
                                 className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${isCurrent
-                                    ? 'bg-blue-50/60 border-blue-600 ring-1 ring-blue-600/30'
-                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                                  ? 'bg-blue-50/60 border-blue-600 ring-1 ring-blue-600/30'
+                                  : 'bg-white border-slate-200 hover:border-slate-300'
                                   }`}
                               >
                                 <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
@@ -1873,8 +1873,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                           <strong className="text-slate-900 font-semibold">{activeItem?.noOfFolds || '72 - 76 Folds'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
-                          <span className="text-slate-500 font-medium">Max Operating Temperature:</span>
-                          <strong className="text-slate-900 font-semibold">{activeItem?.maxOperatingTemperature || 'Up To 120 ° C'}</strong>
+                          <span className="text-slate-500 font-medium">Optimized Temperature:</span>
+                          <strong className="text-slate-900 font-semibold">{activeItem?.maxOperatingTemperature ? String(activeItem.maxOperatingTemperature).replace(/^Up\s*To\s*/i, '').trim() : '120 ° C'}</strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Material of Casing:</span>
