@@ -100,11 +100,10 @@ const UploadedFlangeDrawingViewer = ({
             {hasThreeViews ? 'Three-View Filter Drawings' : (isBox ? 'Filter Front View Drawing (Box Type)' : 'Uploaded Technical Drawing')}
           </span>
           {drawingCode && (
-            <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${
-              isBox 
-                ? 'text-purple-800 bg-purple-100/80 border-purple-200' 
+            <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${isBox
+                ? 'text-purple-800 bg-purple-100/80 border-purple-200'
                 : 'text-blue-800 bg-blue-100/80 border-blue-200'
-            }`}>
+              }`}>
               {drawingCode}
             </span>
           )}
@@ -521,7 +520,7 @@ const SalesOrderDrawingWorkspaceModal = ({
     const filterType = (item.filterType || item.constructionType || 'FLANGE').toUpperCase();
     const isBox = filterType === 'BOX';
     const confirmed = item.confirmedHoleDetails || {};
-    
+
     let rawCount = 12;
     if (item.holeCount !== null && item.holeCount !== undefined && !isNaN(Number(item.holeCount))) {
       rawCount = Number(item.holeCount);
@@ -541,8 +540,8 @@ const SalesOrderDrawingWorkspaceModal = ({
       item.dimensions?.guard
     ].filter(Boolean);
     const positiveGuard = candidateGuards.find(g => g && (
-      g.hasGuard === true || 
-      g.enabled === true || 
+      g.hasGuard === true ||
+      g.enabled === true ||
       (g.material && String(g.material).trim().toUpperCase() !== 'NO' && String(g.material).trim().toUpperCase() !== 'NONE')
     ));
     const guardObj = positiveGuard || item.guard || item.dimensions?.guard || {};
@@ -970,11 +969,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                     <div
                       key={it._id}
                       onClick={() => handleSelectItem(it)}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                        isSelected
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${isSelected
                           ? 'bg-white border-blue-600 shadow-md ring-1 ring-blue-600/20'
                           : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 shadow-sm'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
@@ -1066,33 +1064,30 @@ const SalesOrderDrawingWorkspaceModal = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('preview')}
-                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${
-                    activeTab === 'preview'
+                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'preview'
                       ? 'border-blue-700 text-blue-700'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <Eye size={14} /> Drawing Sheet Preview (A4 Vector)
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('holes')}
-                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${
-                    activeTab === 'holes'
+                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'holes'
                       ? 'border-blue-700 text-blue-700'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <Settings size={14} /> {holeForm.filterType === 'BOX' ? 'Filter Box Details & Drawing' : 'Filter Flange with Hole / Slot Details'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('templates')}
-                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${
-                    activeTab === 'templates'
+                  className={`py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-all ${activeTab === 'templates'
                       ? 'border-blue-700 text-blue-700'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <FileText size={14} /> Template & Specifications
                 </button>
@@ -1143,11 +1138,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                 {/* TAB 2: FILTER FLANGE / BOX WITH HOLE / SLOT DETAILS */}
                 {activeTab === 'holes' && (
                   <div className="max-w-4xl mx-auto space-y-6">
-                    <div className={`border rounded-xl p-4 flex items-start gap-3 text-xs transition-colors ${
-                      holeForm.filterType === 'BOX'
+                    <div className={`border rounded-xl p-4 flex items-start gap-3 text-xs transition-colors ${holeForm.filterType === 'BOX'
                         ? 'bg-purple-50 border-purple-200 text-purple-900'
                         : 'bg-blue-50 border-blue-200 text-blue-900'
-                    }`}>
+                      }`}>
                       <Info size={18} className={`shrink-0 mt-0.5 ${holeForm.filterType === 'BOX' ? 'text-purple-600' : 'text-blue-600'}`} />
                       <div>
                         <strong className="block font-bold mb-0.5">
@@ -1191,11 +1185,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 X: '-',
                                 Y: '-'
                               }))}
-                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                holeForm.filterType === 'BOX'
+                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${holeForm.filterType === 'BOX'
                                   ? 'bg-purple-700 text-white border-purple-700 shadow-sm ring-2 ring-purple-300'
                                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                              }`}
+                                }`}
                             >
                               <Box size={14} /> Box Type (No Holes)
                             </button>
@@ -1210,11 +1203,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                                 M: prev.M && prev.M !== '-' ? prev.M : 100,
                                 dia: prev.dia && prev.dia !== '-' ? prev.dia : 12
                               }))}
-                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                holeForm.filterType === 'FLANGE'
+                              className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${holeForm.filterType === 'FLANGE'
                                   ? 'bg-blue-700 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
                                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                              }`}
+                                }`}
                             >
                               <Layers size={14} /> Flange Type
                             </button>
@@ -1267,11 +1259,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                                           Y: isZero ? '-' : (prev.Y === '-' ? '-' : prev.Y)
                                         }));
                                       }}
-                                      className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                                        isSelected
+                                      className={`py-1.5 px-3.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${isSelected
                                           ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
                                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                                      }`}
+                                        }`}
                                     >
                                       {cnt} Holes
                                     </button>
@@ -1495,9 +1486,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                             const formattedMoc = `${m.label} (${sides === 'Both side' ? 'Both Sides' : 'One Side'})`;
                                             setHoleForm({ ...holeForm, guard: newGuard, protectionGuardMoc: formattedMoc });
                                           }}
-                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${
-                                            isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                                          }`}
+                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
                                         >
                                           {m.label}
                                         </button>
@@ -1526,9 +1516,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                                             const formattedMoc = `${matLabel} (${s.label})`;
                                             setHoleForm({ ...holeForm, guard: newGuard, protectionGuardMoc: formattedMoc });
                                           }}
-                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${
-                                            isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                                          }`}
+                                          className={`flex-1 py-1 px-1 rounded text-[11px] font-semibold border transition-all ${isSel ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
                                         >
                                           {s.label}
                                         </button>
@@ -1573,11 +1562,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                             variant="primary"
                             size="sm"
                             disabled={savingHoles}
-                            className={`text-xs font-bold px-4 ${
-                              holeForm.filterType === 'BOX'
+                            className={`text-xs font-bold px-4 ${holeForm.filterType === 'BOX'
                                 ? 'bg-purple-700 hover:bg-purple-800'
                                 : 'bg-blue-700 hover:bg-blue-800'
-                            }`}
+                              }`}
                           >
                             <CheckCircle2 size={14} className="mr-1.5" />
                             {savingHoles ? 'Saving...' : 'Save & Confirm Details'}
@@ -1601,12 +1589,12 @@ const SalesOrderDrawingWorkspaceModal = ({
                             // 1. Box Type Selection:
                             // Box type has no flange holes. Do not display a Holes Drawing.
                             // Instead, display the Filter's existing Front View image in the same drawing area.
-                            frontUrl = activeItem?.frontViewImage?.url 
-                              || activeItem?.selectedDrawing?.frontViewImage?.url 
-                              || activeItem?.selectedDrawing?.fileUrl 
-                              || activeItem?.drawingSnapshot?.frontViewImage?.url 
-                              || activeItem?.drawingSnapshot?.fileUrl 
-                              || activeItem?.drawingFileUrl 
+                            frontUrl = activeItem?.frontViewImage?.url
+                              || activeItem?.selectedDrawing?.frontViewImage?.url
+                              || activeItem?.selectedDrawing?.fileUrl
+                              || activeItem?.drawingSnapshot?.frontViewImage?.url
+                              || activeItem?.drawingSnapshot?.fileUrl
+                              || activeItem?.drawingFileUrl
                               || '';
 
                             currentDrawingUrl = getVersionedImageUrl(
@@ -1614,14 +1602,14 @@ const SalesOrderDrawingWorkspaceModal = ({
                               activeItem?.selectedDrawing?.updatedAt || activeItem?.updatedAt
                             );
 
-                            currentDrawingCode = activeItem?.selectedDrawing?.drawingCode 
-                              || activeItem?.drawingSnapshot?.drawingCode 
-                              || activeItem?.drawingCode 
+                            currentDrawingCode = activeItem?.selectedDrawing?.drawingCode
+                              || activeItem?.drawingSnapshot?.drawingCode
+                              || activeItem?.drawingCode
                               || 'BOX-FILTER';
 
-                            currentDrawingName = activeItem?.selectedDrawing?.drawingName 
-                              || activeItem?.drawingSnapshot?.drawingName 
-                              || activeItem?.drawingName 
+                            currentDrawingName = activeItem?.selectedDrawing?.drawingName
+                              || activeItem?.drawingSnapshot?.drawingName
+                              || activeItem?.drawingName
                               || `${activeItem?.description || 'Box Filter'} - Front View`;
                           } else if (Number(holeForm.holeCount) === 0) {
                             // 2. Flange Type with 0 Holes: Solid Flange
@@ -1641,12 +1629,12 @@ const SalesOrderDrawingWorkspaceModal = ({
                               p => p.drawingCode === holeForm.flangeHoleConfig || Number(p.holes) === Number(holeForm.holeCount)
                             ) || activeItem?.holePattern;
 
-                            const rawDrawingUrl = matchingHolePattern?.fileUrl 
-                              || matchingHolePattern?.holeImageUrl 
+                            const rawDrawingUrl = matchingHolePattern?.fileUrl
+                              || matchingHolePattern?.holeImageUrl
                               || activeItem?.drawingFileUrl
-                              || activeItem?.selectedDrawing?.fileUrl 
+                              || activeItem?.selectedDrawing?.fileUrl
                               || activeItem?.selectedDrawing?.holeImageUrl
-                              || activeItem?.drawingSnapshot?.fileUrl 
+                              || activeItem?.drawingSnapshot?.fileUrl
                               || '';
 
                             currentDrawingUrl = getVersionedImageUrl(
@@ -1654,20 +1642,20 @@ const SalesOrderDrawingWorkspaceModal = ({
                               matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt
                             );
 
-                            currentDrawingCode = matchingHolePattern?.drawingCode 
-                              || activeItem?.drawingCode 
-                              || activeItem?.selectedDrawing?.drawingCode 
-                              || activeItem?.drawingSnapshot?.drawingCode 
-                              || holeForm.flangeHoleConfig 
+                            currentDrawingCode = matchingHolePattern?.drawingCode
+                              || activeItem?.drawingCode
+                              || activeItem?.selectedDrawing?.drawingCode
+                              || activeItem?.drawingSnapshot?.drawingCode
+                              || holeForm.flangeHoleConfig
                               || 'DRAWING';
 
-                            currentDrawingName = matchingHolePattern?.drawingName 
-                              || activeItem?.drawingName 
-                              || activeItem?.selectedDrawing?.drawingName 
-                              || activeItem?.drawingSnapshot?.drawingName 
+                            currentDrawingName = matchingHolePattern?.drawingName
+                              || activeItem?.drawingName
+                              || activeItem?.selectedDrawing?.drawingName
+                              || activeItem?.drawingSnapshot?.drawingName
                               || 'Filter Flange Technical Drawing';
 
-                            frontUrl = matchingHolePattern?.frontViewImage?.url 
+                            frontUrl = matchingHolePattern?.frontViewImage?.url
                               || currentDrawingUrl;
                           }
 
@@ -1729,11 +1717,10 @@ const SalesOrderDrawingWorkspaceModal = ({
                               <div
                                 key={tpl._id}
                                 onClick={() => handleSelectTemplate(tpl._id)}
-                                className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                                  isCurrent
+                                className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${isCurrent
                                     ? 'bg-blue-50/60 border-blue-600 ring-1 ring-blue-600/30'
                                     : 'bg-white border-slate-200 hover:border-slate-300'
-                                }`}
+                                  }`}
                               >
                                 <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
                                   {tpl.fileUrl ? (
