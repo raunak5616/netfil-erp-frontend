@@ -74,7 +74,7 @@ const STANDARD_MOC_OPTIONS = [
 const BONDING_OPTIONS = [
   { value: 'PU Bonding', label: 'PU Bonding (50–150 °C)', minTemp: 50, maxTemp: 150 },
   { value: 'Epoxy Bonding', label: 'Epoxy Bonding (200–350 °C)', minTemp: 200, maxTemp: 350 },
-  { value: 'White Adhesive (Ceramic)', label: 'White Adhesive (Ceramic) (230–400 °C)', minTemp: 230, maxTemp: 400 }
+  { value: 'White Adhesive (Ceramic)', label: 'Silicon based Ceramic (230–400 °C)', minTemp: 230, maxTemp: 400 }
 ];
 
 const ItemFormModal = ({
@@ -1499,7 +1499,7 @@ const ItemFormModal = ({
               <FormField label="Bonding Adhesive" helperText="Adhesive bonding between media and frame.">
                 <Select
                   name="bonding"
-                  value={formData.bonding}
+                  value={(formData.bonding === 'Silicon based Ceramic' || formData.bonding === 'White Adhesive') ? 'White Adhesive (Ceramic)' : (formData.bonding || '')}
                   onChange={handleChange}
                   disabled={submitting}
                 >

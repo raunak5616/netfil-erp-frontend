@@ -23,6 +23,14 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
   if (!isOpen || !item) return null;
 
+  const formatBondingDisplay = (val) => {
+    if (!val) return '—';
+    if (val === 'White Adhesive (Ceramic)' || val === 'White Adhesive') {
+      return 'Silicon based Ceramic';
+    }
+    return val;
+  };
+
   const isFilterItem = item.productType === 'FILTER' || !!item.constructionType || !!item.filterLength || !!item.filterGrade;
   const isFlangeItem = (item.constructionType || '').toUpperCase() === 'FLANGE';
   const itemOverallL = item.overallLength ?? (item.filterLength ? (isFlangeItem ? Number(item.filterLength) + 60 : Number(item.filterLength)) : null);
@@ -42,7 +50,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
     item.constructionType ? { label: 'Construction', value: item.constructionType } : null,
     item.flangeType ? { label: 'Flange Profile', value: item.flangeType?.designName || item.flangeType?.designCode } : null,
     item.moc ? { label: 'MOC', value: item.moc } : null,
-    item.bonding ? { label: 'Bonding Adhesive', value: item.bonding } : null,
+    item.bonding ? { label: 'Bonding Adhesive', value: formatBondingDisplay(item.bonding) } : null,
     (item.temperatureRating !== null && item.temperatureRating !== undefined) ? { label: 'Rated Operating Temp', value: `${item.temperatureRating} °C` } : null,
     item.filterGrade?.filterGrade ? { label: 'Filter Grade', value: item.filterGrade.filterGrade } : null
   ].filter(Boolean) : [];
@@ -446,7 +454,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   {item.bonding && (
                     <div className="bg-slate-50 p-2 rounded border border-slate-200">
                       <span className="text-[10px] uppercase font-semibold text-slate-500">Bonding Adhesive</span>
-                      <div className="font-bold text-slate-800 mt-0.5">{item.bonding}</div>
+                      <div className="font-bold text-slate-800 mt-0.5">{formatBondingDisplay(item.bonding)}</div>
                     </div>
                   )}
                   {item.temperatureRating !== null && item.temperatureRating !== undefined && (
@@ -581,7 +589,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Bonding Adhesive</span>
-                    <div className="font-bold text-slate-800 mt-0.5">{item.bonding || '—'}</div>
+                    <div className="font-bold text-slate-800 mt-0.5">{formatBondingDisplay(item.bonding)}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Rated Operating Temp</span>

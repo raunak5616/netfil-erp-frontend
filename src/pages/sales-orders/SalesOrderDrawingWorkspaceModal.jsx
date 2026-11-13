@@ -1810,7 +1810,11 @@ const SalesOrderDrawingWorkspaceModal = ({
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Bonding:</span>
-                          <strong className="text-slate-900 font-semibold">{activeItem?.bonding || 'PU Bonding'}</strong>
+                          <strong className="text-slate-900 font-semibold">
+                            {activeItem?.bonding === 'White Adhesive (Ceramic)' || activeItem?.bonding === 'White Adhesive'
+                              ? 'Silicon based Ceramic'
+                              : (activeItem?.bonding || 'PU Bonding')}
+                          </strong>
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Gasket MOC:</span>

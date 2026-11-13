@@ -46,7 +46,7 @@ const STANDARD_MOC_OPTIONS = [
 const BONDING_OPTIONS = [
   { value: 'PU Bonding', label: 'PU Bonding (50–150 °C)' },
   { value: 'Epoxy Bonding', label: 'Epoxy Bonding (200–350 °C)' },
-  { value: 'White Adhesive (Ceramic)', label: 'White Adhesive (Ceramic) (230–400 °C)' }
+  { value: 'White Adhesive (Ceramic)', label: 'Silicon based Ceramic (230–400 °C)' }
 ];
 
 // Helper to normalize and extract construction from a variant object
@@ -1855,7 +1855,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
 
                                               <FormField label="Bonding Adhesive">
                                                 <Select
-                                                  value={catDetails.bonding || ''}
+                                                  value={(catDetails.bonding === 'Silicon based Ceramic' || catDetails.bonding === 'White Adhesive') ? 'White Adhesive (Ceramic)' : (catDetails.bonding || '')}
                                                   onChange={(e) => handleCatalogDetailChange(itemIndex, 'bonding', e.target.value)}
                                                   disabled={submitting}
                                                 >
