@@ -80,15 +80,22 @@ const UploadedFlangeDrawingViewer = ({
   tolerance = '± 2 mm',
   onInspectFull
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const [frontError, setFrontError] = useState(false);
+  const [sideError, setSideError] = useState(false);
+  const [pictorialError, setPictorialError] = useState(false);
 
   useEffect(() => {
-    setImageError(false);
-  }, [drawingUrl, frontViewUrl, sideViewUrl, pictorialViewUrl, isBox]);
+    setFrontError(false);
+    setSideError(false);
+    setPictorialError(false);
+  }, [drawingUrl, frontViewUrl, sideViewUrl, pictorialViewUrl, isBox, holeCount]);
 
   const effectiveFront = frontViewUrl || drawingUrl;
-  const hasThreeViews = !isBox && Boolean(sideViewUrl || pictorialViewUrl);
-  const hasValidFile = Boolean(effectiveFront || sideViewUrl || pictorialViewUrl) && !imageError;
+  const hasValidFront = Boolean(effectiveFront) && !frontError;
+  const hasValidSide = Boolean(sideViewUrl) && !sideError;
+  const hasValidPictorial = Boolean(pictorialViewUrl) && !pictorialError;
+  const hasThreeViews = Boolean(sideViewUrl || pictorialViewUrl);
+  const hasValidFile = hasValidFront || hasValidSide || hasValidPictorial;
   const isPdf = Boolean(effectiveFront) && (effectiveFront.toLowerCase().endsWith('.pdf') || effectiveFront.includes('application/pdf'));
 
   return (
@@ -158,12 +165,16 @@ const UploadedFlangeDrawingViewer = ({
                 </button>
               </div>
               <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
-                <img
-                  src={effectiveFront}
-                  alt="Front View Drawing"
-                  onError={() => setImageError(true)}
-                  className="max-w-full max-h-full object-contain"
-                />
+                {hasValidFront ? (
+                  <img
+                    src={effectiveFront}
+                    alt="Front View Drawing"
+                    onError={() => setFrontError(true)}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Front view unavailable</span>
+                )}
                 <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 py-0.2 rounded font-mono">
                   Left
                 </span>
@@ -175,7 +186,7 @@ const UploadedFlangeDrawingViewer = ({
             <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5 shadow-2xs">
               <div className="flex items-center justify-between border-b border-slate-100 pb-1">
                 <span className="text-[11px] font-bold text-slate-800">2. Side View</span>
-                {sideViewUrl && (
+                {hasValidSide && (
                   <button
                     type="button"
                     onClick={() => onInspectFull?.(sideViewUrl, drawingCode, `${drawingName} - Side View`)}
@@ -186,10 +197,11 @@ const UploadedFlangeDrawingViewer = ({
                 )}
               </div>
               <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
-                {sideViewUrl ? (
+                {hasValidSide ? (
                   <img
                     src={sideViewUrl}
                     alt="Side View Drawing"
+                    onError={() => setSideError(true)}
                     className="max-w-full max-h-full object-contain"
                   />
                 ) : (
@@ -206,7 +218,7 @@ const UploadedFlangeDrawingViewer = ({
             <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex flex-col justify-between space-y-1.5 shadow-2xs">
               <div className="flex items-center justify-between border-b border-slate-100 pb-1">
                 <span className="text-[11px] font-bold text-slate-800">3. 3D / Pictorial</span>
-                {pictorialViewUrl && (
+                {hasValidPictorial && (
                   <button
                     type="button"
                     onClick={() => onInspectFull?.(pictorialViewUrl, drawingCode, `${drawingName} - 3D View`)}
@@ -217,10 +229,11 @@ const UploadedFlangeDrawingViewer = ({
                 )}
               </div>
               <div className="relative w-full h-[220px] bg-slate-50 border border-slate-200 rounded flex items-center justify-center p-2 overflow-hidden">
-                {pictorialViewUrl ? (
+                {hasValidPictorial ? (
                   <img
                     src={pictorialViewUrl}
                     alt="3D View Drawing"
+                    onError={() => setPictorialError(true)}
                     className="max-w-full max-h-full object-contain"
                   />
                 ) : (
@@ -241,13 +254,15 @@ const UploadedFlangeDrawingViewer = ({
                 title={drawingName || drawingCode}
                 className="w-full h-full border-0 rounded"
               />
-            ) : (
+            ) : hasValidFront ? (
               <img
                 src={effectiveFront}
                 alt={drawingName || drawingCode || "Filter Technical Drawing"}
-                onError={() => setImageError(true)}
+                onError={() => setFrontError(true)}
                 className="max-w-full max-h-full object-contain transition-transform group-hover:scale-[1.02] duration-200"
               />
+            ) : (
+              <span className="text-xs text-slate-400 italic">No drawing image available</span>
             )}
           </div>
         )
@@ -400,6 +415,9 @@ const SalesOrderDrawingWorkspaceModal = ({
             holeConfig: item.holeConfig || `${item.holes} Holes`,
             fileUrl: item.imageUrl || '',
             holeImageUrl: item.imageUrl || '',
+            frontViewImage: item.frontViewImage || null,
+            sideViewImage: item.sideViewImage || null,
+            pictorialViewImage: item.pictorialViewImage || null,
             description: item.description || '',
             updatedAt: item.updatedAt
           });
@@ -418,6 +436,10 @@ const SalesOrderDrawingWorkspaceModal = ({
             ...list[existingIdx],
             fileUrl: list[existingIdx].fileUrl || item.fileUrl || item.holeImageUrl || '',
             holeImageUrl: list[existingIdx].holeImageUrl || item.holeImageUrl || item.fileUrl || '',
+            frontViewImage: list[existingIdx].frontViewImage || item.frontViewImage || null,
+            sideViewImage: list[existingIdx].sideViewImage || item.sideViewImage || null,
+            pictorialViewImage: list[existingIdx].pictorialViewImage || item.pictorialViewImage || null,
+            updatedAt: list[existingIdx].updatedAt || item.updatedAt || null
           };
         } else {
           seenCodes.add(code);
@@ -512,9 +534,12 @@ const SalesOrderDrawingWorkspaceModal = ({
   }, [configData, initialItemId, isOpen]);
 
   useEffect(() => {
-    if (!isOpen && pdfBlobUrl) {
-      window.URL.revokeObjectURL(pdfBlobUrl);
-      setPdfBlobUrl(null);
+    if (!isOpen) {
+      setSelectedItemId(null);
+      if (pdfBlobUrl) {
+        window.URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(null);
+      }
     }
   }, [isOpen]);
 
@@ -585,7 +610,11 @@ const SalesOrderDrawingWorkspaceModal = ({
     });
   };
 
-  const activeItem = configData?.items?.find(it => String(it._id) === String(selectedItemId)) || null;
+  const activeItem = (configData?.items && configData.items.length > 0)
+    ? (configData.items.find(it => String(it._id) === String(selectedItemId))
+       || (initialItemId ? configData.items.find(it => String(it._id) === String(initialItemId)) : null)
+       || configData.items[0])
+    : null;
 
   // Load preview PDF for active item
   const loadItemPreview = async (item) => {
@@ -1603,13 +1632,15 @@ const SalesOrderDrawingWorkspaceModal = ({
                           let currentDrawingCode = '';
                           let currentDrawingName = '';
                           let frontUrl = '';
+                          let sideUrl = '';
+                          let pictorialUrl = '';
                           let matchingHolePattern = null;
 
                           if (isBox) {
                             // 1. Box Type Selection:
                             // Box type has no flange holes. Do not display a Holes Drawing.
                             // Instead, display the Filter's existing Front View image in the same drawing area.
-                            frontUrl = activeItem?.frontViewImage?.url
+                            const rawFrontUrl = activeItem?.frontViewImage?.url
                               || activeItem?.selectedDrawing?.frontViewImage?.url
                               || activeItem?.selectedDrawing?.fileUrl
                               || activeItem?.drawingSnapshot?.frontViewImage?.url
@@ -1617,10 +1648,21 @@ const SalesOrderDrawingWorkspaceModal = ({
                               || activeItem?.drawingFileUrl
                               || '';
 
-                            currentDrawingUrl = getVersionedImageUrl(
-                              frontUrl,
-                              activeItem?.selectedDrawing?.updatedAt || activeItem?.updatedAt
-                            );
+                            const rawSideUrl = activeItem?.sideViewImage?.url
+                              || activeItem?.selectedDrawing?.sideViewImage?.url
+                              || activeItem?.drawingSnapshot?.sideViewImage?.url
+                              || '';
+
+                            const rawPictorialUrl = activeItem?.pictorialViewImage?.url
+                              || activeItem?.selectedDrawing?.pictorialViewImage?.url
+                              || activeItem?.drawingSnapshot?.pictorialViewImage?.url
+                              || '';
+
+                            const itemTimestamp = activeItem?.selectedDrawing?.updatedAt || activeItem?.updatedAt;
+                            frontUrl = getVersionedImageUrl(rawFrontUrl, itemTimestamp);
+                            sideUrl = getVersionedImageUrl(rawSideUrl, itemTimestamp);
+                            pictorialUrl = getVersionedImageUrl(rawPictorialUrl, itemTimestamp);
+                            currentDrawingUrl = frontUrl;
 
                             currentDrawingCode = activeItem?.selectedDrawing?.drawingCode
                               || activeItem?.drawingSnapshot?.drawingCode
@@ -1638,6 +1680,8 @@ const SalesOrderDrawingWorkspaceModal = ({
                             currentDrawingCode = 'HOLE-0H';
                             currentDrawingName = 'Solid Flange (No Holes)';
                             frontUrl = '';
+                            sideUrl = '';
+                            pictorialUrl = '';
                           } else {
                             // 3. Flange Type with Holes:
                             // Continue displaying the existing Holes Drawing.
@@ -1657,10 +1701,11 @@ const SalesOrderDrawingWorkspaceModal = ({
                               || activeItem?.drawingSnapshot?.fileUrl
                               || '';
 
-                            currentDrawingUrl = getVersionedImageUrl(
-                              rawDrawingUrl,
-                              matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt
-                            );
+                            const patternTimestamp = matchingHolePattern?.updatedAt || activeItem?.selectedDrawing?.updatedAt || activeItem?.updatedAt;
+
+                            const rawFrontUrl = matchingHolePattern?.frontViewImage?.url || rawDrawingUrl;
+                            frontUrl = getVersionedImageUrl(rawFrontUrl, patternTimestamp);
+                            currentDrawingUrl = frontUrl;
 
                             currentDrawingCode = matchingHolePattern?.drawingCode
                               || activeItem?.drawingCode
@@ -1675,18 +1720,30 @@ const SalesOrderDrawingWorkspaceModal = ({
                               || activeItem?.drawingSnapshot?.drawingName
                               || 'Filter Flange Technical Drawing';
 
-                            frontUrl = matchingHolePattern?.frontViewImage?.url
-                              || currentDrawingUrl;
+                            const rawSideUrl = matchingHolePattern?.sideViewImage?.url
+                              || activeItem?.sideViewImage?.url
+                              || activeItem?.selectedDrawing?.sideViewImage?.url
+                              || activeItem?.drawingSnapshot?.sideViewImage?.url
+                              || '';
+                            sideUrl = getVersionedImageUrl(rawSideUrl, patternTimestamp);
+
+                            const rawPictorialUrl = matchingHolePattern?.pictorialViewImage?.url
+                              || activeItem?.pictorialViewImage?.url
+                              || activeItem?.selectedDrawing?.pictorialViewImage?.url
+                              || activeItem?.drawingSnapshot?.pictorialViewImage?.url
+                              || '';
+                            pictorialUrl = getVersionedImageUrl(rawPictorialUrl, patternTimestamp);
                           }
 
                           const isZeroHoles = isBox || Number(holeForm.holeCount) === 0;
 
                           return (
                             <UploadedFlangeDrawingViewer
+                              key={`${activeItem?._id || 'item'}_${filterType}_${holeForm.holeCount}_${currentDrawingCode}`}
                               drawingUrl={currentDrawingUrl}
                               frontViewUrl={frontUrl}
-                              sideViewUrl={isZeroHoles ? '' : (matchingHolePattern?.sideViewImage?.url || '')}
-                              pictorialViewUrl={isZeroHoles ? '' : (matchingHolePattern?.pictorialViewImage?.url || '')}
+                              sideViewUrl={sideUrl}
+                              pictorialViewUrl={pictorialUrl}
                               drawingCode={currentDrawingCode}
                               drawingName={currentDrawingName}
                               filterType={filterType}
@@ -1695,11 +1752,11 @@ const SalesOrderDrawingWorkspaceModal = ({
                               L={isZeroHoles ? '-' : holeForm.L}
                               M={isZeroHoles ? '-' : holeForm.M}
                               dia={isZeroHoles ? '-' : holeForm.dia}
-                              A={activeItem.dimensions?.A || 610}
-                              B={activeItem.dimensions?.B || 610}
+                              A={activeItem?.dimensions?.A || 610}
+                              B={activeItem?.dimensions?.B || 610}
                               X={isZeroHoles ? '-' : holeForm.X}
                               Y={isZeroHoles ? '-' : holeForm.Y}
-                              tolerance={holeForm.tolerance || activeItem.tolerance || '± 2 mm'}
+                              tolerance={holeForm.tolerance || activeItem?.tolerance || '± 2 mm'}
                               onInspectFull={(url, code, name) => setInspectDrawingModal({ url, code, name })}
                             />
                           );
@@ -1744,7 +1801,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                               >
                                 <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
                                   {tpl.fileUrl ? (
-                                    <img src={tpl.fileUrl} alt={tpl.drawingName} className="w-full h-full object-cover rounded-lg" />
+                                    <img src={getVersionedImageUrl(tpl.fileUrl, tpl.updatedAt)} alt={tpl.drawingName} className="w-full h-full object-cover rounded-lg" />
                                   ) : (
                                     <FileText size={20} className="text-slate-400" />
                                   )}
