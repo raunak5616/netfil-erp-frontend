@@ -144,7 +144,7 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
             <div>
               <span className="text-slate-500 block text-[11px] font-medium mb-1">Filter Body:</span>
               <div className="text-sm font-bold text-slate-900">
-                {bodyWidth ? `${bodyWidth} × ${bodyHeight} × ${depth} mm` : '—'}
+                {bodyHeight ? `${bodyHeight} × ${bodyWidth} × ${depth} mm` : '—'}
               </div>
             </div>
 

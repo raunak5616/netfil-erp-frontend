@@ -1045,7 +1045,7 @@ const SalesOrderDrawingWorkspaceModal = ({
                         <div className="flex justify-between text-slate-600">
                           <span>Body:</span>
                           <strong className="font-mono text-slate-800">
-                            {dims.bodyWidth || dims.A} × {dims.bodyHeight || dims.B} × {dims.depth || dims.C} mm
+                            {dims.bodyHeight || dims.B} × {dims.bodyWidth || dims.A} × {dims.depth || dims.C} mm
                           </strong>
                         </div>
                         <div className="flex justify-between text-slate-600">
