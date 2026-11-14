@@ -19,19 +19,19 @@ import Modal from '../../components/ui/Modal';
 import ItemFormModal from './ItemFormModal';
 import ItemDetailModal from './ItemDetailModal';
 import DeleteItemModal from './DeleteItemModal';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
-  RefreshCw, 
-  Package, 
-  CheckCircle2, 
-  Layers, 
-  Tag, 
-  ArrowUpDown, 
-  RotateCcw, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Eye,
+  Edit,
+  RefreshCw,
+  Package,
+  CheckCircle2,
+  Layers,
+  Tag,
+  ArrowUpDown,
+  RotateCcw,
   Trash2,
   Camera,
   Image as ImageIcon,
@@ -142,7 +142,7 @@ const ItemList = () => {
   const error = localError || (itemsQueryError ? (itemsQueryError.data?.message || itemsQueryError.message || 'Failed to connect to server') : '');
 
   // Modal states
-  const [selectedProductType, setSelectedProductType] = useState('RAW_ITEM');
+  const [selectedProductType, setSelectedProductType] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -542,7 +542,7 @@ const ItemList = () => {
                 size="sm"
                 onClick={() => {
                   setEditingItem(null);
-                  setSelectedProductType('RAW_ITEM');
+                  setSelectedProductType('');
                   setIsFormOpen(true);
                 }}
               >
@@ -862,7 +862,7 @@ const ItemList = () => {
                   </div>
                 </div>
               ) : (
-                <div 
+                <div
                   className="flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:bg-blue-50/30 rounded-lg w-full transition-colors"
                   onClick={() => listFileInputRef.current?.click()}
                 >
