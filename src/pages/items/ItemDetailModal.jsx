@@ -578,10 +578,14 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                 <div className="text-[11px] text-slate-800 uppercase font-bold mb-2.5 flex items-center gap-1.5">
                   <ShieldCheck size={14} className="text-slate-700" /> Construction, Materials & Thermal Specifications
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Material (MOC)</span>
                     <div className="font-bold text-slate-800 mt-0.5">{item.moc || '—'}</div>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+                    <span className="text-[10px] uppercase font-semibold text-slate-500">Gasket MOC</span>
+                    <div className="font-bold text-teal-800 mt-0.5">{item.gasketMoc || '—'}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Overall Box Dimensions</span>

@@ -105,6 +105,7 @@ const TEMPERATURE_RANGE_OPTIONS = [
     adhesiveName: 'PU',
     bondingValue: 'PU',
     gasketMoc: 'EPDM',
+    defaultMoc: 'Aluminium',
     minTemp: 20,
     maxTemp: 70
   },
@@ -114,6 +115,7 @@ const TEMPERATURE_RANGE_OPTIONS = [
     adhesiveName: 'PU',
     bondingValue: 'PU',
     gasketMoc: 'EPDM',
+    defaultMoc: 'Aluminium',
     minTemp: 70,
     maxTemp: 150
   },
@@ -123,6 +125,7 @@ const TEMPERATURE_RANGE_OPTIONS = [
     adhesiveName: 'Epoxy',
     bondingValue: 'Epoxy',
     gasketMoc: 'EPDM',
+    defaultMoc: 'Aluminium',
     minTemp: 150,
     maxTemp: 200
   },
@@ -132,6 +135,7 @@ const TEMPERATURE_RANGE_OPTIONS = [
     adhesiveName: 'Epoxy',
     bondingValue: 'Epoxy',
     gasketMoc: 'EPDM',
+    defaultMoc: 'SS304',
     minTemp: 200,
     maxTemp: 250
   },
@@ -141,31 +145,23 @@ const TEMPERATURE_RANGE_OPTIONS = [
     adhesiveName: 'Silicon based Ceramic',
     bondingValue: 'Silicon based Ceramic',
     gasketMoc: 'Glass Fiber Pad',
+    defaultMoc: 'SS304',
     minTemp: 250,
     maxTemp: 350
   }
 ];
 
-// Standard Gasket MOC options
+// Standard Gasket MOC options (Only EPDM and Glass Fiber Pad)
 const STANDARD_GASKET_MOC_OPTIONS = [
   'EPDM',
-  'Glass Fiber Pad',
-  'Neoprene',
-  'Silicon',
-  'PTFE',
-  'OTHER'
+  'Glass Fiber Pad'
 ];
 
-// Standard MOC options with SS304 and SS316 prioritized
+// Standard MOC options (Only Aluminium, SS304, SS316)
 const STANDARD_MOC_OPTIONS = [
+  'Aluminium',
   'SS304',
-  'SS316',
-  'SS316L',
-  'Aluminum',
-  'Galvanized Iron (GI)',
-  'CRCA Powder Coated',
-  'Mild Steel',
-  'OTHER'
+  'SS316'
 ];
 
 const ItemFormModal = ({
@@ -196,6 +192,7 @@ const ItemFormModal = ({
   const [selectedItemGroupId, setSelectedItemGroupId] = useState('');
   const [selectedMicron, setSelectedMicron] = useState('');
   const [selectedTempRangeId, setSelectedTempRangeId] = useState('');
+  const [isMocManuallySelected, setIsMocManuallySelected] = useState(false);
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState('');
@@ -232,7 +229,7 @@ const ItemFormModal = ({
     imageUrl: '',
     imagePublicId: '',
     constructionType: '',
-    moc: 'SS304',
+    moc: '',
     customMoc: '',
     flangeType: '',
     filterLength: '',
@@ -464,8 +461,16 @@ const ItemFormModal = ({
   // Initialize or reset form data
   useEffect(() => {
     if (item) {
-      const initialMoc = STANDARD_MOC_OPTIONS.includes(item.moc) ? item.moc : (item.moc ? 'OTHER' : 'SS304');
-      const initialCustomMoc = initialMoc === 'OTHER' ? item.moc : '';
+      let initialMoc = item.moc || '';
+      if (initialMoc.toLowerCase() === 'aluminum' || initialMoc.toLowerCase() === 'aluminium') {
+        initialMoc = 'Aluminium';
+      }
+      if (initialMoc) {
+        setIsMocManuallySelected(true);
+      } else {
+        setIsMocManuallySelected(false);
+      }
+
       const resolvedFilterType = (item.filterType === 'BOX' || item.filterType === 'FLANGE')
         ? item.filterType
         : (item.constructionType === 'BOX' || item.constructionType === 'FLANGE')
@@ -490,8 +495,10 @@ const ItemFormModal = ({
         if (matchedR) setSelectedTempRangeId(matchedR.id);
       }
 
-      const initialGasket = item.gasketMoc || (matchedR ? matchedR.gasketMoc : 'EPDM');
-      const isStdGasket = STANDARD_GASKET_MOC_OPTIONS.includes(initialGasket);
+      let initialGasket = item.gasketMoc || (matchedR ? matchedR.gasketMoc : 'EPDM');
+      if (initialGasket !== 'Glass Fiber Pad') {
+        initialGasket = 'EPDM';
+      }
 
       setFormData({
         itemCode: item.itemCode || '',
@@ -523,7 +530,7 @@ const ItemFormModal = ({
         imagePublicId: item.imagePublicId || '',
         constructionType: resolvedFilterType,
         moc: initialMoc,
-        customMoc: initialCustomMoc,
+        customMoc: '',
         flangeType: item.flangeType?._id || item.flangeType || '',
         filterLength: item.filterLength !== null && item.filterLength !== undefined ? item.filterLength : '',
         filterWidth: item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '',
@@ -531,8 +538,8 @@ const ItemFormModal = ({
         faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
         temperatureRating: item.temperatureRange || item.temperatureRating || '',
         temperatureRange: item.temperatureRange || (typeof item.temperatureRating === 'string' ? item.temperatureRating : ''),
-        gasketMoc: isStdGasket ? initialGasket : (initialGasket ? 'OTHER' : 'EPDM'),
-        customGasketMoc: isStdGasket ? '' : initialGasket,
+        gasketMoc: initialGasket,
+        customGasketMoc: '',
         bonding: item.bonding || (matchedR ? matchedR.bondingValue : ''),
       });
       setFilterType(resolvedFilterType);
@@ -541,6 +548,7 @@ const ItemFormModal = ({
     } else {
       const pType = initialProductType || '';
       setSelectedItemGroupId('');
+      setIsMocManuallySelected(false);
       setFormData({
         itemCode: 'AUTO',
         itemName: initialItemName || '',
@@ -570,7 +578,7 @@ const ItemFormModal = ({
         imageUrl: '',
         imagePublicId: '',
         constructionType: '',
-        moc: 'SS304',
+        moc: '',
         customMoc: '',
         flangeType: '',
         filterLength: '',
@@ -618,18 +626,14 @@ const ItemFormModal = ({
         (g.applicableProductTypes || []).includes(pType) ||
         (g.groupName || '').toUpperCase() === (pType === 'RAW_ITEM' ? 'RAW' : pType)
       );
-        if (matched && String(selectedItemGroupId) !== String(matched._id)) {
-          setSelectedItemGroupId(matched._id);
-          setFormData((prev) => ({ ...prev, itemGroup: matched._id }));
-        } else if (itemGroups[0]) {
-          setSelectedItemGroupId(itemGroups[0]._id);
-          setFormData((prev) => ({ ...prev, itemGroup: itemGroups[0]._id }));
-        }
-      } else {
-        setSelectedItemGroupId('');
+      if (matched && String(selectedItemGroupId) !== String(matched._id)) {
+        setSelectedItemGroupId(matched._id);
+        setFormData((prev) => ({ ...prev, itemGroup: matched._id }));
       }
-    }, [itemGroups, item, initialProductType, isOpen, selectedItemGroupId, formData.productType]);
-}, [itemGroups, item, isOpen, formData.productType]);
+    } else {
+      setSelectedItemGroupId('');
+    }
+  }, [itemGroups, item, isOpen, formData.productType, selectedItemGroupId]);
 
 // Available categories: strictly filter by selected Item Group
 const availableCategories = useMemo(() => {
@@ -841,10 +845,10 @@ const handleSelectGroupCard = (card) => {
       bonding: '',
       gasketMoc: '',
     } : {
-      moc: prev.moc || 'SS304',
-      temperatureRange: prev.temperatureRange || '20–70 °C',
-      temperatureRating: prev.temperatureRange || '20–70 °C',
-      bonding: prev.bonding || 'PU',
+      moc: prev.moc || '',
+      temperatureRange: prev.temperatureRange || '',
+      temperatureRating: prev.temperatureRating || '',
+      bonding: prev.bonding || '',
       gasketMoc: prev.gasketMoc || 'EPDM'
     })
   }));
@@ -911,21 +915,37 @@ const handleConstructionSelect = (type) => {
   setErrorMessage('');
 };
 
-// Section 3.3 & 3.4: Temperature Range Selection, Bonding Adhesive & Gasket MOC
-// Requirement: Store temperature range as the range itself (e.g. 20–70 °C), NOT converted to a number.
-// Requirement: Gasket MOC is automatically mapped: <= 250 °C -> EPDM, 250–350 °C -> Glass Fiber Pad.
+// Section 3.3, 3.4 & 3.5: Temperature Range Selection, Bonding Adhesive, Gasket MOC & MOC
+// Requirements:
+// 1. Gasket MOC: <= 250 °C -> EPDM, 250–350 °C -> Glass Fiber Pad.
+// 2. MOC: 200–250 °C and 250–350 °C -> automatically preselect SS304.
+// 3. User can manually change it to Aluminium or SS316.
+// 4. When switching to another temperature range, apply relevant default selection without unnecessarily overwriting a deliberate manual selection.
 const handleTempRangeSelect = (rangeId) => {
   setSelectedTempRangeId(rangeId);
   const range = TEMPERATURE_RANGE_OPTIONS.find(r => r.id === rangeId);
   if (range) {
-    setFormData(prev => ({
-      ...prev,
-      temperatureRange: range.rangeLabel,
-      temperatureRating: range.rangeLabel,
-      bonding: range.adhesiveName,
-      gasketMoc: range.gasketMoc,
-      customGasketMoc: ''
-    }));
+    setFormData(prev => {
+      // Determine MOC:
+      // If user made a deliberate manual selection, preserve it.
+      // Otherwise, apply the relevant default selection:
+      // For 200–250 °C and 250–350 °C -> SS304.
+      // For other ranges -> Aluminium (or range.defaultMoc).
+      const nextMoc = isMocManuallySelected && prev.moc
+        ? prev.moc
+        : (range.defaultMoc || 'SS304');
+
+      return {
+        ...prev,
+        temperatureRange: range.rangeLabel,
+        temperatureRating: range.rangeLabel,
+        bonding: range.adhesiveName,
+        gasketMoc: range.gasketMoc,
+        moc: nextMoc,
+        customGasketMoc: '',
+        customMoc: ''
+      };
+    });
   }
   setErrorMessage('');
 };
@@ -948,6 +968,13 @@ const handleCategoryChange = (e) => {
 
 const handleChange = (e) => {
   const { name, value } = e.target;
+  if (name === 'moc') {
+    if (value) {
+      setIsMocManuallySelected(true);
+    } else {
+      setIsMocManuallySelected(false);
+    }
+  }
   setFormData((prev) => {
     const next = {
       ...prev,
@@ -965,6 +992,18 @@ const handleChange = (e) => {
 
     if (name === 'temperatureRange') {
       next.temperatureRating = value;
+      if (!isMocManuallySelected) {
+        if (value.includes('200–250') || value.includes('250–350') || value.includes('200-250') || value.includes('250-350')) {
+          next.moc = 'SS304';
+        } else if (value.includes('20–70') || value.includes('70–150') || value.includes('150–200')) {
+          next.moc = 'Aluminium';
+        }
+      }
+      if (value.includes('250–350') || value.includes('250-350') || value.includes('350')) {
+        next.gasketMoc = 'Glass Fiber Pad';
+      } else if (value.includes('20–70') || value.includes('70–150') || value.includes('150–200') || value.includes('200–250')) {
+        next.gasketMoc = 'EPDM';
+      }
     }
 
     return next;
@@ -1079,17 +1118,14 @@ const validateCurrentStep = (step) => {
       if (!formData.temperatureRange && !formData.temperatureRating && !selectedTempRangeId) {
         return 'Operating Temperature Range is required.';
       }
-      if (!formData.gasketMoc || (formData.gasketMoc === 'OTHER' && !formData.customGasketMoc?.trim())) {
-        return 'Gasket MOC is required.';
+      if (!formData.gasketMoc) {
+        return 'Gasket MOC is required (EPDM or Glass Fiber Pad).';
       }
       if (!formData.bonding?.trim()) {
         return 'Bonding Adhesive is required.';
       }
       if (!formData.moc) {
-        return 'Material of Construction (MOC) is required.';
-      }
-      if (formData.moc === 'OTHER' && !formData.customMoc?.trim()) {
-        return 'Please specify the custom Material of Construction (MOC).';
+        return 'Material of Construction (MOC) is required (Aluminium, SS304, or SS316).';
       }
       if (formData.filterLength === '' || Number(formData.filterLength) <= 0 || isNaN(Number(formData.filterLength))) {
         return 'Outer Filter Length must be a positive number in MM.';
@@ -1218,9 +1254,7 @@ const handleSubmit = async (e) => {
     const resolvedPurchaseUom = formData.purchaseUom || formData.inventoryUom;
     const resolvedSalesUom = formData.salesUom || formData.inventoryUom;
 
-    const effectiveGasketMoc = formData.gasketMoc === 'OTHER'
-      ? (formData.customGasketMoc?.trim() || 'OTHER')
-      : (formData.gasketMoc || 'EPDM');
+    const effectiveGasketMoc = formData.gasketMoc || 'EPDM';
 
     const effectiveTempRange = formData.temperatureRange || (typeof formData.temperatureRating === 'string' ? formData.temperatureRating : '') || (selectedTempRangeId ? TEMPERATURE_RANGE_OPTIONS.find(r => r.id === selectedTempRangeId)?.rangeLabel : '');
 
@@ -1257,7 +1291,7 @@ const handleSubmit = async (e) => {
       filterDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
       faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
       cfm: formData.productType === 'FILTER' ? calculatedCfm : null,
-      moc: formData.productType === 'FILTER' ? (formData.moc === 'OTHER' ? (formData.customMoc?.trim() || 'OTHER') : formData.moc) : '',
+      moc: formData.productType === 'FILTER' ? (formData.moc || '') : '',
       bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
       gasketMoc: formData.productType === 'FILTER' ? effectiveGasketMoc : '',
       // Store temperature range as the range itself (e.g. 20–70 °C), NOT converted to a number
@@ -1319,6 +1353,9 @@ const handleSubmit = async (e) => {
         }
         else if (code.includes('BOX_CONST') || code.includes('OVERALL_BOX') || name.includes('BOX CONSTRUCTION') || name.includes('OVERALL BOX')) {
           autoVal = calculatedOverallDimensions.summary !== '—' ? calculatedOverallDimensions.summary : '';
+        }
+        else if (code === 'MOC' || code === 'SPEC_MOC' || code.includes('MOC') || name === 'MOC' || name.includes('MATERIAL OF CONSTRUCTION') || name.includes('CASING MATERIAL')) {
+          autoVal = formData.moc || '';
         }
 
         if (autoVal !== null && autoVal !== undefined && autoVal !== '') {
@@ -1558,82 +1595,64 @@ return (
       {/* STEP 1: SELECT ITEM GROUP                                */}
       {/* ======================================================== */}
       {currentStep === 1 && (
-        <div className="space-y-4 py-2">
-          <div className="space-y-5 py-2">
-            <div className="text-center space-y-1">
-              <h3 className="text-sm font-bold text-slate-900">Select Item Group</h3>
-              <p className="text-xs text-slate-500">
-                Choose the core product group to begin configuring your item.
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">Select Item Group</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Choose an Item Group to configure specifications and create a new catalog item.
-                </p>
-            </div>
+        <div className="space-y-5 py-2">
+          <div className="text-center space-y-1">
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">Select Item Group</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Choose an Item Group to configure specifications and create a new catalog item.
+            </p>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                {ITEM_GROUP_CARDS.map((card) => {
-                  const isSelected = formData.productType === card.productType;
-                  const Icon = card.icon;
-                  return (
-                    <button
-                      key={card.id}
-                      type="button"
-                      onClick={() => handleSelectGroupCard(card)}
-                      className={`flex flex-col text-left p-4.5 rounded-xl border-2 transition-all cursor-pointer relative ${className = {`flex flex-col text-left p-5 rounded-xl transition-all duration-150 cursor-pointer relative min-h-[148px] justify-between ${isSelected
-                            ? 'border-blue-600 bg-blue-50/80 shadow-md ring-2 ring-blue-500/20'
-                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70 shadow-2xs'
-                              ? 'border-2 border-blue-600 bg-blue-50/80 shadow-sm ring-2 ring-blue-500/20'
-                              : 'border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-2xs'
-                          }`}
-                  >
-                    {isSelected && (
-                      <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                        <Check size={14} className="stroke-[3]" />
-                    {/* Top Row: Icon on left, checkmark only when selected on right */}
-                    <div className="flex items-center justify-between w-full mb-3">
-                      <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
-                          isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
-                      }`}
-                      >
-                        <Icon size={22} />
-                      </div>
-                    )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            {ITEM_GROUP_CARDS.map((card) => {
+              const isSelected = formData.productType === card.productType;
+              const Icon = card.icon;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => handleSelectGroupCard(card)}
+                  className={`flex flex-col text-left p-5 rounded-xl transition-all duration-150 cursor-pointer relative min-h-[148px] justify-between ${
+                    isSelected
+                      ? 'border-2 border-blue-600 bg-blue-50/80 shadow-sm ring-2 ring-blue-500/20'
+                      : 'border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-2xs'
+                  }`}
+                >
+                  {/* Top Row: Icon on left, checkmark only when selected on right */}
+                  <div className="flex items-center justify-between w-full mb-3">
                     <div
-                      className={`w - 11 h - 11 rounded - xl flex items - center justify - center mb - 3 transition - colors ${
-                    isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
-                  } `}
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                        isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
+                      }`}
                     >
                       <Icon size={22} />
-
-                      {/* Selected checkmark indicator */}
-                      {isSelected && (
-                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                          <Check size={14} className="stroke-[3]" />
-                        </div>
-                      )}
                     </div>
-                    <div className="text-sm font-bold text-slate-900 mb-1">{card.name}</div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed pr-6">{card.description}</p>
 
-                    {/* Bottom Block: Name + Description */}
-                    <div className="space-y-1">
-                      <div className={`text - sm font - bold transition - colors ${
-                    isSelected ? 'text-blue-900' : 'text-slate-900'
-                  } `}>
-                        {card.name}
+                    {/* Selected checkmark indicator */}
+                    {isSelected && (
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                        <Check size={14} className="stroke-[3]" />
                       </div>
-                      <p className="text-[11.5px] text-slate-500 leading-relaxed">
-                        {card.description}
-                      </p>
+                    )}
+                  </div>
+
+                  {/* Bottom Block: Name + Description */}
+                  <div className="space-y-1">
+                    <div className={`text-sm font-bold transition-colors ${
+                      isSelected ? 'text-blue-900' : 'text-slate-900'
+                    }`}>
+                      {card.name}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                    <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                      {card.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+      )}
 
         {/* ======================================================== */}
         {/* STEP 2: ITEM DETAILS                                     */}
@@ -2103,23 +2122,16 @@ return (
           >
             {STANDARD_GASKET_MOC_OPTIONS.map((g) => (
               <option key={g} value={g}>
-                {g === 'OTHER' ? 'Other (Custom Gasket MOC)' : g}
+                {g}
               </option>
             ))}
+            {formData.gasketMoc && !STANDARD_GASKET_MOC_OPTIONS.includes(formData.gasketMoc) && (
+              <option value={formData.gasketMoc}>
+                {formData.gasketMoc} (Historical)
+              </option>
+            )}
           </Select>
         </FormField>
-
-        {formData.gasketMoc === 'OTHER' && (
-          <FormField label="Specify Custom Gasket MOC" required helperText="Enter specific gasket material code / name.">
-            <Input
-              name="customGasketMoc"
-              placeholder="e.g. Viton Pad"
-              value={formData.customGasketMoc}
-              onChange={handleChange}
-              disabled={submitting}
-            />
-          </FormField>
-        )}
       </div>
     </div>
 
@@ -2135,7 +2147,7 @@ return (
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <FormField label="Select MOC" required helperText="SS304 & SS316 prioritized.">
+        <FormField label="Select MOC" required helperText="Options: Aluminium, SS304, SS316">
           <Select
             name="moc"
             value={formData.moc}
@@ -2145,23 +2157,16 @@ return (
             <option value="">-- Select MOC --</option>
             {STANDARD_MOC_OPTIONS.map((m) => (
               <option key={m} value={m}>
-                {m === 'OTHER' ? 'Other (Custom MOC)' : m}
+                {m}
               </option>
             ))}
+            {formData.moc && !STANDARD_MOC_OPTIONS.includes(formData.moc) && (
+              <option value={formData.moc}>
+                {formData.moc} (Historical)
+              </option>
+            )}
           </Select>
         </FormField>
-
-        {formData.moc === 'OTHER' && (
-          <FormField label="Specify Custom MOC" required helperText="Enter specific material code / grade.">
-            <Input
-              name="customMoc"
-              placeholder="e.g. Inconel 625"
-              value={formData.customMoc}
-              onChange={handleChange}
-              disabled={submitting}
-            />
-          </FormField>
-        )}
       </div>
     </div>
 
@@ -2386,14 +2391,14 @@ return (
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Gasket MOC</span>
                 <strong className="text-xs text-teal-700 font-bold">
-                  {formData.gasketMoc === 'OTHER' ? (formData.customGasketMoc || 'Custom') : (formData.gasketMoc || 'EPDM')}
+                  {formData.gasketMoc || 'EPDM'}
                 </strong>
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Material (MOC)</span>
                 <strong className="text-xs text-slate-800">
-                  {formData.moc === 'OTHER' ? (formData.customMoc || 'Custom') : (formData.moc || 'SS304')}
+                  {formData.moc || '—'}
                 </strong>
               </div>
 
