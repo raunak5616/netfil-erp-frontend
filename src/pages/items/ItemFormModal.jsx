@@ -47,7 +47,8 @@ import {
   ArrowRight,
   Thermometer,
   ShieldCheck,
-  FileText
+  FileText,
+  Hash,
 } from 'lucide-react';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
@@ -258,32 +259,41 @@ const ItemFormModal = ({
   const { data: allSpecsRes } = useGetSpecificationsQuery({}, { skip: !isOpen });
 
   // Dynamic next Item Code preview based on Filter Type
-  const { data: nextCodeRes } = useGetNextItemCodeQuery(
+  const { data: nextCodeRes, isFetching: isFetchingNextCode } = useGetNextItemCodeQuery(
     { filterType: formData.productType === 'FILTER' ? filterType : '' },
-    { skip: !isOpen || isEditMode }
+    { skip: !isOpen || isEditMode || (formData.productType === 'FILTER' && !filterType) }
   );
 
   const displayItemCode = useMemo(() => {
     if (isEditMode) return formData.itemCode || '—';
     if (formData.productType === 'FILTER') {
-      if (filterType === 'BOX') {
-        return nextCodeRes?.nextItemCode || 'NFB-0001';
+      if (!filterType) return '';
+      if (nextCodeRes?.filterType === filterType && nextCodeRes?.nextItemCode) {
+        return nextCodeRes.nextItemCode;
       }
-      if (filterType === 'FLANGE') {
-        return nextCodeRes?.nextItemCode || 'NFF-0001';
+      if (isFetchingNextCode) {
+        return filterType === 'BOX' ? 'Generating NFB...' : 'Generating NFF...';
       }
-      return nextCodeRes?.nextItemCode || 'NFB-0001';
+      return filterType === 'BOX'
+        ? (nextCodeRes?.nextItemCode || 'NFB-0001')
+        : (nextCodeRes?.nextItemCode || 'NFF-0001');
     }
     return nextCodeRes?.nextItemCode || 'AUTO GENERATED';
-  }, [isEditMode, formData.itemCode, formData.productType, filterType, nextCodeRes]);
+  }, [isEditMode, formData.itemCode, formData.productType, filterType, nextCodeRes, isFetchingNextCode]);
 
   useEffect(() => {
     if (!isEditMode) {
       if (formData.productType === 'FILTER') {
         if (filterType === 'BOX') {
-          setFormData((prev) => ({ ...prev, itemCode: nextCodeRes?.nextItemCode || 'NFB-0001' }));
+          const code = (nextCodeRes?.filterType === 'BOX' && nextCodeRes?.nextItemCode)
+            ? nextCodeRes.nextItemCode
+            : 'NFB-0001';
+          setFormData((prev) => ({ ...prev, itemCode: code }));
         } else if (filterType === 'FLANGE') {
-          setFormData((prev) => ({ ...prev, itemCode: nextCodeRes?.nextItemCode || 'NFF-0001' }));
+          const code = (nextCodeRes?.filterType === 'FLANGE' && nextCodeRes?.nextItemCode)
+            ? nextCodeRes.nextItemCode
+            : 'NFF-0001';
+          setFormData((prev) => ({ ...prev, itemCode: code }));
         } else {
           setFormData((prev) => ({ ...prev, itemCode: 'AUTO' }));
         }
@@ -291,7 +301,7 @@ const ItemFormModal = ({
         setFormData((prev) => ({ ...prev, itemCode: nextCodeRes?.nextItemCode || 'AUTO' }));
       }
     }
-  }, [filterType, formData.productType, nextCodeRes?.nextItemCode, isEditMode]);
+  }, [filterType, formData.productType, nextCodeRes, isEditMode]);
 
   // Resolve master temperature spec & configured UOM
   const tempSpec = useMemo(() => {
@@ -857,9 +867,9 @@ const handleSelectGroupCard = (card) => {
     setFilterType('');
     setSelectedMicron('');
     setSelectedTempRangeId('');
-  } else if (!filterType) {
-    setFilterType('BOX');
-    setFormData(prev => ({ ...prev, filterType: 'BOX', constructionType: 'BOX' }));
+  } else if (!isEditMode && !filterType) {
+    setFilterType('');
+    setFormData((prev) => ({ ...prev, filterType: '', constructionType: '' }));
   }
 
   setErrorMessage('');
@@ -1694,37 +1704,8 @@ return (
                 />
               </FormField>
 
-              {/* 3-Column: Item Code, Category, Inventory UOM */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-                {/* Item Code Display */}
-                <FormField
-                  label="Item Code"
-                  helperText={
-                    isFilter
-                      ? (filterType === 'BOX'
-                          ? "Generated code for Box Filter (NFB series)."
-                          : filterType === 'FLANGE'
-                          ? "Generated code for Flange Filter (NFF series)."
-                          : "Generated after Construction Type selection in Step 3.")
-                      : "Auto-generated system sequential code."
-                  }
-                >
-                  <div className="flex items-center justify-between h-[38px] px-3 bg-slate-100 border border-slate-300 rounded-md text-slate-800 font-mono font-bold text-xs select-none">
-                    <span>{displayItemCode}</span>
-                    {isFilter && filterType && (
-                      <span
-                        className={`text - [10px] px - 1.5 py - 0.5 rounded font - sans font - semibold uppercase tracking - wider ${
-                    filterType === 'BOX'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  } `}
-                      >
-                        {filterType}
-                      </span>
-                    )}
-                  </div>
-                </FormField>
-
+              {/* 2-Column: Item Category, Inventory UOM */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                 {/* Item Category */}
                 <FormField label="Item Category" required helperText="Filtered by selected Item Group.">
                   <Select
@@ -1740,7 +1721,7 @@ return (
                       <option key={c._id} value={c._id}>
                         {FIXED_CATEGORY_CODES.includes(c.categoryCode?.toUpperCase())
                           ? c.categoryName
-                          : `${ c.categoryName } (${ c.categoryCode })`}
+                          : `${c.categoryName} (${c.categoryCode})`}
                       </option>
                     ))}
                   </Select>
@@ -2021,6 +2002,63 @@ return (
           </div>
         </button>
       </div>
+
+      {/* Generated Item Code Display */}
+      {filterType ? (
+        <div
+          className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            filterType === 'BOX'
+              ? 'bg-blue-50/70 border-blue-200'
+              : 'bg-emerald-50/70 border-emerald-200'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-bold shadow-2xs ${
+                filterType === 'BOX'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-emerald-600 text-white'
+              }`}
+            >
+              <Hash size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Generated Item Code
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                    filterType === 'BOX'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  }`}
+                >
+                  {filterType === 'BOX' ? 'BOX • NFB Series' : 'FLANGE • NFF Series'}
+                </span>
+              </div>
+              <div className="font-mono font-black text-slate-900 text-lg tracking-wider mt-0.5">
+                {displayItemCode}
+              </div>
+            </div>
+          </div>
+          <div className="text-left sm:text-right text-[11px] text-slate-500 leading-snug">
+            <span className="font-medium text-slate-700">Live sequential code preview</span>
+            <span className="block text-[10.5px] text-slate-400">
+              {filterType === 'BOX'
+                ? 'Assigned independently to BOX series'
+                : 'Assigned independently to FLANGE series'}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 flex items-center gap-2.5 text-slate-500 text-xs">
+          <Info size={16} className="text-blue-500 shrink-0" />
+          <span>
+            Select <strong>BOX Construction</strong> or <strong>FLANGE Construction</strong> above to generate and display the corresponding sequential item code (<strong>NFB-XXXX</strong> or <strong>NFF-XXXX</strong>).
+          </span>
+        </div>
+      )}
     </div>
 
     {/* 3.3 Operating Temperature & Bonding Adhesive */}
