@@ -304,6 +304,9 @@ const ItemFormModal = ({
     }
   }, [filterType, formData.productType, nextCodeRes, isEditMode]);
 
+  const isFlange = (filterType || formData.constructionType || '').toUpperCase() === 'FLANGE';
+  const isBox = (filterType || formData.constructionType || '').toUpperCase() === 'BOX';
+
   // Resolve master temperature spec & configured UOM
   const tempSpec = useMemo(() => {
     const list = allSpecsRes?.specifications || [];
@@ -547,8 +550,8 @@ const ItemFormModal = ({
         filterWidth: item.outerWidth !== null && item.outerWidth !== undefined ? item.outerWidth : (item.overallWidth ?? (item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '')),
         filterDepth: item.outerDepth !== null && item.outerDepth !== undefined ? item.outerDepth : (item.overallDepth ?? (item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : '')),
         faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
-        temperatureRating: item.temperatureRange || item.temperatureRating || '',
-        temperatureRange: item.temperatureRange || (typeof item.temperatureRating === 'string' ? item.temperatureRating : ''),
+        temperatureRating: item.temperatureRange || (matchedR ? matchedR.rangeLabel : (item.temperatureRating || '')),
+        temperatureRange: item.temperatureRange || (matchedR ? matchedR.rangeLabel : (typeof item.temperatureRating === 'string' ? item.temperatureRating : '')),
         gasketMoc: initialGasket,
         customGasketMoc: '',
         bonding: item.bonding || (matchedR ? matchedR.bondingValue : ''),

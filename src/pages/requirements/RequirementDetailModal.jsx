@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
+import { resolveItemTechnicalSpecs } from './RequirementFormModal';
 import { 
   Building2, 
   Calendar, 
@@ -478,10 +479,12 @@ const RequirementDetailModal = ({
                         const ofb = reqItem.dimensions?.overallFlangeBreadth || reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || origW;
                         const ofd = reqItem.dimensions?.overallFlangeDepth || origD;
 
-                        const mocVal = reqItem.dimensions?.moc || '—';
-                        const tempRangeVal = reqItem.dimensions?.temperatureRange || reqItem.dimensions?.temperature || '—';
-                        const bondingVal = reqItem.dimensions?.bonding || '—';
-                        const gasketMocVal = reqItem.dimensions?.gasketMoc || '—';
+                        const itemObj = typeof reqItem.item === 'object' ? reqItem.item : null;
+                        const resolvedSpecs = resolveItemTechnicalSpecs(itemObj, reqItem.dimensions || {});
+                        const mocVal = reqItem.dimensions?.moc || resolvedSpecs.moc || '—';
+                        const tempRangeVal = reqItem.dimensions?.temperatureRange || reqItem.dimensions?.temperature || resolvedSpecs.temperatureRange || '—';
+                        const bondingVal = reqItem.dimensions?.bonding || resolvedSpecs.bonding || '—';
+                        const gasketMocVal = reqItem.dimensions?.gasketMoc || resolvedSpecs.gasketMoc || '—';
 
                         return (
                           <div style={{ padding: '12px', backgroundColor: 'var(--neutral-50)', borderRadius: '6px', border: '1px solid var(--neutral-200)', display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -49,6 +49,88 @@ const STANDARD_GASKET_MOC_OPTIONS = [
   'Glass Fiber Pad'
 ];
 
+/**
+ * Resolves technical specifications (MOC, Temperature Range, Bonding, Gasket MOC) from an Item Master object
+ * ensuring exact string representations (e.g. 20–70 °C, 250–350 °C) and Gasket MOC (EPDM, Glass Fiber Pad).
+ */
+export const resolveItemTechnicalSpecs = (itemObj = null, fallbackDims = {}) => {
+  if (!itemObj && !fallbackDims) {
+    return { moc: '', temperatureRange: '', bonding: '', gasketMoc: '' };
+  }
+
+  // 1. Resolve Temperature Range string (e.g. 20–70 °C, 70–150 °C, 150–200 °C, 200–250 °C, 250–350 °C)
+  let resolvedTempRange = '';
+  const rawRange = itemObj?.temperatureRange || fallbackDims?.temperatureRange;
+  const rawRating = itemObj?.temperatureRating ?? fallbackDims?.temperature;
+  const rawGradeTemp = itemObj?.grade_items?.filterTemp;
+
+  if (rawRange && typeof rawRange === 'string' && rawRange.trim() !== '') {
+    resolvedTempRange = rawRange.trim();
+  } else if (rawRating !== undefined && rawRating !== null && String(rawRating).trim() !== '') {
+    const strVal = String(rawRating).trim();
+    if (strVal.includes('–') || strVal.includes('-') || strVal.includes('°') || strVal.includes('C')) {
+      resolvedTempRange = strVal;
+    } else {
+      const numVal = Number(strVal);
+      if (!Number.isNaN(numVal)) {
+        if (numVal <= 70) resolvedTempRange = '20–70 °C';
+        else if (numVal <= 150) resolvedTempRange = '70–150 °C';
+        else if (numVal <= 200) resolvedTempRange = '150–200 °C';
+        else if (numVal <= 250) resolvedTempRange = '200–250 °C';
+        else resolvedTempRange = '250–350 °C';
+      }
+    }
+  } else if (rawGradeTemp !== undefined && rawGradeTemp !== null && String(rawGradeTemp).trim() !== '') {
+    const numVal = Number(rawGradeTemp);
+    if (!Number.isNaN(numVal)) {
+      if (numVal <= 70) resolvedTempRange = '20–70 °C';
+      else if (numVal <= 150) resolvedTempRange = '70–150 °C';
+      else if (numVal <= 200) resolvedTempRange = '150–200 °C';
+      else if (numVal <= 250) resolvedTempRange = '200–250 °C';
+      else resolvedTempRange = '250–350 °C';
+    }
+  }
+
+  // 2. Resolve Gasket MOC ('EPDM' or 'Glass Fiber Pad')
+  let resolvedGasketMoc = (itemObj?.gasketMoc || fallbackDims?.gasketMoc || itemObj?.gasket || '').trim();
+  if (!resolvedGasketMoc && resolvedTempRange) {
+    if (resolvedTempRange.includes('250–350') || resolvedTempRange.includes('250-350') || resolvedTempRange.includes('350')) {
+      resolvedGasketMoc = 'Glass Fiber Pad';
+    } else {
+      resolvedGasketMoc = 'EPDM';
+    }
+  }
+
+  // 3. Resolve Bonding Adhesive
+  let resolvedBonding = (itemObj?.bonding || fallbackDims?.bonding || itemObj?.adhesive || '').trim();
+  if (!resolvedBonding && resolvedTempRange) {
+    if (resolvedTempRange.includes('250–350') || resolvedTempRange.includes('350')) {
+      resolvedBonding = 'White Adhesive (Ceramic)';
+    } else if (resolvedTempRange.includes('150–200') || resolvedTempRange.includes('200–250') || resolvedTempRange.includes('200') || resolvedTempRange.includes('250')) {
+      resolvedBonding = 'Epoxy Bonding';
+    } else {
+      resolvedBonding = 'PU Bonding';
+    }
+  }
+
+  // 4. Resolve MOC ('Aluminium', 'SS304', 'SS316')
+  let resolvedMoc = (itemObj?.moc || fallbackDims?.moc || itemObj?.casingMoc || '').trim();
+  if (!resolvedMoc && resolvedTempRange) {
+    if (resolvedTempRange.includes('200–250') || resolvedTempRange.includes('250–350')) {
+      resolvedMoc = 'SS304';
+    } else {
+      resolvedMoc = 'Aluminium';
+    }
+  }
+
+  return {
+    moc: resolvedMoc,
+    temperatureRange: resolvedTempRange,
+    bonding: resolvedBonding,
+    gasketMoc: resolvedGasketMoc,
+  };
+};
+
 // Confirmed Bonding options with operating temperature ranges
 const BONDING_OPTIONS = [
   { value: 'PU Bonding', label: 'PU Bonding' },
@@ -396,10 +478,11 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             cfm = calculateFilterCfm(innerL, innerW, fpm);
           }
 
-          const moc = rawDims.moc || itemObj?.moc || '';
-          const tempRange = rawDims.temperatureRange || rawDims.temperature || itemObj?.temperatureRange || (typeof itemObj?.temperatureRating === 'string' ? itemObj.temperatureRating : '') || '';
-          const bonding = rawDims.bonding || itemObj?.bonding || '';
-          const gasketMoc = rawDims.gasketMoc || itemObj?.gasketMoc || '';
+          const itemSpecs = resolveItemTechnicalSpecs(itemObj, rawDims);
+          const moc = itemSpecs.moc;
+          const tempRange = itemSpecs.temperatureRange;
+          const bonding = itemSpecs.bonding;
+          const gasketMoc = itemSpecs.gasketMoc;
 
           const dims = {
             itemLength: origL,
@@ -861,10 +944,11 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       }
 
       // 6. Fetch Technical Specifications from Item Master
-      const itemMoc = selectedItemObj.moc || '';
-      const itemTempRange = selectedItemObj.temperatureRange || (typeof selectedItemObj.temperatureRating === 'string' ? selectedItemObj.temperatureRating : '') || '';
-      const itemBonding = selectedItemObj.bonding || '';
-      const itemGasketMoc = selectedItemObj.gasketMoc || '';
+      const itemSpecs = resolveItemTechnicalSpecs(selectedItemObj);
+      const itemMoc = itemSpecs.moc;
+      const itemTempRange = itemSpecs.temperatureRange;
+      const itemBonding = itemSpecs.bonding;
+      const itemGasketMoc = itemSpecs.gasketMoc;
 
       // 7. Flange Design & Hole Config
       let nextFlangeDesign = '';
@@ -2165,14 +2249,18 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                               <>
                                 <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-700)' }}>
-                                      Filter Construction Type <span style={{ color: 'red' }}>*</span>
+                                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--neutral-700)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>Filter Construction Type</span>
+                                      <span style={{ color: 'red' }}>*</span>
+                                      {hasCatalogItem && (
+                                        <Lock size={13} className="text-blue-600" />
+                                      )}
                                     </div>
-                                    {hasCatalogItem && (
-                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
-                                        <Lock size={12} /> Locked to Catalog Specification ({itemObj.constructionType})
+                                    {hasCatalogItem ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '3px 10px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 700 }}>
+                                        <Lock size={12} /> Locked: {itemObj.constructionType} Construction (Catalog Item)
                                       </span>
-                                    )}
+                                    ) : null}
                                   </div>
 
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -2186,7 +2274,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         }
                                       }}
                                       disabled={hasCatalogItem || submitting}
-                                      title={hasCatalogItem ? 'Construction type is locked to selected catalog item' : 'Select FLANGE construction'}
+                                      title={hasCatalogItem ? `Construction type is locked to ${itemObj.constructionType} for selected Item Master item` : 'Select FLANGE construction'}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -2194,8 +2282,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         padding: '10px 14px',
                                         borderRadius: '8px',
                                         border: itemObj.constructionType === 'FLANGE' ? '2px solid #2563eb' : '1px solid var(--neutral-300)',
-                                        backgroundColor: itemObj.constructionType === 'FLANGE' ? '#eff6ff' : '#ffffff',
-                                        color: itemObj.constructionType === 'FLANGE' ? '#1e40af' : 'var(--neutral-700)',
+                                        backgroundColor: itemObj.constructionType === 'FLANGE' ? '#eff6ff' : (hasCatalogItem ? '#f8fafc' : '#ffffff'),
+                                        color: itemObj.constructionType === 'FLANGE' ? '#1e40af' : (hasCatalogItem ? '#94a3b8' : 'var(--neutral-700)'),
                                         cursor: hasCatalogItem ? 'not-allowed' : 'pointer',
                                         opacity: hasCatalogItem && itemObj.constructionType !== 'FLANGE' ? 0.45 : 1,
                                         textAlign: 'left',
@@ -2203,8 +2291,13 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                       }}
                                     >
                                       <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: itemObj.constructionType === 'FLANGE' ? '5px solid #2563eb' : '2px solid var(--neutral-400)', backgroundColor: '#fff', flexShrink: 0 }} />
-                                      <div>
-                                        <div style={{ fontWeight: 700, fontSize: '13px' }}>FLANGE Construction</div>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                          <span>FLANGE Construction</span>
+                                          {hasCatalogItem && itemObj.constructionType === 'FLANGE' && (
+                                            <span style={{ fontSize: '10px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '1px 6px', borderRadius: '3px', fontWeight: 600 }}>Locked</span>
+                                          )}
+                                        </div>
                                         <div style={{ fontSize: '11px', color: itemObj.constructionType === 'FLANGE' ? '#3b82f6' : 'var(--neutral-500)' }}>
                                           Filter Body + External Flange Dimensions
                                         </div>
@@ -2219,7 +2312,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         handleItemFieldChange(itemIndex, 'flangeDesign', '');
                                       }}
                                       disabled={hasCatalogItem || submitting}
-                                      title={hasCatalogItem ? 'Construction type is locked to selected catalog item' : 'Select BOX construction'}
+                                      title={hasCatalogItem ? `Construction type is locked to ${itemObj.constructionType} for selected Item Master item` : 'Select BOX construction'}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -2227,8 +2320,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         padding: '10px 14px',
                                         borderRadius: '8px',
                                         border: itemObj.constructionType === 'BOX' ? '2px solid #7c3aed' : '1px solid var(--neutral-300)',
-                                        backgroundColor: itemObj.constructionType === 'BOX' ? '#faf5ff' : '#ffffff',
-                                        color: itemObj.constructionType === 'BOX' ? '#5b21b6' : 'var(--neutral-700)',
+                                        backgroundColor: itemObj.constructionType === 'BOX' ? '#faf5ff' : (hasCatalogItem ? '#f8fafc' : '#ffffff'),
+                                        color: itemObj.constructionType === 'BOX' ? '#5b21b6' : (hasCatalogItem ? '#94a3b8' : 'var(--neutral-700)'),
                                         cursor: hasCatalogItem ? 'not-allowed' : 'pointer',
                                         opacity: hasCatalogItem && itemObj.constructionType !== 'BOX' ? 0.45 : 1,
                                         textAlign: 'left',
@@ -2236,14 +2329,28 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                       }}
                                     >
                                       <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: itemObj.constructionType === 'BOX' ? '5px solid #7c3aed' : '2px solid var(--neutral-400)', backgroundColor: '#fff', flexShrink: 0 }} />
-                                      <div>
-                                        <div style={{ fontWeight: 700, fontSize: '13px' }}>BOX Construction</div>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                          <span>BOX Construction</span>
+                                          {hasCatalogItem && itemObj.constructionType === 'BOX' && (
+                                            <span style={{ fontSize: '10px', color: '#6d28d9', backgroundColor: '#f3e8ff', padding: '1px 6px', borderRadius: '3px', fontWeight: 600 }}>Locked</span>
+                                          )}
+                                        </div>
                                         <div style={{ fontSize: '11px', color: itemObj.constructionType === 'BOX' ? '#8b5cf6' : 'var(--neutral-500)' }}>
                                           Standard Box Filter (No External Flange)
                                         </div>
                                       </div>
                                     </button>
                                   </div>
+
+                                  {hasCatalogItem && (
+                                    <div style={{ fontSize: '11px', color: '#475569', backgroundColor: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <Lock size={12} className="text-blue-600" />
+                                      <span>
+                                        Filter construction type is <strong>locked to {itemObj.constructionType}</strong> per selected catalog item ({itemObj.itemSearch || 'Item Master'}).
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* ENGINEERING DIMENSION SPECIFICATION SECTION */}
@@ -2264,9 +2371,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                         <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
                                           A. Original Filter Dimensions (Item Master)
                                         </div>
-                                        <span style={{ fontSize: '10.5px', color: hasCatalogItem ? '#1e40af' : '#475569', backgroundColor: hasCatalogItem ? '#dbeafe' : '#e2e8f0', padding: '2px 8px', borderRadius: '4px', border: hasCatalogItem ? '1px solid #bfdbfe' : '1px solid #cbd5e1', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                          {hasCatalogItem && <Lock size={11} />}
-                                          {hasCatalogItem ? 'Read-Only (From Item Master)' : 'Original Dimensions'}
+                                        <span style={{ fontSize: '10.5px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
+                                          {hasCatalogItem ? 'From Item Master (Editable)' : 'Filter Dimensions'}
                                         </span>
                                       </div>
                                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
@@ -2276,9 +2382,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                             placeholder="e.g. 510"
                                             value={dispOrigL}
                                             onChange={(e) => handleItemDimensionChange(itemIndex, 'itemLength', e.target.value)}
-                                            readOnly={hasCatalogItem}
-                                            disabled={hasCatalogItem || submitting}
-                                            style={hasCatalogItem ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : undefined}
+                                            disabled={submitting}
                                           />
                                         </FormField>
 
@@ -2288,9 +2392,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                             placeholder="e.g. 510"
                                             value={dispOrigW}
                                             onChange={(e) => handleItemDimensionChange(itemIndex, 'itemBreadth', e.target.value)}
-                                            readOnly={hasCatalogItem}
-                                            disabled={hasCatalogItem || submitting}
-                                            style={hasCatalogItem ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : undefined}
+                                            disabled={submitting}
                                           />
                                         </FormField>
 
@@ -2300,9 +2402,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                             placeholder="e.g. 150"
                                             value={dispOrigD}
                                             onChange={(e) => handleItemDimensionChange(itemIndex, 'depth', e.target.value)}
-                                            readOnly={hasCatalogItem}
-                                            disabled={hasCatalogItem || submitting}
-                                            style={hasCatalogItem ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : undefined}
+                                            disabled={submitting}
                                           />
                                         </FormField>
 
@@ -2312,16 +2412,12 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                             placeholder="500"
                                             value={dispFpm}
                                             onChange={(e) => handleItemDimensionChange(itemIndex, 'faceVelocity', e.target.value)}
-                                            readOnly={hasCatalogItem}
-                                            disabled={hasCatalogItem || submitting}
-                                            style={hasCatalogItem ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : undefined}
+                                            disabled={submitting}
                                           />
                                         </FormField>
                                       </div>
                                       <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
-                                        {hasCatalogItem
-                                          ? 'Item Master is the single source of truth for filter dimensions. Dimensions are read-only in Enquiry.'
-                                          : 'Actual filter dimensions. Changing dimensions dynamically updates calculated inner dimensions and airflow.'}
+                                        Actual filter dimensions. Changing dimensions dynamically updates calculated inner dimensions and airflow.
                                       </div>
                                     </div>
 
