@@ -2309,21 +2309,26 @@ return (
       </div>
     </div>
 
-    {/* 3.6 Filter Size: Outer Dimensions Only */}
+    {/* 3.6 Filter Size: Custom Filter Box Size / Dimensions */}
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
         <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
           <Maximize2 size={15} className="text-indigo-600" />
-          <span>3.6 Filter Size: Outer Dimensions (MM)</span>
+          <span>3.6 Filter Size: {isFlange ? 'Custom Filter Box Size (MM)' : 'Filter Dimensions (MM)'}</span>
           <span className="text-red-500 font-bold">*</span>
         </div>
         <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium border border-blue-200">
-          Enter Outer Dimensions Only
+          {isFlange ? 'Custom Filter Box Size' : 'Enter Dimensions Only'}
         </span>
       </div>
+      {isFlange && (
+        <div className="text-[11.5px] text-slate-500 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-lg">
+          Define custom filter/body dimensions (Length, Breadth, Depth). Custom dimensions are stored in Item Master and control inner airflow core, airflow (CFM), and drawing generation.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
-        <FormField label="Outer Length (MM)" required>
+        <FormField label="Length (MM)" required>
           <Input
             type="number"
             step="any"
@@ -2335,7 +2340,7 @@ return (
           />
         </FormField>
 
-        <FormField label="Outer Width (MM)" required>
+        <FormField label="Breadth (MM)" required>
           <Input
             type="number"
             step="any"
@@ -2347,7 +2352,7 @@ return (
           />
         </FormField>
 
-        <FormField label="Outer Depth (MM)" required>
+        <FormField label="Depth (MM)" required>
           <Input
             type="number"
             step="any"
