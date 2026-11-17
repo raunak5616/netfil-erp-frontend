@@ -461,78 +461,140 @@ const RequirementDetailModal = ({
                       )}
 
                       {/* TECHNICAL & ENGINEERING DIMENSION SPECIFICATIONS */}
-                      <div style={{ padding: '10px', backgroundColor: 'var(--neutral-50)', borderRadius: '6px', border: '1px solid var(--neutral-200)' }}>
-                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Maximize2 size={14} /> ENGINEERING DIMENSION SPECIFICATION
-                          </span>
-                          <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: 'var(--neutral-500)' }}>Unit: mm</span>
-                        </div>
+                      {(() => {
+                        const origL = reqItem.dimensions?.itemLength || reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—';
+                        const origW = reqItem.dimensions?.itemBreadth || reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—';
+                        const origD = reqItem.dimensions?.itemDepth || reqItem.dimensions?.depth || reqItem.dimensions?.length || '—';
+                        const fpm = reqItem.dimensions?.faceVelocity || 500;
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                          <div>
-                            <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>A. Filter Body (BOX) Dimensions</span>
-                            <strong style={{ color: 'var(--neutral-900)' }}>
-                              {reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—'} × {reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
-                            </strong>
-                          </div>
+                        const numOrigL = Number(origL);
+                        const numOrigW = Number(origW);
 
-                          {constTypeStr === 'FLANGE' ? (
-                            <div>
-                              <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block' }}>B. Overall Flange Dimensions (+60 mm total flange)</span>
-                              <strong style={{ color: 'var(--primary-800)' }}>
-                                {reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || '—'} × {reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
-                              </strong>
+                        const innerL = reqItem.dimensions?.innerLength || reqItem.dimensions?.bodyHeight || (constTypeStr === 'FLANGE' && !isNaN(numOrigL) && numOrigL > 60 ? numOrigL - 60 : origL);
+                        const innerW = reqItem.dimensions?.innerWidth || reqItem.dimensions?.bodyWidth || (constTypeStr === 'FLANGE' && !isNaN(numOrigW) && numOrigW > 60 ? numOrigW - 60 : origW);
+                        const innerD = reqItem.dimensions?.innerDepth || origD;
+
+                        const ofl = reqItem.dimensions?.overallFlangeLength || reqItem.dimensions?.overallFlangeHeight || reqItem.dimensions?.flangeHeight || origL;
+                        const ofb = reqItem.dimensions?.overallFlangeBreadth || reqItem.dimensions?.overallFlangeWidth || reqItem.dimensions?.flangeWidth || origW;
+                        const ofd = reqItem.dimensions?.overallFlangeDepth || origD;
+
+                        const mocVal = reqItem.dimensions?.moc || '—';
+                        const tempRangeVal = reqItem.dimensions?.temperatureRange || reqItem.dimensions?.temperature || '—';
+                        const bondingVal = reqItem.dimensions?.bonding || '—';
+                        const gasketMocVal = reqItem.dimensions?.gasketMoc || '—';
+
+                        return (
+                          <div style={{ padding: '12px', backgroundColor: 'var(--neutral-50)', borderRadius: '6px', border: '1px solid var(--neutral-200)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--primary-800)', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--neutral-200)', paddingBottom: '6px' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Maximize2 size={14} /> ENGINEERING DIMENSION & TECHNICAL SPECIFICATIONS
+                              </span>
+                              <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: 'var(--neutral-500)', backgroundColor: '#fff', padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--neutral-200)' }}>
+                                Unit: mm
+                              </span>
                             </div>
-                          ) : (
-                            <div>
-                              <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block' }}>B. Overall Dimensions (Equal to BOX)</span>
-                              <strong style={{ color: 'var(--neutral-900)' }}>
-                                {reqItem.dimensions?.bodyWidth || reqItem.dimensions?.width || '—'} × {reqItem.dimensions?.bodyHeight || reqItem.dimensions?.height || '—'} × {reqItem.dimensions?.depth || reqItem.dimensions?.length || '—'} mm
-                              </strong>
-                              <span style={{ fontSize: '10px', color: 'var(--neutral-400)', display: 'block' }}>No flange projection added</span>
-                            </div>
-                          )}
-                        </div>
 
-                        {/* CFM rating */}
-                        {reqItem.dimensions?.cfm ? (
-                          <div style={{ marginTop: '6px', padding: '6px 10px', backgroundColor: '#ecfdf5', borderRadius: '4px', border: '1px solid #a7f3d0', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: '#065f46', fontWeight: 600 }}>Design Airflow (Calculated from BOX Size):</span>
-                            <strong style={{ color: '#047857', fontFamily: 'monospace' }}>{reqItem.dimensions.cfm} CFM @ {reqItem.dimensions.faceVelocity || 500} FPM</strong>
-                          </div>
-                        ) : null}
-
-                        {/* Flange Design & Flange Hole Configuration */}
-                        {constTypeStr === 'FLANGE' && (
-                          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--neutral-200)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '11.5px', color: 'var(--neutral-700)', marginBottom: '4px' }}>
-                              <div>
-                                Flange Design Master: <strong style={{ color: 'var(--neutral-900)' }}>
-                                  {reqItem.flangeDesignSnapshot?.designCode || flangeObj?.designCode || 'FLG-001'} — {reqItem.flangeDesignSnapshot?.designName || flangeObj?.designName || 'Flange Design'}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+                              {/* Subsection A */}
+                              <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                                <span style={{ color: 'var(--neutral-500)', fontSize: '11px', display: 'block', fontWeight: 600 }}>A. Original Filter Dimensions (Item Master)</span>
+                                <strong style={{ color: 'var(--neutral-900)', fontSize: '13px' }}>
+                                  {origL} × {origW} × {origD} mm
                                 </strong>
+                                <span style={{ fontSize: '10.5px', color: 'var(--neutral-500)', display: 'block', marginTop: '2px' }}>
+                                  Face Velocity: {fpm} FPM
+                                </span>
                               </div>
-                              <div>
-                                Flange Hole Configuration: <strong style={{ color: reqItem.flangeHoleConfig || reqItem.holeCount ? '#7c3aed' : 'var(--neutral-600)' }}>
-                                  {reqItem.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : 'Not Specified')}
+
+                              {/* Subsection B */}
+                              <div style={{ backgroundColor: constTypeStr === 'FLANGE' ? '#eff6ff' : '#faf5ff', padding: '8px 10px', borderRadius: '4px', border: constTypeStr === 'FLANGE' ? '1px solid #bfdbfe' : '1px solid #e9d5ff' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ color: constTypeStr === 'FLANGE' ? '#1e40af' : '#6b21a8', fontSize: '11px', fontWeight: 600 }}>B. Calculated Inner Core</span>
+                                  {constTypeStr === 'FLANGE' ? (
+                                    <span style={{ fontSize: '10px', color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '1px 6px', borderRadius: '3px' }}>−60 mm Flange</span>
+                                  ) : (
+                                    <span style={{ fontSize: '10px', color: '#6d28d9', backgroundColor: '#f3e8ff', padding: '1px 6px', borderRadius: '3px' }}>Inner = Outer</span>
+                                  )}
+                                </div>
+                                <strong style={{ color: constTypeStr === 'FLANGE' ? '#1e3a8a' : '#581c87', fontSize: '13px', display: 'block', marginTop: '2px' }}>
+                                  {innerL} × {innerW} × {innerD} mm
                                 </strong>
+                                {reqItem.dimensions?.cfm ? (
+                                  <span style={{ fontSize: '11px', color: '#047857', fontWeight: 700, display: 'block', marginTop: '2px' }}>
+                                    Airflow: {reqItem.dimensions.cfm} CFM
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {/* Subsection C */}
+                              <div style={{ backgroundColor: '#ffffff', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
+                                {constTypeStr === 'FLANGE' ? (
+                                  <>
+                                    <span style={{ color: 'var(--primary-700)', fontSize: '11px', display: 'block', fontWeight: 600 }}>C. Overall Flange Dimensions (Enquiry)</span>
+                                    <strong style={{ color: 'var(--primary-800)', fontSize: '13px' }}>
+                                      {ofl} × {ofb} × {ofd} mm
+                                    </strong>
+                                    <span style={{ fontSize: '10px', color: '#3b82f6', display: 'block', marginTop: '2px' }}>
+                                      Outer flange mounting size
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span style={{ color: 'var(--neutral-600)', fontSize: '11px', display: 'block', fontWeight: 600 }}>C. Overall Dimensions (BOX)</span>
+                                    <strong style={{ color: 'var(--neutral-900)', fontSize: '13px' }}>
+                                      {origL} × {origW} × {origD} mm
+                                    </strong>
+                                    <span style={{ fontSize: '10px', color: 'var(--neutral-400)', display: 'block', marginTop: '2px' }}>
+                                      No external flange extension
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Subsection D */}
+                              <div style={{ backgroundColor: '#f0fdf4', padding: '8px 10px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                                <span style={{ color: '#166534', fontSize: '11px', display: 'block', fontWeight: 600 }}>D. Technical Specifications</span>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px', color: '#1e293b', marginTop: '3px' }}>
+                                  <div>MOC: <strong>{mocVal}</strong></div>
+                                  <div>Temp: <strong>{tempRangeVal}</strong></div>
+                                  <div>Bonding: <strong>{bondingVal}</strong></div>
+                                  <div>Gasket MOC: <strong>{gasketMocVal}</strong></div>
+                                </div>
                               </div>
                             </div>
-                            {(reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage) && (
-                              <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>
-                                <img
-                                  src={reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage}
-                                  alt="Reference Design Preview"
-                                  style={{ maxHeight: '140px', objectFit: 'contain' }}
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                  }}
-                                />
+
+                            {/* Flange Design & Flange Hole Configuration */}
+                            {constTypeStr === 'FLANGE' && (
+                              <div style={{ marginTop: '2px', paddingTop: '8px', borderTop: '1px dashed var(--neutral-200)' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '11.5px', color: 'var(--neutral-700)', marginBottom: '4px' }}>
+                                  <div>
+                                    Flange Design Master: <strong style={{ color: 'var(--neutral-900)' }}>
+                                      {reqItem.flangeDesignSnapshot?.designCode || flangeObj?.designCode || 'FLG-001'} — {reqItem.flangeDesignSnapshot?.designName || flangeObj?.designName || 'Flange Design'}
+                                    </strong>
+                                  </div>
+                                  <div>
+                                    Flange Hole Configuration: <strong style={{ color: reqItem.flangeHoleConfig || reqItem.holeCount ? '#7c3aed' : 'var(--neutral-600)' }}>
+                                      {reqItem.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : 'Not Specified')}
+                                    </strong>
+                                  </div>
+                                </div>
+                                {(reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage) && (
+                                  <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>
+                                    <img
+                                      src={reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage}
+                                      alt="Reference Design Preview"
+                                      style={{ maxHeight: '140px', objectFit: 'contain' }}
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
 
                       {/* Item Specifications */}
                       {Array.isArray(reqItem.specifications) && reqItem.specifications.length > 0 && (
