@@ -33,17 +33,21 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
   const isFilterItem = item.productType === 'FILTER' || !!item.constructionType || !!item.filterLength || !!item.filterGrade;
   const isFlangeItem = (item.constructionType || '').toUpperCase() === 'FLANGE';
-  const itemOverallL = item.overallLength ?? (item.filterLength ? (isFlangeItem ? Number(item.filterLength) + 60 : Number(item.filterLength)) : null);
-  const itemOverallW = item.overallWidth ?? (item.filterWidth ? (isFlangeItem ? Number(item.filterWidth) + 60 : Number(item.filterWidth)) : null);
-  const itemOverallD = item.overallDepth ?? item.filterDepth;
+  const itemInnerL = item.innerLength ?? item.filterLength ?? (item.outerLength ? (isFlangeItem ? Number(item.outerLength) - 60 : Number(item.outerLength)) : null);
+  const itemInnerW = item.innerWidth ?? item.filterWidth ?? (item.outerWidth ? (isFlangeItem ? Number(item.outerWidth) - 60 : Number(item.outerWidth)) : null);
+  const itemInnerD = item.innerDepth ?? item.filterDepth ?? item.outerDepth;
+
+  const itemOverallL = item.outerLength ?? item.overallLength ?? (item.filterLength ? (isFlangeItem ? Number(item.filterLength) + 60 : Number(item.filterLength)) : null);
+  const itemOverallW = item.outerWidth ?? item.overallWidth ?? (item.filterWidth ? (isFlangeItem ? Number(item.filterWidth) + 60 : Number(item.filterWidth)) : null);
+  const itemOverallD = item.outerDepth ?? item.overallDepth ?? item.filterDepth;
 
   const filterSpecsList = isFilterItem ? [
-    item.filterLength ? { label: 'Body Length', value: `${item.filterLength} mm` } : null,
-    item.filterWidth ? { label: 'Body Width', value: `${item.filterWidth} mm` } : null,
-    item.filterDepth ? { label: 'Body Depth', value: `${item.filterDepth} mm` } : null,
+    itemInnerL ? { label: 'Inner Body Length', value: `${itemInnerL} mm` } : null,
+    itemInnerW ? { label: 'Inner Body Width', value: `${itemInnerW} mm` } : null,
+    itemInnerD ? { label: 'Inner Body Depth', value: `${itemInnerD} mm` } : null,
     (itemOverallL && itemOverallW && itemOverallD) ? {
-      label: 'Overall Box Dimensions',
-      value: `${itemOverallL} × ${itemOverallW} × ${itemOverallD} mm${isFlangeItem ? ' (+60mm Flange)' : ' (Box)'}`
+      label: isFlangeItem ? 'Outer Flange Dimensions' : 'Outer Box Dimensions',
+      value: `${itemOverallL} × ${itemOverallW} × ${itemOverallD} mm${isFlangeItem ? ' (Flange)' : ' (Box)'}`
     } : ((item.overallBoxConstruction || item.boxConstruction) ? { label: 'Overall Box Dimensions', value: item.overallBoxConstruction || item.boxConstruction } : null),
     item.cfm ? { label: 'Airflow Capacity', value: `${item.cfm} CFM` } : null,
     item.faceVelocity ? { label: 'Face Velocity', value: `${item.faceVelocity} FPM` } : null,
@@ -345,12 +349,12 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             {(item.productType === 'FILTER' || item.constructionType || item.filterLength) && (() => {
               const constType = (item.constructionType || '').toUpperCase();
               const isFlange = constType === 'FLANGE';
-              const boxL = item.filterLength ?? item.grade_items?.height;
-              const boxW = item.filterWidth ?? item.grade_items?.width;
-              const boxD = item.filterDepth ?? item.grade_items?.length;
-              const ofL = item.overallLength ?? (item.overallFlangeLength || (boxL ? (isFlange ? Number(boxL) + 60 : Number(boxL)) : null));
-              const ofW = item.overallWidth ?? (item.overallFlangeWidth || (boxW ? (isFlange ? Number(boxW) + 60 : Number(boxW)) : null));
-              const ofD = item.overallDepth ?? (item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : boxD);
+              const innerL = item.innerLength ?? item.filterLength ?? item.grade_items?.height;
+              const innerW = item.innerWidth ?? item.filterWidth ?? item.grade_items?.width;
+              const innerD = item.innerDepth ?? item.filterDepth ?? item.grade_items?.length;
+              const outerL = item.outerLength ?? item.overallLength ?? item.overallFlangeLength ?? (innerL ? (isFlange ? Number(innerL) + 60 : Number(innerL)) : null);
+              const outerW = item.outerWidth ?? item.overallWidth ?? item.overallFlangeWidth ?? (innerW ? (isFlange ? Number(innerW) + 60 : Number(innerW)) : null);
+              const outerD = item.outerDepth ?? item.overallDepth ?? (item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : innerD);
 
               return (
                 <div className="border border-blue-200 bg-blue-50/50 rounded-md p-3.5">
@@ -364,47 +368,49 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {/* Body Dimensions */}
+                    {/* Inner Dimensions */}
                     <div className="bg-white p-2.5 rounded border border-blue-100">
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                        Body Dimensions (MM)
+                        Calculated Inner Dimensions (MM)
                       </span>
                       <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                        {boxL || '—'} × {boxW || '—'} × {boxD || '—'} mm
+                        {innerL || '—'} × {innerW || '—'} × {innerD || '—'} mm
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Body Length × Width × Depth</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        {isFlange ? 'Inner Length × Width × Depth (−60 mm)' : 'Inner Body Length × Width × Depth'}
+                      </span>
                     </div>
 
-                    {/* Overall Dimensions */}
+                    {/* Outer Dimensions */}
                     {isFlange ? (
                       <div className="bg-white p-2.5 rounded border border-blue-200 bg-blue-50/30">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-blue-700">
-                            Overall Box Dimensions
+                            Outer Dimensions (MM)
                           </span>
                           <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
-                            +60 mm Total (+30 mm/side)
+                            +60 mm Flange
                           </span>
                         </div>
                         <div className="font-mono font-bold text-sm text-blue-950 mt-0.5">
-                          {ofL || '—'} × {ofW || '—'} × {ofD || '—'} mm
+                          {outerL || '—'} × {outerW || '—'} × {outerD || '—'} mm
                         </div>
                         <span className="text-[10px] text-blue-600 block mt-0.5">
-                          Overall Length × Overall Width × Depth
+                          Outer Length × Outer Width × Depth
                         </span>
                       </div>
                     ) : (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-slate-600">
-                            Overall Box Dimensions
+                            Outer Dimensions (MM)
                           </span>
                           <span className="text-[9.5px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                            Equal to Body (No Flange)
+                            Equal to Inner (No Flange)
                           </span>
                         </div>
                         <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                          {ofL || boxL || '—'} × {ofW || boxW || '—'} × {ofD || boxD || '—'} mm
+                          {outerL || innerL || '—'} × {outerW || innerW || '—'} × {outerD || innerD || '—'} mm
                         </div>
                         <span className="text-[10px] text-slate-400 block mt-0.5">
                           Equal to body dimensions
@@ -485,12 +491,12 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
             {isFilterItem && (() => {
               const constType = (item.constructionType || '').toUpperCase();
               const isFlange = constType === 'FLANGE';
-              const boxL = item.filterLength ?? item.grade_items?.height;
-              const boxW = item.filterWidth ?? item.grade_items?.width;
-              const boxD = item.filterDepth ?? item.grade_items?.length;
-              const ofL = item.overallFlangeLength || (boxL ? Number(boxL) + 60 : null);
-              const ofW = item.overallFlangeWidth || (boxW ? Number(boxW) + 60 : null);
-              const ofD = item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : boxD;
+              const innerL = item.innerLength ?? item.filterLength ?? item.grade_items?.height;
+              const innerW = item.innerWidth ?? item.filterWidth ?? item.grade_items?.width;
+              const innerD = item.innerDepth ?? item.filterDepth ?? item.grade_items?.length;
+              const outerL = item.outerLength ?? item.overallLength ?? item.overallFlangeLength ?? (innerL ? (isFlange ? Number(innerL) + 60 : Number(innerL)) : null);
+              const outerW = item.outerWidth ?? item.overallWidth ?? item.overallFlangeWidth ?? (innerW ? (isFlange ? Number(innerW) + 60 : Number(innerW)) : null);
+              const outerD = item.outerDepth ?? item.overallDepth ?? (item.overallFlangeDepth !== null && item.overallFlangeDepth !== undefined ? item.overallFlangeDepth : innerD);
 
               return (
                 <div className="border border-blue-200 bg-blue-50/50 rounded-md p-3.5">
@@ -504,47 +510,49 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {/* BOX Dimensions */}
+                    {/* Inner Dimensions */}
                     <div className="bg-white p-2.5 rounded border border-blue-100">
                       <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                        Authoritative BOX Dimensions
+                        Calculated Inner Dimensions (MM)
                       </span>
                       <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                        {boxL || '—'} × {boxW || '—'} × {boxD || '—'} mm
+                        {innerL || '—'} × {innerW || '—'} × {innerD || '—'} mm
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Length × Width × Depth</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        {isFlange ? 'Inner Length × Width × Depth (−60 mm)' : 'Inner Body Length × Width × Depth'}
+                      </span>
                     </div>
 
-                    {/* Overall Dimensions */}
+                    {/* Outer Dimensions */}
                     {isFlange ? (
                       <div className="bg-white p-2.5 rounded border border-blue-200 bg-blue-50/30">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-blue-700">
-                            Overall Flange Dimensions
+                            Outer Dimensions (MM)
                           </span>
                           <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
-                            +60 mm Total (+30 mm/side)
+                            +60 mm Flange
                           </span>
                         </div>
                         <div className="font-mono font-bold text-sm text-blue-950 mt-0.5">
-                          {ofL || '—'} × {ofW || '—'} × {ofD || '—'} mm
+                          {outerL || '—'} × {outerW || '—'} × {outerD || '—'} mm
                         </div>
                         <span className="text-[10px] text-blue-600 block mt-0.5">
-                          (Flange Length × Flange Width × Depth)
+                          (Outer Length × Outer Width × Depth)
                         </span>
                       </div>
                     ) : (
                       <div className="bg-white p-2.5 rounded border border-slate-200">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold text-slate-600">
-                            Overall Dimensions
+                            Outer Dimensions (MM)
                           </span>
                           <span className="text-[9.5px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                            Equal to BOX (No Flange)
+                            Equal to Inner (No Flange)
                           </span>
                         </div>
                         <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                          {boxL || '—'} × {boxW || '—'} × {boxD || '—'} mm
+                          {outerL || innerL || '—'} × {outerW || innerW || '—'} × {outerD || innerD || '—'} mm
                         </div>
                         <span className="text-[10px] text-slate-400 block mt-0.5">
                           No flange projection added

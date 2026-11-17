@@ -49,6 +49,7 @@ import {
   ShieldCheck,
   FileText,
   Hash,
+  AlertTriangle,
 } from 'lucide-react';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
@@ -542,9 +543,9 @@ const ItemFormModal = ({
         moc: initialMoc,
         customMoc: '',
         flangeType: item.flangeType?._id || item.flangeType || '',
-        filterLength: item.filterLength !== null && item.filterLength !== undefined ? item.filterLength : '',
-        filterWidth: item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '',
-        filterDepth: item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : '',
+        filterLength: item.outerLength !== null && item.outerLength !== undefined ? item.outerLength : (item.overallLength ?? (item.filterLength !== null && item.filterLength !== undefined ? item.filterLength : '')),
+        filterWidth: item.outerWidth !== null && item.outerWidth !== undefined ? item.outerWidth : (item.overallWidth ?? (item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '')),
+        filterDepth: item.outerDepth !== null && item.outerDepth !== undefined ? item.outerDepth : (item.overallDepth ?? (item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : '')),
         faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
         temperatureRating: item.temperatureRange || item.temperatureRating || '',
         temperatureRange: item.temperatureRange || (typeof item.temperatureRating === 'string' ? item.temperatureRating : ''),
@@ -713,21 +714,10 @@ const { requiredSpecs, optionalSpecs } = useMemo(() => {
   };
 }, [categorySpecs, formData.productType]);
 
-// Calculated CFM
-const calculatedCfm = useMemo(() => {
-  const l = Number(formData.filterLength);
-  const w = Number(formData.filterWidth);
-  const fv = Number(formData.faceVelocity);
-  if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(fv) || fv <= 0) {
-    return null;
-  }
-  const rawCfm = (l / 304.8) * (w / 304.8) * fv;
-  const rounded10 = Math.round(rawCfm / 10) * 10;
-  return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
-}, [formData.filterLength, formData.filterWidth, formData.faceVelocity]);
-
-// Automatic calculation of overall physical filter dimensions
-const calculatedOverallDimensions = useMemo(() => {
+// Automatic calculation of inner dimensions from outer dimensions
+// FLANGE: Inner Length = Outer Length - 60mm, Inner Width = Outer Width - 60mm, Inner Depth = Outer Depth
+// BOX: Inner Dimensions = Outer Dimensions
+const calculatedInnerDimensions = useMemo(() => {
   const rawL = Number(formData.filterLength);
   const rawW = Number(formData.filterWidth);
   const rawD = Number(formData.filterDepth);
@@ -735,35 +725,88 @@ const calculatedOverallDimensions = useMemo(() => {
   const hasW = Number.isFinite(rawW) && rawW > 0;
   const hasD = Number.isFinite(rawD) && rawD > 0;
 
-  const isFlange = filterType === 'FLANGE';
-  const isBox = filterType === 'BOX';
+  const effConstruction = (filterType || formData.constructionType || formData.filterType || '').toUpperCase().trim();
+  const isFlange = effConstruction === 'FLANGE';
+  const isBox = effConstruction === 'BOX';
 
-  if (!isFlange && !isBox) {
-    return {
-      overallLength: hasL ? rawL : '',
-      overallWidth: hasW ? rawW : '',
-      overallDepth: hasD ? rawD : '',
-      displayL: hasL ? `${rawL} mm` : '—',
-      displayW: hasW ? `${rawW} mm` : '—',
-      displayD: hasD ? `${rawD} mm` : '—',
-      summary: (hasL && hasW && hasD) ? `${rawL} × ${rawW} × ${rawD} mm` : '—'
-    };
+  let innerL = null;
+  let innerW = null;
+  let innerD = hasD ? rawD : null;
+  let validationError = '';
+
+  if (isFlange) {
+    if (hasL) {
+      if (rawL <= 60) {
+        validationError = 'Outer Length must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side';
+        innerL = null;
+      } else {
+        innerL = rawL - 60;
+      }
+    }
+    if (hasW) {
+      if (rawW <= 60) {
+        validationError = validationError
+          ? 'Outer Length and Outer Width must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side'
+          : 'Outer Width must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side';
+        innerW = null;
+      } else {
+        innerW = rawW - 60;
+      }
+    }
+  } else {
+    // BOX or standard
+    if (hasL) innerL = rawL;
+    if (hasW) innerW = rawW;
   }
 
-  const overallL = hasL ? (isFlange ? rawL + 60 : rawL) : '';
-  const overallW = hasW ? (isFlange ? rawW + 60 : rawW) : '';
-  const overallD = hasD ? rawD : '';
+  const overallL = hasL ? rawL : null;
+  const overallW = hasW ? rawW : null;
+  const overallD = hasD ? rawD : null;
+
+  const isInvalid = Boolean(validationError) || (isFlange && ((hasL && rawL <= 60) || (hasW && rawW <= 60)));
 
   return {
+    outerLength: overallL,
+    outerWidth: overallW,
+    outerDepth: overallD,
+    innerLength: isInvalid ? null : innerL,
+    innerWidth: isInvalid ? null : innerW,
+    innerDepth: innerD,
     overallLength: overallL,
     overallWidth: overallW,
     overallDepth: overallD,
-    displayL: overallL !== '' ? `${overallL} mm` : '—',
-    displayW: overallW !== '' ? `${overallW} mm` : '—',
-    displayD: overallD !== '' ? `${overallD} mm` : '—',
-    summary: (overallL !== '' && overallW !== '' && overallD !== '') ? `${overallL} × ${overallW} × ${overallD} mm` : '—'
+    hasInnerDimensions: !isInvalid && innerL !== null && innerW !== null && innerD !== null && innerL > 0 && innerW > 0,
+    displayInnerL: (!isInvalid && innerL !== null && innerL > 0) ? `${innerL} mm` : '—',
+    displayInnerW: (!isInvalid && innerW !== null && innerW > 0) ? `${innerW} mm` : '—',
+    displayInnerD: innerD !== null ? `${innerD} mm` : '—',
+    summaryInner: (!isInvalid && innerL !== null && innerW !== null && innerD !== null && innerL > 0 && innerW > 0)
+      ? `${innerL} × ${innerW} × ${innerD} mm`
+      : '—',
+    summaryOuter: (hasL && hasW && hasD) ? `${rawL} × ${rawW} × ${rawD} mm` : '—',
+    summary: (hasL && hasW && hasD) ? `${rawL} × ${rawW} × ${rawD} mm` : '—',
+    validationError,
+    isInvalid,
+    isFlange,
+    isBox
   };
-}, [formData.filterLength, formData.filterWidth, formData.filterDepth, filterType]);
+}, [formData.filterLength, formData.filterWidth, formData.filterDepth, filterType, formData.constructionType, formData.filterType]);
+
+// Alias for backwards compatibility
+const calculatedOverallDimensions = calculatedInnerDimensions;
+
+// Calculated CFM based on active core / inner dimensions:
+// (Inner Length / 304.8) * (Inner Width / 304.8) * Face Velocity, rounded to nearest 10
+const calculatedCfm = useMemo(() => {
+  const innerL = calculatedInnerDimensions.innerLength;
+  const innerW = calculatedInnerDimensions.innerWidth;
+  const fv = Number(formData.faceVelocity);
+  if (!Number.isFinite(innerL) || innerL <= 0 || !Number.isFinite(innerW) || innerW <= 0 || !Number.isFinite(fv) || fv <= 0) {
+    return null;
+  }
+  const rawCfm = (innerL / 304.8) * (innerW / 304.8) * fv;
+  const rounded10 = Math.round(rawCfm / 10) * 10;
+  return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
+}, [calculatedInnerDimensions.innerLength, calculatedInnerDimensions.innerWidth, formData.faceVelocity]);
 
 // Selected Filter Grade Object
 const selectedFg = useMemo(() => {
@@ -1146,6 +1189,15 @@ const validateCurrentStep = (step) => {
       if (formData.filterDepth === '' || Number(formData.filterDepth) <= 0 || isNaN(Number(formData.filterDepth))) {
         return 'Outer Filter Depth must be a positive number in MM.';
       }
+      const isFlange = (filterType || formData.constructionType || '').toUpperCase() === 'FLANGE';
+      if (isFlange) {
+        if (Number(formData.filterLength) <= 60) {
+          return 'Outer Length must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side.';
+        }
+        if (Number(formData.filterWidth) <= 60) {
+          return 'Outer Width must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side.';
+        }
+      }
       return null;
     } else {
       // Non-Filter Step 3: Required Category Specifications
@@ -1215,13 +1267,22 @@ const validate = () => {
       return 'Bonding Adhesive is required.';
     }
     if (formData.filterLength !== '' && (Number(formData.filterLength) <= 0 || isNaN(Number(formData.filterLength)))) {
-      return 'Filter Length must be a positive number in MM.';
+      return 'Outer Filter Length must be a positive number in MM.';
     }
     if (formData.filterWidth !== '' && (Number(formData.filterWidth) <= 0 || isNaN(Number(formData.filterWidth)))) {
-      return 'Filter Width must be a positive number in MM.';
+      return 'Outer Filter Width must be a positive number in MM.';
     }
     if (formData.filterDepth !== '' && (Number(formData.filterDepth) <= 0 || isNaN(Number(formData.filterDepth)))) {
-      return 'Filter Depth must be a positive number in MM.';
+      return 'Outer Filter Depth must be a positive number in MM.';
+    }
+    const isFlange = (filterType || formData.constructionType || '').toUpperCase() === 'FLANGE';
+    if (isFlange) {
+      if (Number(formData.filterLength) <= 60) {
+        return 'Outer Length must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side.';
+      }
+      if (Number(formData.filterWidth) <= 60) {
+        return 'Outer Width must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side.';
+      }
     }
     if (formData.moc === 'OTHER' && !formData.customMoc?.trim()) {
       return 'Please specify the custom Material of Construction (MOC).';
@@ -1296,9 +1357,15 @@ const handleSubmit = async (e) => {
       filterGradeVariant: formData.productType === 'FILTER' ? formData.filterGradeVariant : '',
       drawing: formData.productType === 'FILTER' && formData.drawing ? formData.drawing : null,
       drawingSnapshot: formData.productType === 'FILTER' ? formData.drawingSnapshot : null,
-      filterLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
-      filterWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
-      filterDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+      outerLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
+      outerWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
+      outerDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+      innerLength: formData.productType === 'FILTER' && calculatedInnerDimensions.innerLength !== null ? Number(calculatedInnerDimensions.innerLength) : null,
+      innerWidth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerWidth !== null ? Number(calculatedInnerDimensions.innerWidth) : null,
+      innerDepth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerDepth !== null ? Number(calculatedInnerDimensions.innerDepth) : null,
+      filterLength: formData.productType === 'FILTER' && calculatedInnerDimensions.innerLength !== null ? Number(calculatedInnerDimensions.innerLength) : (formData.filterLength !== '' ? Number(formData.filterLength) : null),
+      filterWidth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerWidth !== null ? Number(calculatedInnerDimensions.innerWidth) : (formData.filterWidth !== '' ? Number(formData.filterWidth) : null),
+      filterDepth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerDepth !== null ? Number(calculatedInnerDimensions.innerDepth) : (formData.filterDepth !== '' ? Number(formData.filterDepth) : null),
       faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
       cfm: formData.productType === 'FILTER' ? calculatedCfm : null,
       moc: formData.productType === 'FILTER' ? (formData.moc || '') : '',
@@ -1307,20 +1374,17 @@ const handleSubmit = async (e) => {
       // Store temperature range as the range itself (e.g. 20–70 °C), NOT converted to a number
       temperatureRating: formData.productType === 'FILTER' ? (effectiveTempRange || formData.temperatureRating || '') : null,
       temperatureRange: formData.productType === 'FILTER' ? (effectiveTempRange || '') : '',
-      overallLength: formData.productType === 'FILTER' && calculatedOverallDimensions.overallLength !== ''
-        ? Number(calculatedOverallDimensions.overallLength)
-        : null,
-      overallWidth: formData.productType === 'FILTER' && calculatedOverallDimensions.overallWidth !== ''
-        ? Number(calculatedOverallDimensions.overallWidth)
-        : null,
-      overallDepth: formData.productType === 'FILTER' && calculatedOverallDimensions.overallDepth !== ''
-        ? Number(calculatedOverallDimensions.overallDepth)
-        : null,
+      overallLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
+      overallWidth: formData.productType === 'FILTER' && formData.filterWidth !== '' ? Number(formData.filterWidth) : null,
+      overallDepth: formData.productType === 'FILTER' && formData.filterDepth !== '' ? Number(formData.filterDepth) : null,
+      overallFlangeLength: (formData.productType === 'FILTER' && filterType === 'FLANGE' && formData.filterLength !== '') ? Number(formData.filterLength) : null,
+      overallFlangeWidth: (formData.productType === 'FILTER' && filterType === 'FLANGE' && formData.filterWidth !== '') ? Number(formData.filterWidth) : null,
+      overallFlangeDepth: (formData.productType === 'FILTER' && filterType === 'FLANGE' && formData.filterDepth !== '') ? Number(formData.filterDepth) : null,
       overallBoxConstruction: formData.productType === 'FILTER'
-        ? (calculatedOverallDimensions.summary !== '—' ? calculatedOverallDimensions.summary : '')
+        ? (calculatedInnerDimensions.summaryOuter !== '—' ? calculatedInnerDimensions.summaryOuter : '')
         : '',
       boxConstruction: formData.productType === 'FILTER'
-        ? (calculatedOverallDimensions.summary !== '—' ? calculatedOverallDimensions.summary : '')
+        ? (calculatedInnerDimensions.summaryOuter !== '—' ? calculatedInnerDimensions.summaryOuter : '')
         : '',
       imageUrl: formData.imageUrl || '',
       imagePublicId: formData.imagePublicId || '',
@@ -1500,6 +1564,43 @@ const stepLabels = useMemo(() => [
   { num: 4, label: 'Review & Save' }
 ], [isFilter]);
 
+  const isNextDisabled = useMemo(() => {
+    if (submitting) return true;
+    if (currentStep === 1) {
+      return !formData.productType;
+    }
+    if (currentStep === 2) {
+      return !formData.itemName?.trim() || !formData.itemCategory || !formData.inventoryUom;
+    }
+    if (currentStep === 3 && isFilter) {
+      if (!filterType) return true;
+      if (calculatedInnerDimensions.validationError) return true;
+      const l = Number(formData.filterLength);
+      const w = Number(formData.filterWidth);
+      const d = Number(formData.filterDepth);
+      if (!l || l <= 0 || isNaN(l)) return true;
+      if (!w || w <= 0 || isNaN(w)) return true;
+      if (!d || d <= 0 || isNaN(d)) return true;
+      const isFlange = (filterType || formData.constructionType || '').toUpperCase() === 'FLANGE';
+      if (isFlange && (l <= 60 || w <= 60)) return true;
+    }
+    return false;
+  }, [
+    submitting,
+    currentStep,
+    formData.productType,
+    formData.itemName,
+    formData.itemCategory,
+    formData.inventoryUom,
+    isFilter,
+    filterType,
+    formData.constructionType,
+    calculatedInnerDimensions.validationError,
+    formData.filterLength,
+    formData.filterWidth,
+    formData.filterDepth
+  ]);
+
 if (!isOpen) return null;
 
 return (
@@ -1540,7 +1641,7 @@ return (
               variant="primary"
               type="button"
               onClick={handleNextStep}
-              disabled={submitting || (currentStep === 1 && !formData.productType)}
+              disabled={isNextDisabled}
               className="flex items-center gap-1.5"
             >
               Next <ArrowRight size={14} />
@@ -2217,7 +2318,7 @@ return (
           <span className="text-red-500 font-bold">*</span>
         </div>
         <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium border border-blue-200">
-          Outer Dimensions Only
+          Enter Outer Dimensions Only
         </span>
       </div>
 
@@ -2277,17 +2378,124 @@ return (
         </FormField>
       </div>
 
+      {/* Calculated Inner Dimensions Display */}
+      <div
+        className={`p-3.5 rounded-xl border transition-all ${
+          calculatedInnerDimensions.validationError
+            ? 'bg-red-50/70 border-red-200'
+            : calculatedInnerDimensions.isFlange
+            ? 'bg-emerald-50/60 border-emerald-200'
+            : 'bg-blue-50/60 border-blue-200'
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200/60 pb-2 mb-3">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                calculatedInnerDimensions.validationError
+                  ? 'bg-red-600 text-white'
+                  : calculatedInnerDimensions.isFlange
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-blue-600 text-white'
+              }`}
+            >
+              <Layers size={14} />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-800">
+                Calculated Inner Dimensions (MM)
+              </span>
+              <span className="text-[10px] text-slate-500 block">
+                Auto-calculated in real time from outer dimensions (Read-only)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {calculatedInnerDimensions.isFlange ? (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                −60 mm Flange Allowance (30 mm per side)
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                BOX Construction (Inner = Outer)
+              </span>
+            )}
+          </div>
+        </div>
+
+        {calculatedInnerDimensions.validationError ? (
+          <div className="flex items-center gap-2 text-xs text-red-700 bg-red-100/90 px-3 py-2 rounded-lg border border-red-200 font-medium">
+            <AlertTriangle size={16} className="text-red-600 shrink-0" />
+            <span>{calculatedInnerDimensions.validationError}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="bg-white/80 p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Inner Length (MM)</span>
+              <strong className="text-sm font-mono font-bold text-slate-900">
+                {calculatedInnerDimensions.displayInnerL}
+              </strong>
+              {calculatedInnerDimensions.isFlange && calculatedInnerDimensions.innerLength !== null ? (
+                <span className="text-[9.5px] text-emerald-700 block mt-0.5 font-medium">
+                  {formData.filterLength} − 60 mm
+                </span>
+              ) : (
+                <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                  Equal to outer length
+                </span>
+              )}
+            </div>
+
+            <div className="bg-white/80 p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Inner Width (MM)</span>
+              <strong className="text-sm font-mono font-bold text-slate-900">
+                {calculatedInnerDimensions.displayInnerW}
+              </strong>
+              {calculatedInnerDimensions.isFlange && calculatedInnerDimensions.innerWidth !== null ? (
+                <span className="text-[9.5px] text-emerald-700 block mt-0.5 font-medium">
+                  {formData.filterWidth} − 60 mm
+                </span>
+              ) : (
+                <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                  Equal to outer width
+                </span>
+              )}
+            </div>
+
+            <div className="bg-white/80 p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Inner Depth (MM)</span>
+              <strong className="text-sm font-mono font-bold text-slate-900">
+                {calculatedInnerDimensions.displayInnerD}
+              </strong>
+              <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                Depth unchanged
+              </span>
+            </div>
+
+            <div className="bg-white/80 p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Inner / Core Size</span>
+              <strong className="text-xs font-mono font-bold text-indigo-700 truncate block">
+                {calculatedInnerDimensions.summaryInner}
+              </strong>
+              <span className="text-[9.5px] text-indigo-600 block mt-0.5">
+                Active airflow area
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Dimensional Rule Explanation */}
       <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-start gap-2">
         <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
         <span>
-          {filterType === 'FLANGE' ? (
+          {calculatedInnerDimensions.isFlange ? (
             <>
-              <strong>FLANGE Construction:</strong> Enter outer casing dimensions. A standard 30 mm peripheral flange (+60 mm total) is maintained per standard ERP engineering drawing logic.
+              <strong>FLANGE Construction:</strong> Enter outer casing dimensions. The system automatically subtracts the standard 60 mm flange allowance (30 mm per side) to calculate Inner Length and Inner Width. Inner Depth equals Outer Depth.
             </>
           ) : (
             <>
-              <strong>BOX Construction:</strong> Outer dimensions are strictly equal to filter body dimensions without flange extension.
+              <strong>BOX Construction:</strong> Inner dimensions are strictly equal to outer dimensions without flange extension.
             </>
           )}
         </span>
@@ -2440,10 +2648,17 @@ return (
                 </strong>
               </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2">
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2 sm:col-span-1">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Outer Dimensions (L × W × D)</span>
-                <strong className="text-xs font-mono font-bold text-slate-900">
-                  {formData.filterLength || 0} × {formData.filterWidth || 0} × {formData.filterDepth || 0} mm
+                <strong className="text-xs font-mono font-bold text-slate-900 block truncate">
+                  {calculatedInnerDimensions.summaryOuter}
+                </strong>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Calculated Inner Dimensions</span>
+                <strong className="text-xs font-mono font-bold text-emerald-800 block truncate">
+                  {calculatedInnerDimensions.summaryInner}
                 </strong>
               </div>
 
