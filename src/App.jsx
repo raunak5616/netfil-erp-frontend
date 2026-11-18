@@ -15,6 +15,7 @@ import ItemGroupList from './pages/item-groups/ItemGroupList';
 import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 import SpecificationList from './pages/specifications/SpecificationList';
 import FilterGradeList from './pages/filterGrades/FilterGradeList';
+import FaceVelocityMasterList from './pages/face-velocity-master/FaceVelocityMasterList';
 import FlangeDesignList from './pages/flange-designs/FlangeDesignList';
 import DrawingMasterList from './pages/drawing-master/DrawingMasterList';
 import TermsMasterList from './pages/terms/TermsMasterList';
@@ -208,6 +209,8 @@ function App() {
               {/* Protected Filter Grades & Drawing Master Module Route */}
               <Route element={<ProtectedRoute requiredPermission="FILTER_GRADE_VIEW" />}>
                 <Route path="/filter-grades" element={<FilterGradeList />} />
+                <Route path="/face-velocity-master" element={<FaceVelocityMasterList />} />
+                <Route path="/face-velocities" element={<FaceVelocityMasterList />} />
                 <Route path="/flange-designs" element={<Navigate to="/drawing-master" replace />} />
                 <Route path="/drawing-master" element={<DrawingMasterList />} />
                 <Route path="/drawings" element={<DrawingMasterList />} />

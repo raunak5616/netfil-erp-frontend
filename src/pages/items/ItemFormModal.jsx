@@ -16,6 +16,7 @@ import {
   useGetUOMsQuery,
   useGetFilterGradesQuery,
   useGetSpecificationsQuery,
+  useLazyLookupFaceVelocityQuery,
 } from '../../features/masterData/masterDataApi';
 import { useGetBinsQuery } from '../../features/stores/storesApi';
 import Modal from '../../components/ui/Modal';
@@ -50,6 +51,7 @@ import {
   FileText,
   Hash,
   AlertTriangle,
+  Gauge,
 } from 'lucide-react';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
@@ -238,6 +240,9 @@ const ItemFormModal = ({
     filterWidth: '',
     filterDepth: '',
     faceVelocity: 500,
+    faceVelocityMaster: '',
+    pleatsPerFeet: '',
+    filtrationArea: '',
     temperatureRating: '',
     temperatureRange: '',
     gasketMoc: 'EPDM',
@@ -264,6 +269,11 @@ const ItemFormModal = ({
     { filterType: formData.productType === 'FILTER' ? filterType : '' },
     { skip: !isOpen || isEditMode || (formData.productType === 'FILTER' && !filterType) }
   );
+
+  // Face Velocity Master dynamic lookup
+  const [triggerLookupFaceVelocity, { isFetching: isFetchingFaceVelocity }] = useLazyLookupFaceVelocityQuery();
+  const [matchedFaceVelocityConfig, setMatchedFaceVelocityConfig] = useState(null);
+  const [faceVelocityLookupAttempted, setFaceVelocityLookupAttempted] = useState(false);
 
   const displayItemCode = useMemo(() => {
     if (isEditMode) return formData.itemCode || '—';
@@ -550,6 +560,9 @@ const ItemFormModal = ({
         filterWidth: item.outerWidth !== null && item.outerWidth !== undefined ? item.outerWidth : (item.overallWidth ?? (item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '')),
         filterDepth: item.outerDepth !== null && item.outerDepth !== undefined ? item.outerDepth : (item.overallDepth ?? (item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : '')),
         faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
+        faceVelocityMaster: item.faceVelocityMaster?._id || item.faceVelocityMaster || '',
+        pleatsPerFeet: item.pleatsPerFeet !== null && item.pleatsPerFeet !== undefined ? item.pleatsPerFeet : '',
+        filtrationArea: item.filtrationArea !== null && item.filtrationArea !== undefined ? item.filtrationArea : '',
         temperatureRating: item.temperatureRange || (matchedR ? matchedR.rangeLabel : (item.temperatureRating || '')),
         temperatureRange: item.temperatureRange || (matchedR ? matchedR.rangeLabel : (typeof item.temperatureRating === 'string' ? item.temperatureRating : '')),
         gasketMoc: initialGasket,
@@ -599,6 +612,9 @@ const ItemFormModal = ({
         filterWidth: '',
         filterDepth: '',
         faceVelocity: 500,
+        faceVelocityMaster: '',
+        pleatsPerFeet: '',
+        filtrationArea: '',
         temperatureRating: '',
         temperatureRange: '',
         gasketMoc: 'EPDM',
@@ -840,6 +856,69 @@ useEffect(() => {
     }));
   }
 }, [variantOptions, formData.filterGradeVariant]);
+
+// Dynamic Face Velocity Master Lookup:
+// When filterGrade, filterLength, filterWidth, filterDepth are entered for FILTER items,
+// query the backend for matching Face Velocity Master configuration within the depth range.
+useEffect(() => {
+  if (formData.productType !== 'FILTER') return;
+
+  const gradeId = formData.filterGrade;
+  const l = Number(formData.filterLength);
+  const w = Number(formData.filterWidth);
+  const d = Number(formData.filterDepth);
+
+  if (gradeId && !isNaN(l) && l > 0 && !isNaN(w) && w > 0 && !isNaN(d) && d > 0) {
+    let isMounted = true;
+    triggerLookupFaceVelocity({
+      filterGrade: gradeId,
+      height: l,
+      width: w,
+      depth: d,
+    })
+      .unwrap()
+      .then((res) => {
+        if (!isMounted) return;
+        setFaceVelocityLookupAttempted(true);
+        if (res?.matched && res?.configuration) {
+          setMatchedFaceVelocityConfig(res.configuration);
+          setFormData((prev) => ({
+            ...prev,
+            faceVelocity: res.configuration.faceVelocity,
+            pleatsPerFeet: res.configuration.pleatsPerFeet,
+            filtrationArea: res.configuration.filtrationArea,
+            faceVelocityMaster: res.configuration._id,
+          }));
+        } else {
+          setMatchedFaceVelocityConfig(null);
+          setFormData((prev) => ({
+            ...prev,
+            faceVelocityMaster: '',
+          }));
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.warn('Face Velocity lookup error:', err);
+        setFaceVelocityLookupAttempted(true);
+        setMatchedFaceVelocityConfig(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  } else {
+    setMatchedFaceVelocityConfig(null);
+    setFaceVelocityLookupAttempted(false);
+  }
+}, [
+  formData.productType,
+  formData.filterGrade,
+  formData.filterLength,
+  formData.filterWidth,
+  formData.filterDepth,
+  triggerLookupFaceVelocity,
+]);
 
 // Step 1: Select Item Group Card Handler
 const handleSelectGroupCard = (card) => {
@@ -1370,6 +1449,9 @@ const handleSubmit = async (e) => {
       filterWidth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerWidth !== null ? Number(calculatedInnerDimensions.innerWidth) : (formData.filterWidth !== '' ? Number(formData.filterWidth) : null),
       filterDepth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerDepth !== null ? Number(calculatedInnerDimensions.innerDepth) : (formData.filterDepth !== '' ? Number(formData.filterDepth) : null),
       faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
+      faceVelocityMaster: formData.productType === 'FILTER' && formData.faceVelocityMaster ? formData.faceVelocityMaster : null,
+      pleatsPerFeet: formData.productType === 'FILTER' && formData.pleatsPerFeet !== '' ? Number(formData.pleatsPerFeet) : null,
+      filtrationArea: formData.productType === 'FILTER' && formData.filtrationArea !== '' ? Number(formData.filtrationArea) : null,
       cfm: formData.productType === 'FILTER' ? calculatedCfm : null,
       moc: formData.productType === 'FILTER' ? (formData.moc || '') : '',
       bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
@@ -2385,6 +2467,86 @@ return (
           </div>
         </FormField>
       </div>
+
+      {/* Face Velocity Master Lookup Status & Parameters */}
+      {formData.productType === 'FILTER' && (
+        <div className="space-y-2.5">
+          {/* Matched Configuration Banner */}
+          {matchedFaceVelocityConfig && (
+            <div className="bg-emerald-50/90 rounded-xl border border-emerald-200 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Gauge size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-950">
+                      Face Velocity Master Matched ({matchedFaceVelocityConfig.height} × {matchedFaceVelocityConfig.width} mm)
+                    </span>
+                    <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                      Depth {matchedFaceVelocityConfig.minDepth}–{matchedFaceVelocityConfig.maxDepth} mm
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-emerald-900 mt-1 font-medium">
+                    <span>Grade: <strong>{selectedFg?.filterGrade || matchedFaceVelocityConfig.filterGrade?.filterGrade || 'Selected'}</strong></span>
+                    {matchedFaceVelocityConfig.filterGrades && matchedFaceVelocityConfig.filterGrades.length > 1 && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-1.5 py-0.5 rounded border border-emerald-200">
+                        {matchedFaceVelocityConfig.filterGrades.length} Grades Configured
+                      </span>
+                    )}
+                    <span>•</span>
+                    <span>Pleats / Ft: <strong>{matchedFaceVelocityConfig.pleatsPerFeet}</strong></span>
+                    <span>•</span>
+                    <span>Filtration Area: <strong>{matchedFaceVelocityConfig.filtrationArea} Sq. M.</strong></span>
+                    <span>•</span>
+                    <span>Face Velocity: <strong>{matchedFaceVelocityConfig.faceVelocity} FPM</strong></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Missing Configuration Notice */}
+          {faceVelocityLookupAttempted && !matchedFaceVelocityConfig && formData.filterGrade && formData.filterLength && formData.filterWidth && formData.filterDepth && (
+            <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
+              <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold block text-amber-950">No matching Face Velocity Master configuration found</span>
+                <span className="text-amber-800">
+                  No active master configuration covers Grade, Dimensions ({formData.filterLength} × {formData.filterWidth} mm), and Depth ({formData.filterDepth} mm). Face Velocity and pleats can be entered manually.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Pleats Per Feet & Filtration Area Inputs */}
+          <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
+            <FormField label="No. of Pleats / Feet">
+              <Input
+                type="number"
+                step="any"
+                name="pleatsPerFeet"
+                placeholder={matchedFaceVelocityConfig ? String(matchedFaceVelocityConfig.pleatsPerFeet) : "e.g. 11"}
+                value={formData.pleatsPerFeet}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+
+            <FormField label="Filtration Area (Sq. M.)">
+              <Input
+                type="number"
+                step="any"
+                name="filtrationArea"
+                placeholder={matchedFaceVelocityConfig ? String(matchedFaceVelocityConfig.filtrationArea) : "e.g. 1.05"}
+                value={formData.filtrationArea}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </FormField>
+          </div>
+        </div>
+      )}
 
       {/* Calculated Inner Dimensions Display */}
       <div

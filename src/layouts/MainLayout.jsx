@@ -41,6 +41,7 @@ import {
   Database,
   ShieldCheck,
   FileImage,
+  Gauge,
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -105,7 +106,7 @@ const MainLayout = () => {
   // Auto-expand parent group on route change
   useEffect(() => {
     const path = location.pathname;
-    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/flange-designs', '/drawing-master'];
+    const itemMasterPaths = ['/uoms', '/items', '/item-groups', '/item-categories', '/specifications', '/filter-grades', '/face-velocity-master', '/face-velocities', '/flange-designs', '/drawing-master'];
     const isItemMasterChild = itemMasterPaths.some((p) => path.startsWith(p));
 
     const partyMasterPaths = ['/clients', '/parties', '/terms'];
@@ -189,6 +190,8 @@ const MainLayout = () => {
       '/item-categories': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Item Categories' }],
       '/specifications': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Specifications' }],
       '/filter-grades': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Filter Grades' }],
+      '/face-velocity-master': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Face Velocity Master' }],
+      '/face-velocities': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Face Velocity Master' }],
       '/flange-designs': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Flange Designs' }],
       '/drawing-master': [{ label: 'Master' }, { label: 'Item Master' }, { label: 'Drawing Master' }],
       '/clients': [{ label: 'Master' }, { label: 'Party Master' }],
@@ -282,6 +285,7 @@ const MainLayout = () => {
                 { label: 'Item Categories', path: '/item-categories', icon: Layers, permission: 'ITEM_CATEGORY_VIEW' },
                 { label: 'Specifications', path: '/specifications', icon: Layers, permission: 'SPECIFICATION_VIEW' },
                 { label: 'Filter Grades', path: '/filter-grades', icon: Layers, permission: 'FILTER_GRADE_VIEW' },
+                { label: 'Face Velocity Master', path: '/face-velocity-master', icon: Gauge, permission: 'FILTER_GRADE_VIEW' },
                 { label: 'Drawing Master', path: '/drawing-master', icon: FileImage, permission: 'FILTER_GRADE_VIEW' },
                 { label: 'Units of Measure', path: '/uoms', icon: Layers, permission: 'UOM_VIEW' },
               ],

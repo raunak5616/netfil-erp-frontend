@@ -33,6 +33,7 @@ export const apiSlice = createApi({
     'Clients',
     'Terms',
     'Suppliers',
+    'FaceVelocityMaster',
     'PurchaseRequisitions',
     'PurchaseEnquiries',
     'PurchaseOrders',

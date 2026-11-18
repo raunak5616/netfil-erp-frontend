@@ -578,6 +578,83 @@ export const masterDataApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'Plants', id }],
     }),
+
+    // --- Face Velocity Master ---
+    getFaceVelocities: builder.query({
+      query: (params = {}) => ({
+        url: '/face-velocity-master',
+        method: 'get',
+        params,
+      }),
+      providesTags: (result) =>
+        result?.configurations
+          ? [
+              ...result.configurations.map(({ _id }) => ({ type: 'FaceVelocityMaster', id: _id })),
+              { type: 'FaceVelocityMaster', id: 'LIST' },
+            ]
+          : [{ type: 'FaceVelocityMaster', id: 'LIST' }],
+    }),
+    getFaceVelocityById: builder.query({
+      query: (id) => ({
+        url: `/face-velocity-master/${id}`,
+        method: 'get',
+      }),
+      providesTags: (result, error, id) => [{ type: 'FaceVelocityMaster', id }],
+    }),
+    createFaceVelocity: builder.mutation({
+      query: (configData) => ({
+        url: '/face-velocity-master',
+        method: 'post',
+        data: configData,
+      }),
+      invalidatesTags: [{ type: 'FaceVelocityMaster', id: 'LIST' }],
+    }),
+    updateFaceVelocity: builder.mutation({
+      query: ({ id, ...configData }) => ({
+        url: `/face-velocity-master/${id}`,
+        method: 'put',
+        data: configData,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'FaceVelocityMaster', id },
+        { type: 'FaceVelocityMaster', id: 'LIST' },
+      ],
+    }),
+    updateFaceVelocityStatus: builder.mutation({
+      query: ({ id, status }) => ({
+        url: `/face-velocity-master/${id}/status`,
+        method: 'patch',
+        data: { status },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'FaceVelocityMaster', id },
+        { type: 'FaceVelocityMaster', id: 'LIST' },
+      ],
+    }),
+    deleteFaceVelocity: builder.mutation({
+      query: (id) => ({
+        url: `/face-velocity-master/${id}`,
+        method: 'delete',
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: 'FaceVelocityMaster', id },
+        { type: 'FaceVelocityMaster', id: 'LIST' },
+      ],
+    }),
+    lookupFaceVelocity: builder.query({
+      query: (params) => ({
+        url: '/face-velocity-master/lookup',
+        method: 'get',
+        params,
+      }),
+    }),
+    seedFaceVelocity: builder.mutation({
+      query: () => ({
+        url: '/face-velocity-master/seed',
+        method: 'post',
+      }),
+      invalidatesTags: [{ type: 'FaceVelocityMaster', id: 'LIST' }],
+    }),
   }),
 });
 
@@ -647,5 +724,16 @@ export const {
   // Plants
   useGetPlantsQuery,
   useGetPlantByIdQuery,
+  // Face Velocity Master
+  useGetFaceVelocitiesQuery,
+  useLazyGetFaceVelocitiesQuery,
+  useGetFaceVelocityByIdQuery,
+  useCreateFaceVelocityMutation,
+  useUpdateFaceVelocityMutation,
+  useUpdateFaceVelocityStatusMutation,
+  useDeleteFaceVelocityMutation,
+  useLookupFaceVelocityQuery,
+  useLazyLookupFaceVelocityQuery,
+  useSeedFaceVelocityMutation,
 } = masterDataApi;
 
