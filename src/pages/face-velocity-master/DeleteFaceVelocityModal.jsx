@@ -72,14 +72,10 @@ const DeleteFaceVelocityModal = ({
             <StatusBadge status={config.status} />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-xs">
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs">
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Pleats / Ft</span>
               <span className="font-semibold text-slate-700">{config.pleatsPerFeet}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Area (Sq. M.)</span>
-              <span className="font-semibold text-slate-700">{config.filtrationArea}</span>
             </div>
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Face Velocity</span>

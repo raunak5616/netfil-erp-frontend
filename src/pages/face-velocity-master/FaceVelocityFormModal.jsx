@@ -34,7 +34,6 @@ const FaceVelocityFormModal = ({
     minDepth: '',
     maxDepth: '',
     pleatsPerFeet: '',
-    filtrationArea: '',
     faceVelocity: '',
     status: 'active',
     remarks: '',
@@ -73,7 +72,6 @@ const FaceVelocityFormModal = ({
         minDepth: configData.minDepth !== undefined ? String(configData.minDepth) : '',
         maxDepth: configData.maxDepth !== undefined ? String(configData.maxDepth) : '',
         pleatsPerFeet: configData.pleatsPerFeet !== undefined ? String(configData.pleatsPerFeet) : '',
-        filtrationArea: configData.filtrationArea !== undefined ? String(configData.filtrationArea) : '',
         faceVelocity: configData.faceVelocity !== undefined ? String(configData.faceVelocity) : '',
         status: configData.status || 'active',
         remarks: configData.remarks || '',
@@ -84,7 +82,6 @@ const FaceVelocityFormModal = ({
         minDepth: '',
         maxDepth: '',
         pleatsPerFeet: '',
-        filtrationArea: '',
         faceVelocity: '',
         status: 'active',
         remarks: '',
@@ -168,11 +165,6 @@ const FaceVelocityFormModal = ({
       return 'No. of Pleats Per Feet must be a positive number.';
     }
 
-    const area = Number(formData.filtrationArea);
-    if (!formData.filtrationArea || isNaN(area) || area <= 0) {
-      return 'Filtration Area must be a positive number (Sq. M.).';
-    }
-
     const fv = Number(formData.faceVelocity);
     if (!formData.faceVelocity || isNaN(fv) || fv <= 0) {
       return 'Face Velocity must be a positive number (FPM).';
@@ -200,7 +192,6 @@ const FaceVelocityFormModal = ({
         minDepth: Number(formData.minDepth),
         maxDepth: Number(formData.maxDepth),
         pleatsPerFeet: Number(formData.pleatsPerFeet),
-        filtrationArea: Number(formData.filtrationArea),
         faceVelocity: Number(formData.faceVelocity),
         status: formData.status,
         remarks: formData.remarks?.trim() || '',
@@ -464,7 +455,7 @@ const FaceVelocityFormModal = ({
             <span>Engineering Performance Specifications</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Pleats / Foot" required>
               <Input
                 type="number"
@@ -474,20 +465,6 @@ const FaceVelocityFormModal = ({
                 placeholder="e.g. 11"
                 min="1"
                 step="1"
-                disabled={loading}
-                required
-              />
-            </FormField>
-
-            <FormField label="Filtration Area (Sq. M.)" required>
-              <Input
-                type="number"
-                name="filtrationArea"
-                value={formData.filtrationArea}
-                onChange={handleChange}
-                placeholder="e.g. 1.05"
-                min="0.01"
-                step="0.01"
                 disabled={loading}
                 required
               />

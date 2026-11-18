@@ -134,14 +134,10 @@ const FaceVelocityDetailModal = ({
             <span>Engineering Performance Parameters</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-3 pt-1">
             <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
               <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Pleats / Foot</span>
               <span className="text-base font-bold text-slate-900">{config.pleatsPerFeet}</span>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-              <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Filtration Area</span>
-              <span className="text-base font-bold text-slate-900">{config.filtrationArea} <span className="text-xs font-normal text-slate-500">Sq. M.</span></span>
             </div>
             <div className="bg-primary-50/50 rounded-lg p-2.5 border border-primary-100">
               <span className="text-[10px] text-primary-600 block uppercase font-bold tracking-wider">Face Velocity</span>

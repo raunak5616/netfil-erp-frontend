@@ -175,17 +175,6 @@ const FaceVelocityMasterList = () => {
       render: (val) => <span className="text-xs font-semibold text-slate-700">{val}</span>,
     },
     {
-      key: 'filtrationArea',
-      header: 'Area (Sq. M.)',
-      width: '130px',
-      align: 'center',
-      render: (val) => (
-        <span className="text-xs font-semibold text-slate-800">
-          {val} <span className="text-[10px] font-normal text-slate-400">Sq.M.</span>
-        </span>
-      ),
-    },
-    {
       key: 'faceVelocity',
       header: 'Face Velocity',
       width: '130px',

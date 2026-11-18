@@ -932,7 +932,6 @@ useEffect(() => {
             ...prev,
             faceVelocity: res.configuration.faceVelocity,
             pleatsPerFeet: res.configuration.pleatsPerFeet,
-            filtrationArea: res.configuration.filtrationArea,
             faceVelocityMaster: res.configuration._id,
           }));
         } else {
@@ -2726,8 +2725,6 @@ return (
                     <span>•</span>
                     <span>Pleats / Ft: <strong>{matchedFaceVelocityConfig.pleatsPerFeet}</strong></span>
                     <span>•</span>
-                    <span>Filtration Area: <strong>{matchedFaceVelocityConfig.filtrationArea} Sq. M.</strong></span>
-                    <span>•</span>
                     <span>Face Velocity: <strong>{matchedFaceVelocityConfig.faceVelocity} FPM</strong></span>
                   </div>
                 </div>
@@ -2771,8 +2768,8 @@ return (
             </div>
           )}
 
-          {/* Pleats Per Feet & Filtration Area Inputs (Read-only, auto-populated) */}
-          <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
+          {/* Pleats Per Feet Input (Read-only, auto-populated) */}
+          <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
             <FormField
               label={
                 <div className="flex items-center justify-between gap-1 w-full">
@@ -2786,25 +2783,6 @@ return (
                 name="pleatsPerFeet"
                 placeholder={isFetchingFaceVelocity ? "Searching..." : "Auto-fetched"}
                 value={formData.pleatsPerFeet !== '' && formData.pleatsPerFeet !== null && formData.pleatsPerFeet !== undefined ? String(formData.pleatsPerFeet) : ''}
-                readOnly
-                disabled
-                className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
-              />
-            </FormField>
-
-            <FormField
-              label={
-                <div className="flex items-center justify-between gap-1 w-full">
-                  <span>Filtration Area (Sq. M.)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Auto-populated</span>
-                </div>
-              }
-            >
-              <Input
-                type="text"
-                name="filtrationArea"
-                placeholder={isFetchingFaceVelocity ? "Searching..." : "Auto-fetched"}
-                value={formData.filtrationArea !== '' && formData.filtrationArea !== null && formData.filtrationArea !== undefined ? `${formData.filtrationArea} Sq. M.` : ''}
                 readOnly
                 disabled
                 className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
@@ -3109,13 +3087,6 @@ return (
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Pleats / Foot</span>
                 <strong className="text-xs text-slate-800">
                   {formData.pleatsPerFeet || '—'}
-                </strong>
-              </div>
-
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Filtration Area</span>
-                <strong className="text-xs text-slate-800">
-                  {formData.filtrationArea ? `${formData.filtrationArea} Sq. M.` : '—'}
                 </strong>
               </div>
 
