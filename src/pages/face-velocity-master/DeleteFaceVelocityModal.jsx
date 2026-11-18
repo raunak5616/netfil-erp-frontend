@@ -62,7 +62,7 @@ const DeleteFaceVelocityModal = ({
               </div>
               <div className="min-w-0">
                 <h4 className="text-sm font-bold text-slate-900 truncate" title={gradeNames}>
-                  {gradeNames} – {config.height} × {config.width} mm
+                  {gradeNames} – Depth {config.minDepth}–{config.maxDepth} mm
                 </h4>
                 <p className="text-xs text-slate-500">
                   Depth Range: {config.minDepth} – {config.maxDepth} mm ({assignedGrades.length} Grade{assignedGrades.length > 1 ? 's' : ''})

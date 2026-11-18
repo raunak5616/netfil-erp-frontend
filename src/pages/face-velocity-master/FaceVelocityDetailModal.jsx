@@ -103,22 +103,14 @@ const FaceVelocityDetailModal = ({
           </div>
         </div>
 
-        {/* Dimension & Depth Range Section */}
+        {/* Depth Range Section */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
             <Ruler size={14} className="text-primary-600" />
-            <span>Filter Dimensions & Depth Range</span>
+            <span>Depth Range Configuration</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-            <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-              <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Height (H)</span>
-              <span className="text-sm font-bold text-slate-900">{config.height} mm</span>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-              <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Width (W)</span>
-              <span className="text-sm font-bold text-slate-900">{config.width} mm</span>
-            </div>
+          <div className="grid grid-cols-2 gap-3 pt-1">
             <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
               <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Min Depth</span>
               <span className="text-sm font-bold text-slate-900">{config.minDepth} mm</span>

@@ -31,8 +31,6 @@ const FaceVelocityFormModal = ({
   const dropdownRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    height: '',
-    width: '',
     minDepth: '',
     maxDepth: '',
     pleatsPerFeet: '',
@@ -72,8 +70,6 @@ const FaceVelocityFormModal = ({
 
       setSelectedGradeIds(initialGrades);
       setFormData({
-        height: configData.height !== undefined ? String(configData.height) : '',
-        width: configData.width !== undefined ? String(configData.width) : '',
         minDepth: configData.minDepth !== undefined ? String(configData.minDepth) : '',
         maxDepth: configData.maxDepth !== undefined ? String(configData.maxDepth) : '',
         pleatsPerFeet: configData.pleatsPerFeet !== undefined ? String(configData.pleatsPerFeet) : '',
@@ -85,8 +81,6 @@ const FaceVelocityFormModal = ({
     } else if (isOpen) {
       setSelectedGradeIds([]);
       setFormData({
-        height: '',
-        width: '',
         minDepth: '',
         maxDepth: '',
         pleatsPerFeet: '',
@@ -155,16 +149,6 @@ const FaceVelocityFormModal = ({
       return 'Please select at least one Filter Grade.';
     }
 
-    const h = Number(formData.height);
-    if (!formData.height || isNaN(h) || h <= 0) {
-      return 'Height must be a positive number in mm.';
-    }
-
-    const w = Number(formData.width);
-    if (!formData.width || isNaN(w) || w <= 0) {
-      return 'Width must be a positive number in mm.';
-    }
-
     const minD = Number(formData.minDepth);
     if (!formData.minDepth || isNaN(minD) || minD <= 0) {
       return 'Minimum Depth must be a positive number in mm.';
@@ -213,8 +197,6 @@ const FaceVelocityFormModal = ({
       const payload = {
         filterGrades: selectedGradeIds,
         filterGrade: selectedGradeIds[0],
-        height: Number(formData.height),
-        width: Number(formData.width),
         minDepth: Number(formData.minDepth),
         maxDepth: Number(formData.maxDepth),
         pleatsPerFeet: Number(formData.pleatsPerFeet),
@@ -426,49 +408,16 @@ const FaceVelocityFormModal = ({
           </div>
         </div>
 
-        {/* Section 2: Dimensions & Depth Range */}
+        {/* Section 2: Depth Range */}
         <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
               <Ruler size={14} className="text-primary-600" />
-              <span>Filter Dimensions & Depth Range (MM)</span>
+              <span>Depth Range (MM)</span>
             </div>
-            {formData.height && formData.width && (
-              <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-100">
-                {formData.height} × {formData.width} mm
-              </span>
-            )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <FormField label="Height (H) mm" required>
-              <Input
-                type="number"
-                name="height"
-                value={formData.height}
-                onChange={handleChange}
-                placeholder="e.g. 610"
-                min="1"
-                step="1"
-                disabled={loading}
-                required
-              />
-            </FormField>
-
-            <FormField label="Width (W) mm" required>
-              <Input
-                type="number"
-                name="width"
-                value={formData.width}
-                onChange={handleChange}
-                placeholder="e.g. 610"
-                min="1"
-                step="1"
-                disabled={loading}
-                required
-              />
-            </FormField>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Min Depth mm" required>
               <Input
                 type="number"

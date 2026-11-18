@@ -17,14 +17,14 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import { FormField, Input, Select, Textarea } from '../../components/ui/FormField';
-import { 
-  Search, 
-  X, 
-  Plus, 
-  Trash2, 
-  User, 
-  Package, 
-  Maximize2, 
+import {
+  Search,
+  X,
+  Plus,
+  Trash2,
+  User,
+  Package,
+  Maximize2,
   Image as ImageIcon,
   ChevronDown,
   ChevronUp,
@@ -443,10 +443,10 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         formItems = requirement.items.map((reqItem, idx) => {
           const specs = Array.isArray(reqItem.specifications)
             ? reqItem.specifications.map((s) =>
-                typeof s === 'object' && s !== null
-                  ? { key: s.key || s.name || '', value: s.value || s.val || '' }
-                  : { key: 'Spec', value: String(s) }
-              )
+              typeof s === 'object' && s !== null
+                ? { key: s.key || s.name || '', value: s.value || s.val || '' }
+                : { key: 'Spec', value: String(s) }
+            )
             : [];
 
           const rawDims = reqItem.dimensions && typeof reqItem.dimensions === 'object' && !Array.isArray(reqItem.dimensions)
@@ -533,10 +533,10 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       } else {
         const specs = Array.isArray(requirement.specifications)
           ? requirement.specifications.map((s) =>
-              typeof s === 'object' && s !== null
-                ? { key: s.key || s.name || '', value: s.value || s.val || '' }
-                : { key: 'Spec', value: String(s) }
-            )
+            typeof s === 'object' && s !== null
+              ? { key: s.key || s.name || '', value: s.value || s.val || '' }
+              : { key: 'Spec', value: String(s) }
+          )
           : [];
 
         const rawDims = requirement.dimensions && typeof requirement.dimensions === 'object' && !Array.isArray(requirement.dimensions)
@@ -1535,8 +1535,8 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                 let summaryTitle = selectedCatalogItem
                   ? selectedCatalogItem.itemName
                   : itemObj.dimensions.bodyWidth && itemObj.dimensions.bodyHeight
-                  ? `${itemObj.constructionType} Filter (${itemObj.dimensions.bodyWidth}×${itemObj.dimensions.bodyHeight}×${itemObj.dimensions.depth || '0'}mm)`
-                  : `Item #${itemIndex + 1}`;
+                    ? `${itemObj.constructionType} Filter (${itemObj.dimensions.bodyWidth}×${itemObj.dimensions.bodyHeight}×${itemObj.dimensions.depth || '0'}mm)`
+                    : `Item #${itemIndex + 1}`;
 
                 return (
                   <div
@@ -2202,49 +2202,6 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                             const isFlange = (itemObj.constructionType || 'FLANGE').toUpperCase() === 'FLANGE';
                             const hasCatalogItem = Boolean(itemObj.item);
 
-                            // Original / Item Master Dimensions
-                            const dispOrigL = itemObj.dimensions.itemLength !== undefined && itemObj.dimensions.itemLength !== null && itemObj.dimensions.itemLength !== ''
-                              ? itemObj.dimensions.itemLength
-                              : (itemObj.dimensions.bodyHeight || '');
-                            const dispOrigW = itemObj.dimensions.itemBreadth !== undefined && itemObj.dimensions.itemBreadth !== null && itemObj.dimensions.itemBreadth !== ''
-                              ? itemObj.dimensions.itemBreadth
-                              : (itemObj.dimensions.bodyWidth || '');
-                            const dispOrigD = itemObj.dimensions.itemDepth !== undefined && itemObj.dimensions.itemDepth !== null && itemObj.dimensions.itemDepth !== ''
-                              ? itemObj.dimensions.itemDepth
-                              : (itemObj.dimensions.depth || '');
-                            const dispFpm = itemObj.dimensions.faceVelocity !== undefined && itemObj.dimensions.faceVelocity !== null && itemObj.dimensions.faceVelocity !== ''
-                              ? itemObj.dimensions.faceVelocity
-                              : 500;
-
-                            // Calculated Inner Dimensions
-                            const numOrigL = Number(dispOrigL);
-                            const numOrigW = Number(dispOrigW);
-
-                            const dispInnerL = itemObj.dimensions.innerLength !== undefined && itemObj.dimensions.innerLength !== null && itemObj.dimensions.innerLength !== ''
-                              ? itemObj.dimensions.innerLength
-                              : (isFlange ? (numOrigL > 60 ? numOrigL - 60 : dispOrigL) : dispOrigL);
-
-                            const dispInnerW = itemObj.dimensions.innerWidth !== undefined && itemObj.dimensions.innerWidth !== null && itemObj.dimensions.innerWidth !== ''
-                              ? itemObj.dimensions.innerWidth
-                              : (isFlange ? (numOrigW > 60 ? numOrigW - 60 : dispOrigW) : dispOrigW);
-
-                            const dispInnerD = itemObj.dimensions.innerDepth !== undefined && itemObj.dimensions.innerDepth !== null && itemObj.dimensions.innerDepth !== ''
-                              ? itemObj.dimensions.innerDepth
-                              : dispOrigD;
-
-                            // Overall Flange Dimensions
-                            const dispFlangeL = itemObj.dimensions.overallFlangeLength !== undefined && itemObj.dimensions.overallFlangeLength !== null && itemObj.dimensions.overallFlangeLength !== ''
-                              ? itemObj.dimensions.overallFlangeLength
-                              : (itemObj.dimensions.overallFlangeHeight !== undefined && itemObj.dimensions.overallFlangeHeight !== null && itemObj.dimensions.overallFlangeHeight !== ''
-                                ? itemObj.dimensions.overallFlangeHeight
-                                : dispOrigL);
-
-                            const dispFlangeB = itemObj.dimensions.overallFlangeBreadth !== undefined && itemObj.dimensions.overallFlangeBreadth !== null && itemObj.dimensions.overallFlangeBreadth !== ''
-                              ? itemObj.dimensions.overallFlangeBreadth
-                              : (itemObj.dimensions.overallFlangeWidth !== undefined && itemObj.dimensions.overallFlangeWidth !== null && itemObj.dimensions.overallFlangeWidth !== ''
-                                ? itemObj.dimensions.overallFlangeWidth
-                                : dispOrigW);
-
                             return (
                               <>
                                 <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
@@ -2353,268 +2310,66 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   )}
                                 </div>
 
-                                {/* ENGINEERING DIMENSION SPECIFICATION SECTION */}
+                                                                {/* ENGINEERING SPECIFICATIONS SECTION */}
                                 <div style={{ gridColumn: 'span 2', marginTop: '6px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid var(--neutral-300)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--neutral-200)' }}>
                                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <Maximize2 size={15} className="text-blue-600" /> ENGINEERING DIMENSION SPECIFICATION
+                                      <Maximize2 size={15} className="text-blue-600" /> ENGINEERING SPECIFICATIONS
                                     </div>
-                                    <span style={{ fontSize: '11px', color: 'var(--neutral-600)', fontFamily: 'monospace', backgroundColor: 'var(--neutral-100)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--neutral-200)' }}>
-                                      Unit: mm
-                                    </span>
+                                    {hasCatalogItem && (
+                                      <span style={{ fontSize: '11px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
+                                        From Item Master
+                                      </span>
+                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    {/* Subsection A: Original Filter Dimensions */}
-                                    <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
-                                          A. Original Filter Dimensions (Item Master)
-                                        </div>
-                                        <span style={{ fontSize: '10.5px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
-                                          {hasCatalogItem ? 'From Item Master (Editable)' : 'Filter Dimensions'}
-                                        </span>
-                                      </div>
-                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
-                                        <FormField label="Length (MM)" required>
-                                          <Input
-                                            type="number"
-                                            placeholder="e.g. 510"
-                                            value={dispOrigL}
-                                            onChange={(e) => handleItemDimensionChange(itemIndex, 'itemLength', e.target.value)}
-                                            disabled={submitting}
-                                          />
-                                        </FormField>
-
-                                        <FormField label="Breadth (MM)" required>
-                                          <Input
-                                            type="number"
-                                            placeholder="e.g. 510"
-                                            value={dispOrigW}
-                                            onChange={(e) => handleItemDimensionChange(itemIndex, 'itemBreadth', e.target.value)}
-                                            disabled={submitting}
-                                          />
-                                        </FormField>
-
-                                        <FormField label="Depth (MM)" required>
-                                          <Input
-                                            type="number"
-                                            placeholder="e.g. 150"
-                                            value={dispOrigD}
-                                            onChange={(e) => handleItemDimensionChange(itemIndex, 'depth', e.target.value)}
-                                            disabled={submitting}
-                                          />
-                                        </FormField>
-
-                                        <FormField label="Face Velocity (FPM)" helperText="Default: 500 FPM">
-                                          <Input
-                                            type="number"
-                                            placeholder="500"
-                                            value={dispFpm}
-                                            onChange={(e) => handleItemDimensionChange(itemIndex, 'faceVelocity', e.target.value)}
-                                            disabled={submitting}
-                                          />
-                                        </FormField>
-                                      </div>
-                                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
-                                        Actual filter dimensions. Changing dimensions dynamically updates calculated inner dimensions and airflow.
-                                      </div>
-                                    </div>
-
-                                    {/* Subsection B: Calculated Inner Dimensions */}
-                                    <div style={{ backgroundColor: isFlange ? '#eff6ff' : '#faf5ff', padding: '12px', borderRadius: '6px', border: isFlange ? '1px solid #bfdbfe' : '1px solid #e9d5ff' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: isFlange ? '#1e40af' : '#5b21b6' }}>
-                                          B. Calculated Inner Dimensions (Active Airflow Area)
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          {isFlange ? (
-                                            <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
-                                              −60 mm Flange Allowance (30 mm per side)
-                                            </span>
-                                          ) : (
-                                            <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#6d28d9', backgroundColor: '#f3e8ff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
-                                              BOX Construction (Inner = Outer)
-                                            </span>
-                                          )}
-                                          {itemObj.dimensions.cfm ? (
-                                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
-                                              {itemObj.dimensions.cfm} CFM
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                      </div>
-
-                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                                        <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                          <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Inner Length</div>
-                                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                                            {dispInnerL !== '' ? `${dispInnerL} mm` : '—'}
-                                          </div>
-                                        </div>
-                                        <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                          <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Inner Width</div>
-                                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                                            {dispInnerW !== '' ? `${dispInnerW} mm` : '—'}
-                                          </div>
-                                        </div>
-                                        <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                          <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Inner Depth</div>
-                                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                                            {dispInnerD !== '' ? `${dispInnerD} mm` : '—'}
-                                          </div>
-                                        </div>
-                                        <div style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                          <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Active Airflow Core</div>
-                                          <div style={{ fontSize: '13px', fontWeight: 700, color: isFlange ? '#1d4ed8' : '#7c3aed', marginTop: '2px' }}>
-                                            {dispInnerL && dispInnerW ? `${dispInnerL} × ${dispInnerW} × ${dispInnerD || 0} mm` : '—'}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div style={{ fontSize: '11px', color: isFlange ? '#1e40af' : '#6b21a8', marginTop: '8px' }}>
-                                        {isFlange ? (
-                                          <span>
-                                            <strong>FLANGE:</strong> Inner Length = {dispOrigL || 0} − 60 = <strong>{dispInnerL || 0} mm</strong>, Inner Width = {dispOrigW || 0} − 60 = <strong>{dispInnerW || 0} mm</strong>. Airflow ({itemObj.dimensions.cfm || 0} CFM) is calculated strictly from active inner core size.
-                                          </span>
-                                        ) : (
-                                          <span>
-                                            <strong>BOX:</strong> Inner dimensions are strictly equal to original filter dimensions without flange subtraction. Airflow ({itemObj.dimensions.cfm || 0} CFM) is calculated from complete dimensions.
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Subsection C: Overall Flange Dimensions / Overall Dimensions */}
-                                    {isFlange ? (
+                                    {/* Flange Hole Configuration (Preserved for FLANGE Construction) */}
+                                    {isFlange && (
                                       <div style={{ backgroundColor: '#eff6ff', padding: '12px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                           <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#1e40af' }}>
-                                            C. Overall Flange Dimensions (Item Master Configuration)
+                                            Flange Hole Configuration
                                           </div>
-                                          <span style={{ fontSize: '10.5px', color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                            <Lock size={11} /> Read-Only (From Item Master)
+                                          <span style={{ fontSize: '10.5px', color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
+                                            Mounting Specification
                                           </span>
                                         </div>
-                                        <div style={{ fontSize: '11px', color: '#3b82f6', marginBottom: '10px' }}>
-                                          Overall flange dimensions are defined by the Item Master configuration and are read-only in Enquiry. Flange projection is 30 mm per side (60 mm total) relative to the inner core.
-                                        </div>
-
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                          <FormField label="Overall Flange Length (mm)" helperText="Equal to Item Master Length">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigL || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-
-                                          <FormField label="Overall Flange Breadth (mm)" helperText="Equal to Item Master Breadth">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigW || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-
-                                          <FormField label="Overall Flange Depth (mm)" helperText="Equal to Item Master Depth">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigD || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-                                        </div>
-
-                                        {/* Flange Hole Configuration */}
-                                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #bfdbfe' }}>
-                                          <FormField
-                                            label="Flange Hole Configuration"
-                                            helperText="Optional flange hole configuration for mounting specification"
+                                        <FormField
+                                          label="Flange Hole Configuration"
+                                          helperText="Optional flange hole configuration for mounting specification"
+                                        >
+                                          <Select
+                                            value={itemObj.flangeHoleConfig || (itemObj.holeCount ? `${itemObj.holeCount} Holes` : '')}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              let count = null;
+                                              if (val) {
+                                                const m = val.match(/^(\d+)/);
+                                                if (m) count = Number(m[1]);
+                                              }
+                                              handleItemFieldChange(itemIndex, 'flangeHoleConfig', val);
+                                              handleItemFieldChange(itemIndex, 'holeCount', count);
+                                            }}
+                                            disabled={submitting}
                                           >
-                                            <Select
-                                              value={itemObj.flangeHoleConfig || (itemObj.holeCount ? `${itemObj.holeCount} Holes` : '')}
-                                              onChange={(e) => {
-                                                const val = e.target.value;
-                                                let count = null;
-                                                if (val) {
-                                                  const m = val.match(/^(\d+)/);
-                                                  if (m) count = Number(m[1]);
-                                                }
-                                                handleItemFieldChange(itemIndex, 'flangeHoleConfig', val);
-                                                handleItemFieldChange(itemIndex, 'holeCount', count);
-                                              }}
-                                              disabled={submitting}
-                                            >
-                                              <option value="">No Selection</option>
-                                              {holeOptions.map((opt) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                              ))}
-                                              {itemObj.flangeHoleConfig && !holeOptions.includes(itemObj.flangeHoleConfig) && (
-                                                <option value={itemObj.flangeHoleConfig}>{itemObj.flangeHoleConfig}</option>
-                                              )}
-                                            </Select>
-                                          </FormField>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                          <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
-                                            C. Overall Dimensions (BOX Construction)
-                                          </div>
-                                          <span style={{ fontSize: '10.5px', color: '#475569', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 600 }}>
-                                            Equal to Filter Dimensions (No External Flange)
-                                          </span>
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px' }}>
-                                          Box filters do not have external mounting flanges; overall external dimensions are strictly equal to filter body dimensions.
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                          <FormField label="Overall Length (mm)" helperText="Equal to Filter Length">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigL || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-
-                                          <FormField label="Overall Breadth (mm)" helperText="Equal to Filter Breadth">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigW || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-
-                                          <FormField label="Overall Depth (mm)" helperText="Equal to Filter Depth">
-                                            <Input
-                                              type="number"
-                                              readOnly
-                                              style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                                              value={dispOrigD || ''}
-                                              disabled={true}
-                                            />
-                                          </FormField>
-                                        </div>
+                                            <option value="">No Selection</option>
+                                            {holeOptions.map((opt) => (
+                                              <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                            {itemObj.flangeHoleConfig && !holeOptions.includes(itemObj.flangeHoleConfig) && (
+                                              <option value={itemObj.flangeHoleConfig}>{itemObj.flangeHoleConfig}</option>
+                                            )}
+                                          </Select>
+                                        </FormField>
                                       </div>
                                     )}
 
-                                    {/* Subsection D: Technical Specifications */}
+                                    {/* Technical Specifications */}
                                     <div style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                         <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#166534' }}>
-                                          D. Technical Specifications (Item Master)
+                                          Technical Specifications
                                         </div>
                                         <span style={{ fontSize: '10.5px', color: hasCatalogItem ? '#15803d' : '#475569', backgroundColor: hasCatalogItem ? '#dcfce7' : '#e2e8f0', padding: '2px 8px', borderRadius: '4px', border: hasCatalogItem ? '1px solid #bbf7d0' : '1px solid #cbd5e1', fontWeight: 600 }}>
                                           {hasCatalogItem ? 'Fetched from Item Master' : 'Technical Specifications'}

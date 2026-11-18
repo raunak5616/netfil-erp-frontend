@@ -158,16 +158,6 @@ const FaceVelocityMasterList = () => {
       },
     },
     {
-      key: 'dimensions',
-      header: 'Dimensions (H × W)',
-      width: '150px',
-      render: (_, row) => (
-        <span className="font-medium text-slate-900 text-xs bg-slate-100 px-2 py-1 rounded border border-slate-200">
-          {row.height} × {row.width} mm
-        </span>
-      ),
-    },
-    {
       key: 'depthRange',
       header: 'Depth Range',
       width: '150px',

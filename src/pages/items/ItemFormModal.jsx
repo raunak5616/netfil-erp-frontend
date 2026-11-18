@@ -52,6 +52,9 @@ import {
   Hash,
   AlertTriangle,
   Gauge,
+  Lock,
+  Unlock,
+  RotateCcw,
 } from 'lucide-react';
 
 const PRODUCT_TYPE_TO_ITEM_TYPE = {
@@ -195,6 +198,7 @@ const ItemFormModal = ({
 
   const [selectedItemGroupId, setSelectedItemGroupId] = useState('');
   const [selectedMicron, setSelectedMicron] = useState('');
+  const [isGradeMicronLocked, setIsGradeMicronLocked] = useState(false);
   const [selectedTempRangeId, setSelectedTempRangeId] = useState('');
   const [isMocManuallySelected, setIsMocManuallySelected] = useState(false);
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
@@ -239,7 +243,7 @@ const ItemFormModal = ({
     filterLength: '',
     filterWidth: '',
     filterDepth: '',
-    faceVelocity: 500,
+    faceVelocity: '',
     faceVelocityMaster: '',
     pleatsPerFeet: '',
     filtrationArea: '',
@@ -274,6 +278,8 @@ const ItemFormModal = ({
   const [triggerLookupFaceVelocity, { isFetching: isFetchingFaceVelocity }] = useLazyLookupFaceVelocityQuery();
   const [matchedFaceVelocityConfig, setMatchedFaceVelocityConfig] = useState(null);
   const [faceVelocityLookupAttempted, setFaceVelocityLookupAttempted] = useState(false);
+  const [faceVelocityAmbiguityError, setFaceVelocityAmbiguityError] = useState('');
+  const lookupRequestIdRef = useRef(0);
 
   const displayItemCode = useMemo(() => {
     if (isEditMode) return formData.itemCode || '—';
@@ -504,8 +510,15 @@ const ItemFormModal = ({
       const initGroupId = item.itemGroup?._id || item.itemGroup || item.itemCategory?.itemGroup?._id || item.itemCategory?.itemGroup || '';
       setSelectedItemGroupId(initGroupId);
 
-      const m = getMicronForGrade(item.filterGrade?._id || item.filterGrade);
-      if (m) setSelectedMicron(m);
+      const m = item.micronRating || getMicronForGrade(item.filterGrade?._id || item.filterGrade);
+      if (m) {
+        setSelectedMicron(m);
+        setIsGradeMicronLocked(true);
+      } else if (item.filterGrade) {
+        setIsGradeMicronLocked(true);
+      } else {
+        setIsGradeMicronLocked(false);
+      }
 
       // Match temperature range if present
       const itemTemp = item.temperatureRange || item.temperatureRating;
@@ -559,7 +572,7 @@ const ItemFormModal = ({
         filterLength: item.outerLength !== null && item.outerLength !== undefined ? item.outerLength : (item.overallLength ?? (item.filterLength !== null && item.filterLength !== undefined ? item.filterLength : '')),
         filterWidth: item.outerWidth !== null && item.outerWidth !== undefined ? item.outerWidth : (item.overallWidth ?? (item.filterWidth !== null && item.filterWidth !== undefined ? item.filterWidth : '')),
         filterDepth: item.outerDepth !== null && item.outerDepth !== undefined ? item.outerDepth : (item.overallDepth ?? (item.filterDepth !== null && item.filterDepth !== undefined ? item.filterDepth : '')),
-        faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : 500,
+        faceVelocity: item.faceVelocity !== null && item.faceVelocity !== undefined ? item.faceVelocity : '',
         faceVelocityMaster: item.faceVelocityMaster?._id || item.faceVelocityMaster || '',
         pleatsPerFeet: item.pleatsPerFeet !== null && item.pleatsPerFeet !== undefined ? item.pleatsPerFeet : '',
         filtrationArea: item.filtrationArea !== null && item.filtrationArea !== undefined ? item.filtrationArea : '',
@@ -569,6 +582,12 @@ const ItemFormModal = ({
         customGasketMoc: '',
         bonding: item.bonding || (matchedR ? matchedR.bondingValue : ''),
       });
+      if (item.faceVelocityMaster && typeof item.faceVelocityMaster === 'object') {
+        setMatchedFaceVelocityConfig(item.faceVelocityMaster);
+      } else {
+        setMatchedFaceVelocityConfig(null);
+      }
+      setFaceVelocityAmbiguityError('');
       setFilterType(resolvedFilterType);
       setImageError('');
       setCurrentStep(2);
@@ -576,6 +595,9 @@ const ItemFormModal = ({
       const pType = initialProductType || '';
       setSelectedItemGroupId('');
       setIsMocManuallySelected(false);
+      setMatchedFaceVelocityConfig(null);
+      setFaceVelocityLookupAttempted(false);
+      setFaceVelocityAmbiguityError('');
       setFormData({
         itemCode: 'AUTO',
         itemName: initialItemName || '',
@@ -611,7 +633,7 @@ const ItemFormModal = ({
         filterLength: '',
         filterWidth: '',
         filterDepth: '',
-        faceVelocity: 500,
+        faceVelocity: '',
         faceVelocityMaster: '',
         pleatsPerFeet: '',
         filtrationArea: '',
@@ -625,6 +647,7 @@ const ItemFormModal = ({
       setImageError('');
       setSpecsData({});
       setSelectedMicron('');
+      setIsGradeMicronLocked(false);
       setSelectedTempRangeId('');
       setShowAdvancedDetails(false);
       setCurrentStep(1);
@@ -816,6 +839,9 @@ const calculatedOverallDimensions = calculatedInnerDimensions;
 // Calculated CFM based on active core / inner dimensions:
 // (Inner Length / 304.8) * (Inner Width / 304.8) * Face Velocity, rounded to nearest 10
 const calculatedCfm = useMemo(() => {
+  if (!matchedFaceVelocityConfig || !formData.faceVelocityMaster) {
+    return null;
+  }
   const innerL = calculatedInnerDimensions.innerLength;
   const innerW = calculatedInnerDimensions.innerWidth;
   const fv = Number(formData.faceVelocity);
@@ -825,7 +851,7 @@ const calculatedCfm = useMemo(() => {
   const rawCfm = (innerL / 304.8) * (innerW / 304.8) * fv;
   const rounded10 = Math.round(rawCfm / 10) * 10;
   return rounded10 === 0 && rawCfm > 0 ? Math.round(rawCfm) : rounded10;
-}, [calculatedInnerDimensions.innerLength, calculatedInnerDimensions.innerWidth, formData.faceVelocity]);
+}, [matchedFaceVelocityConfig, formData.faceVelocityMaster, calculatedInnerDimensions.innerLength, calculatedInnerDimensions.innerWidth, formData.faceVelocity]);
 
 // Selected Filter Grade Object
 const selectedFg = useMemo(() => {
@@ -858,29 +884,49 @@ useEffect(() => {
 }, [variantOptions, formData.filterGradeVariant]);
 
 // Dynamic Face Velocity Master Lookup:
-// When filterGrade, filterLength, filterWidth, filterDepth are entered for FILTER items,
+// When filterGrade and filterDepth are entered for FILTER items,
 // query the backend for matching Face Velocity Master configuration within the depth range.
+// Filter Length and Breadth do NOT participate in Face Velocity Master lookup.
 useEffect(() => {
   if (formData.productType !== 'FILTER') return;
 
   const gradeId = formData.filterGrade;
-  const l = Number(formData.filterLength);
-  const w = Number(formData.filterWidth);
   const d = Number(formData.filterDepth);
 
-  if (gradeId && !isNaN(l) && l > 0 && !isNaN(w) && w > 0 && !isNaN(d) && d > 0) {
-    let isMounted = true;
+  if (gradeId && !isNaN(d) && d > 0) {
+    const reqId = ++lookupRequestIdRef.current;
+
+    // Immediately clear stale/previous values while new request is in flight
+    setMatchedFaceVelocityConfig(null);
+    setFaceVelocityAmbiguityError('');
+    setFormData((prev) => ({
+      ...prev,
+      faceVelocity: '',
+      pleatsPerFeet: '',
+      filtrationArea: '',
+      faceVelocityMaster: '',
+    }));
+
     triggerLookupFaceVelocity({
       filterGrade: gradeId,
-      height: l,
-      width: w,
       depth: d,
     })
       .unwrap()
       .then((res) => {
-        if (!isMounted) return;
+        if (reqId !== lookupRequestIdRef.current) return;
         setFaceVelocityLookupAttempted(true);
-        if (res?.matched && res?.configuration) {
+        if (res?.ambiguous) {
+          setFaceVelocityAmbiguityError(res.message || 'Multiple matching Face Velocity Master configurations found for the selected Filter Grade and depth. Please resolve overlapping ranges in Face Velocity Master.');
+          setMatchedFaceVelocityConfig(null);
+          setFormData((prev) => ({
+            ...prev,
+            faceVelocity: '',
+            pleatsPerFeet: '',
+            filtrationArea: '',
+            faceVelocityMaster: '',
+          }));
+        } else if (res?.matched && res?.configuration) {
+          setFaceVelocityAmbiguityError('');
           setMatchedFaceVelocityConfig(res.configuration);
           setFormData((prev) => ({
             ...prev,
@@ -890,32 +936,52 @@ useEffect(() => {
             faceVelocityMaster: res.configuration._id,
           }));
         } else {
+          setFaceVelocityAmbiguityError('');
           setMatchedFaceVelocityConfig(null);
           setFormData((prev) => ({
             ...prev,
+            faceVelocity: '',
+            pleatsPerFeet: '',
+            filtrationArea: '',
             faceVelocityMaster: '',
           }));
         }
       })
       .catch((err) => {
-        if (!isMounted) return;
+        if (reqId !== lookupRequestIdRef.current) return;
         console.warn('Face Velocity lookup error:', err);
         setFaceVelocityLookupAttempted(true);
+        const errMsg = err?.data?.message || err?.message || '';
+        if (err?.data?.ambiguous || errMsg.toLowerCase().includes('multiple matching')) {
+          setFaceVelocityAmbiguityError(errMsg || 'Multiple matching Face Velocity Master configurations found for the selected Filter Grade and depth. Please resolve overlapping ranges in Face Velocity Master.');
+        } else {
+          setFaceVelocityAmbiguityError('');
+        }
         setMatchedFaceVelocityConfig(null);
+        setFormData((prev) => ({
+          ...prev,
+          faceVelocity: '',
+          pleatsPerFeet: '',
+          filtrationArea: '',
+          faceVelocityMaster: '',
+        }));
       });
-
-    return () => {
-      isMounted = false;
-    };
   } else {
+    lookupRequestIdRef.current++;
     setMatchedFaceVelocityConfig(null);
     setFaceVelocityLookupAttempted(false);
+    setFaceVelocityAmbiguityError('');
+    setFormData((prev) => ({
+      ...prev,
+      faceVelocity: '',
+      pleatsPerFeet: '',
+      filtrationArea: '',
+      faceVelocityMaster: '',
+    }));
   }
 }, [
   formData.productType,
   formData.filterGrade,
-  formData.filterLength,
-  formData.filterWidth,
   formData.filterDepth,
   triggerLookupFaceVelocity,
 ]);
@@ -1002,10 +1068,26 @@ const handleSelectGroupCard = (card) => {
 
 // Section 3.1: Interconnected Grade Selection
 const handleGradeSelect = (gradeId) => {
+  if (!gradeId) {
+    setFormData(prev => ({
+      ...prev,
+      filterGrade: '',
+      filterGradeVariant: ''
+    }));
+    setSelectedMicron('');
+    setIsGradeMicronLocked(false);
+    setErrorMessage('');
+    return;
+  }
+
   const fg = filterGrades.find(f => String(f._id) === String(gradeId));
   const extractedMicron = fg ? getMicronForGrade(gradeId) : '';
   if (extractedMicron) {
     setSelectedMicron(extractedMicron);
+    setIsGradeMicronLocked(true);
+  } else {
+    setSelectedMicron('');
+    setIsGradeMicronLocked(false);
   }
 
   setFormData(prev => ({
@@ -1019,21 +1101,43 @@ const handleGradeSelect = (gradeId) => {
 // Section 3.1: Interconnected Micron Selection
 const handleMicronSelect = (micronVal) => {
   setSelectedMicron(micronVal);
-  if (!micronVal) return;
+  if (!micronVal) {
+    setFormData(prev => ({
+      ...prev,
+      filterGrade: '',
+      filterGradeVariant: ''
+    }));
+    setIsGradeMicronLocked(false);
+    setErrorMessage('');
+    return;
+  }
 
   // Filter compatible grades for this micron
   const matchingGrades = filterGrades.filter(fg => getMicronForGrade(fg._id) === micronVal);
   if (matchingGrades.length > 0) {
     const isAlreadyMatching = matchingGrades.some(fg => String(fg._id) === String(formData.filterGrade));
-    if (!isAlreadyMatching) {
-      const firstMatch = matchingGrades[0];
-      setFormData(prev => ({
-        ...prev,
-        filterGrade: firstMatch._id,
-        filterGradeVariant: ''
-      }));
-    }
+    const targetGradeId = isAlreadyMatching ? formData.filterGrade : matchingGrades[0]._id;
+    setFormData(prev => ({
+      ...prev,
+      filterGrade: targetGradeId,
+      filterGradeVariant: ''
+    }));
+    setIsGradeMicronLocked(true);
+  } else {
+    setIsGradeMicronLocked(false);
   }
+  setErrorMessage('');
+};
+
+// Section 3.1: Reset/Change action to unlock and reset both fields together
+const handleResetGradeMicron = () => {
+  setIsGradeMicronLocked(false);
+  setFormData(prev => ({
+    ...prev,
+    filterGrade: '',
+    filterGradeVariant: ''
+  }));
+  setSelectedMicron('');
   setErrorMessage('');
 };
 
@@ -1280,6 +1384,15 @@ const validateCurrentStep = (step) => {
           return 'Outer Width must be greater than 60 mm for FLANGE construction to allow for 30 mm flange on each side.';
         }
       }
+      if (isFetchingFaceVelocity) {
+        return 'Searching Face Velocity Master configuration... Please wait.';
+      }
+      if (faceVelocityAmbiguityError) {
+        return faceVelocityAmbiguityError;
+      }
+      if (!matchedFaceVelocityConfig || !formData.faceVelocityMaster || !formData.faceVelocity) {
+        return 'No matching Face Velocity Master configuration found for the selected Filter Grade and Depth. Please configure the required depth range.';
+      }
       return null;
     } else {
       // Non-Filter Step 3: Required Category Specifications
@@ -1369,6 +1482,12 @@ const validate = () => {
     if (formData.moc === 'OTHER' && !formData.customMoc?.trim()) {
       return 'Please specify the custom Material of Construction (MOC).';
     }
+    if (faceVelocityAmbiguityError) {
+      return faceVelocityAmbiguityError;
+    }
+    if (!formData.faceVelocityMaster || !formData.faceVelocity || !matchedFaceVelocityConfig) {
+      return 'No matching Face Velocity Master configuration found for the selected Filter Grade and dimensions/depth. Please update Face Velocity Master or correct the filter dimensions.';
+    }
   }
 
   if (Number(formData.itemPerPurchaseUnit) <= 0) {
@@ -1437,6 +1556,7 @@ const handleSubmit = async (e) => {
       constructionType: formData.productType === 'FILTER' ? filterType : '',
       filterGrade: formData.productType === 'FILTER' && formData.filterGrade ? formData.filterGrade : null,
       filterGradeVariant: formData.productType === 'FILTER' ? formData.filterGradeVariant : '',
+      micronRating: formData.productType === 'FILTER' ? (selectedMicron || '') : '',
       drawing: formData.productType === 'FILTER' && formData.drawing ? formData.drawing : null,
       drawingSnapshot: formData.productType === 'FILTER' ? formData.drawingSnapshot : null,
       outerLength: formData.productType === 'FILTER' && formData.filterLength !== '' ? Number(formData.filterLength) : null,
@@ -1448,7 +1568,7 @@ const handleSubmit = async (e) => {
       filterLength: formData.productType === 'FILTER' && calculatedInnerDimensions.innerLength !== null ? Number(calculatedInnerDimensions.innerLength) : (formData.filterLength !== '' ? Number(formData.filterLength) : null),
       filterWidth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerWidth !== null ? Number(calculatedInnerDimensions.innerWidth) : (formData.filterWidth !== '' ? Number(formData.filterWidth) : null),
       filterDepth: formData.productType === 'FILTER' && calculatedInnerDimensions.innerDepth !== null ? Number(calculatedInnerDimensions.innerDepth) : (formData.filterDepth !== '' ? Number(formData.filterDepth) : null),
-      faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : 500,
+      faceVelocity: formData.productType === 'FILTER' && formData.faceVelocity !== '' ? Number(formData.faceVelocity) : null,
       faceVelocityMaster: formData.productType === 'FILTER' && formData.faceVelocityMaster ? formData.faceVelocityMaster : null,
       pleatsPerFeet: formData.productType === 'FILTER' && formData.pleatsPerFeet !== '' ? Number(formData.pleatsPerFeet) : null,
       filtrationArea: formData.productType === 'FILTER' && formData.filtrationArea !== '' ? Number(formData.filtrationArea) : null,
@@ -1659,6 +1779,7 @@ const stepLabels = useMemo(() => [
     }
     if (currentStep === 3 && isFilter) {
       if (!filterType) return true;
+      if (!formData.filterGrade) return true;
       if (calculatedInnerDimensions.validationError) return true;
       const l = Number(formData.filterLength);
       const w = Number(formData.filterWidth);
@@ -1668,6 +1789,9 @@ const stepLabels = useMemo(() => [
       if (!d || d <= 0 || isNaN(d)) return true;
       const isFlange = (filterType || formData.constructionType || '').toUpperCase() === 'FLANGE';
       if (isFlange && (l <= 60 || w <= 60)) return true;
+      if (isFetchingFaceVelocity) return true;
+      if (faceVelocityAmbiguityError) return true;
+      if (!matchedFaceVelocityConfig || !formData.faceVelocityMaster || !formData.faceVelocity) return true;
     }
     return false;
   }, [
@@ -1679,11 +1803,17 @@ const stepLabels = useMemo(() => [
     formData.inventoryUom,
     isFilter,
     filterType,
+    formData.filterGrade,
     formData.constructionType,
     calculatedInnerDimensions.validationError,
     formData.filterLength,
     formData.filterWidth,
-    formData.filterDepth
+    formData.filterDepth,
+    isFetchingFaceVelocity,
+    faceVelocityAmbiguityError,
+    matchedFaceVelocityConfig,
+    formData.faceVelocityMaster,
+    formData.faceVelocity
   ]);
 
 if (!isOpen) return null;
@@ -2023,7 +2153,7 @@ return (
               </span>
             </div>
 
-            {/* 3.1 Grade / Micron Selection (Interconnected) */}
+            {/* 3.1 Grade / Micron Selection (Interconnected & Locked on Mapping) */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
@@ -2031,54 +2161,133 @@ return (
                   <span>3.1 Grade & Micron Classification</span>
                   <span className="text-red-500 font-bold">*</span>
                 </div>
-                <span className="text-[11px] text-slate-400">Interconnected selection</span>
+                {isGradeMicronLocked && formData.filterGrade && selectedMicron ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <Lock size={10} className="text-emerald-600" />
+                      Mapping Locked
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResetGradeMicron}
+                      disabled={submitting}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
+                      title="Unlock both fields together to select a different compatible pair"
+                    >
+                      <RotateCcw size={11} />
+                      Reset / Change
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-slate-400">Interconnected selection</span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <FormField label="Filter Grade" required helperText="Selecting Grade auto-populates Micron.">
-                  <Select
-                    name="filterGrade"
-                    value={formData.filterGrade}
-                    onChange={(e) => handleGradeSelect(e.target.value)}
-                    disabled={submitting || loadingData}
-                  >
-                    <option value="">-- Select Filter Grade --</option>
-                    {filterGrades.map((fg) => {
-                      const m = getMicronForGrade(fg._id);
-                      return (
-                        <option key={fg._id} value={fg._id}>
-                          {fg.filterGrade} {fg.eurovent ? `(${ fg.eurovent })` : ''} {m ? `— ${m} µm` : ''}
-              </option>
-              );
-                    })}
-            </Select>
-          </FormField>
+                {isGradeMicronLocked && formData.filterGrade && selectedMicron ? (
+                  <>
+                    <FormField
+                      label={
+                        <div className="flex items-center justify-between w-full">
+                          <span>Filter Grade</span>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
+                            <Lock size={10} className="text-slate-500" /> Locked
+                          </span>
+                        </div>
+                      }
+                      required
+                      helperText="Filter Grade is locked to verified compatible mapping."
+                    >
+                      <div className="h-[38px] w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-800 flex items-center justify-between shadow-2xs select-none cursor-not-allowed">
+                        <span className="truncate">
+                          {selectedFg?.filterGrade || 'Selected Grade'} {selectedFg?.eurovent ? `(${selectedFg.eurovent})` : ''}
+                        </span>
+                        <Lock size={13} className="text-slate-400 shrink-0 ml-2" />
+                      </div>
+                    </FormField>
 
-          <FormField label="Micron Rating" required helperText="Selecting Micron auto-populates Grade.">
-            <Select
-              value={selectedMicron}
-              onChange={(e) => handleMicronSelect(e.target.value)}
-              disabled={submitting || loadingData}
-            >
-              <option value="">-- Select Micron Rating --</option>
-              {availableMicrons.map((m) => (
-                <option key={m} value={m}>
-                  {m} µm ({m} micron)
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        </div>
+                    <FormField
+                      label={
+                        <div className="flex items-center justify-between w-full">
+                          <span>Micron Rating</span>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
+                            <Lock size={10} className="text-slate-500" /> Locked
+                          </span>
+                        </div>
+                      }
+                      required
+                      helperText="Micron Rating is locked to verified compatible mapping."
+                    >
+                      <div className="h-[38px] w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-800 flex items-center justify-between shadow-2xs select-none cursor-not-allowed">
+                        <span className="truncate font-mono">
+                          {selectedMicron} µm ({selectedMicron} micron)
+                        </span>
+                        <Lock size={13} className="text-slate-400 shrink-0 ml-2" />
+                      </div>
+                    </FormField>
+                  </>
+                ) : (
+                  <>
+                    <FormField label="Filter Grade" required helperText="Selecting Grade auto-populates Micron and locks mapping.">
+                      <Select
+                        name="filterGrade"
+                        value={formData.filterGrade}
+                        onChange={(e) => handleGradeSelect(e.target.value)}
+                        disabled={submitting || loadingData}
+                      >
+                        <option value="">-- Select Filter Grade --</option>
+                        {filterGrades.map((fg) => {
+                          const m = getMicronForGrade(fg._id);
+                          return (
+                            <option key={fg._id} value={fg._id}>
+                              {fg.filterGrade} {fg.eurovent ? `(${ fg.eurovent })` : ''} {m ? `— ${m} µm` : ''}
+                            </option>
+                          );
+                        })}
+                      </Select>
+                    </FormField>
+
+                    <FormField label="Micron Rating" required helperText="Selecting Micron auto-populates Grade and locks mapping.">
+                      <Select
+                        value={selectedMicron}
+                        onChange={(e) => handleMicronSelect(e.target.value)}
+                        disabled={submitting || loadingData}
+                      >
+                        <option value="">-- Select Micron Rating --</option>
+                        {availableMicrons.map((m) => (
+                          <option key={m} value={m}>
+                            {m} µm ({m} micron)
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                  </>
+                )}
+              </div>
 
               {formData.filterGrade && selectedMicron && (
-        <div className="bg-blue-50/80 border border-blue-200 text-blue-900 rounded-lg p-2.5 flex items-center justify-between text-[11px]">
-          <span className="font-semibold flex items-center gap-1.5">
-            <CheckCircle2 size={13} className="text-blue-600" />
-            Verified Mapping: <strong>{selectedFg?.filterGrade || 'Selected Grade'}</strong> ({selectedFg?.eurovent || 'Eurovent'}) ⟷ <strong>{selectedMicron} µm</strong>
-          </span>
-          <span className="text-blue-700 font-mono text-[10.5px]">Compatible Selection</span>
-        </div>
-      )}
+                <div className="bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-lg p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] shadow-2xs">
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    Verified Mapping: <strong>{selectedFg?.filterGrade || 'Selected Grade'}</strong> ({selectedFg?.eurovent || 'Eurovent'}) ⟷ <strong>{selectedMicron} µm</strong>
+                  </span>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <span className="text-emerald-700 font-mono text-[10.5px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200 font-semibold flex items-center gap-1">
+                      <Lock size={10} /> Verified & Locked
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResetGradeMicron}
+                      disabled={submitting}
+                      className="text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 px-2.5 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title="Unlock both fields together to select a different compatible pair"
+                    >
+                      <RotateCcw size={11} className="text-blue-600" />
+                      Reset / Change
+                    </button>
+                  </div>
+                </div>
+              )}
 
       {/* Grade Variant & Engineering Drawing Assignment */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-100">
@@ -2449,15 +2658,24 @@ return (
           />
         </FormField>
 
-        <FormField label="Face Velocity (FPM)">
+        <FormField
+          label={
+            <div className="flex items-center justify-between gap-1 w-full">
+              <span>Face Velocity (FPM)</span>
+              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                Fetched from Face Velocity Master
+              </span>
+            </div>
+          }
+        >
           <Input
-            type="number"
-            step="any"
+            type="text"
             name="faceVelocity"
-            placeholder="500"
-            value={formData.faceVelocity}
-            onChange={handleChange}
-            disabled={submitting}
+            placeholder={isFetchingFaceVelocity ? "Searching..." : (matchedFaceVelocityConfig ? `${formData.faceVelocity} FPM` : "Auto-fetched")}
+            value={formData.faceVelocity ? `${formData.faceVelocity} FPM` : ''}
+            readOnly
+            disabled
+            className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
           />
         </FormField>
 
@@ -2471,6 +2689,17 @@ return (
       {/* Face Velocity Master Lookup Status & Parameters */}
       {formData.productType === 'FILTER' && (
         <div className="space-y-2.5">
+          {/* Searching Spinner */}
+          {isFetchingFaceVelocity && (
+            <div className="bg-blue-50/90 rounded-xl border border-blue-200 p-3 flex items-center gap-2.5 text-xs text-blue-900 shadow-2xs">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+              <div>
+                <span className="font-semibold block text-blue-950">Searching Face Velocity Master configuration...</span>
+                <span className="text-blue-700 text-[11px]">Looking up matching Filter Grade and Depth range...</span>
+              </div>
+            </div>
+          )}
+
           {/* Matched Configuration Banner */}
           {matchedFaceVelocityConfig && (
             <div className="bg-emerald-50/90 rounded-xl border border-emerald-200 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
@@ -2481,7 +2710,7 @@ return (
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-emerald-950">
-                      Face Velocity Master Matched ({matchedFaceVelocityConfig.height} × {matchedFaceVelocityConfig.width} mm)
+                      Face Velocity Master Matched
                     </span>
                     <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
                       Depth {matchedFaceVelocityConfig.minDepth}–{matchedFaceVelocityConfig.maxDepth} mm
@@ -2506,42 +2735,79 @@ return (
             </div>
           )}
 
-          {/* Missing Configuration Notice */}
-          {faceVelocityLookupAttempted && !matchedFaceVelocityConfig && formData.filterGrade && formData.filterLength && formData.filterWidth && formData.filterDepth && (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
-              <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold block text-amber-950">No matching Face Velocity Master configuration found</span>
-                <span className="text-amber-800">
-                  No active master configuration covers Grade, Dimensions ({formData.filterLength} × {formData.filterWidth} mm), and Depth ({formData.filterDepth} mm). Face Velocity and pleats can be entered manually.
-                </span>
+          {/* Multiple Matching Ambiguity Notice */}
+          {!isFetchingFaceVelocity && faceVelocityAmbiguityError && (
+            <div className="bg-red-50 rounded-xl border border-red-300 p-3.5 flex items-start gap-2.5 text-xs text-red-950 shadow-2xs">
+              <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold block text-red-950">Configuration Ambiguity Error</span>
+                <p className="text-red-900 text-xs leading-relaxed">
+                  {faceVelocityAmbiguityError}
+                </p>
+                <div className="pt-0.5">
+                  <span className="inline-block text-[11px] font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                    Next step is disabled until overlapping depth ranges in Face Velocity Master are resolved.
+                  </span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Pleats Per Feet & Filtration Area Inputs */}
+          {/* Missing Configuration Notice */}
+          {!isFetchingFaceVelocity && faceVelocityLookupAttempted && !matchedFaceVelocityConfig && !faceVelocityAmbiguityError && formData.filterGrade && formData.filterDepth && (
+            <div className="bg-amber-50 rounded-xl border border-amber-300 p-3.5 flex items-start gap-2.5 text-xs text-amber-950 shadow-2xs">
+              <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold block text-amber-950">No matching Face Velocity Master configuration found</span>
+                <p className="text-amber-900 text-xs leading-relaxed">
+                  No matching Face Velocity Master configuration found for the selected Filter Grade and Depth. Please configure the required depth range.
+                </p>
+                <div className="pt-0.5">
+                  <span className="inline-block text-[11px] font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                    Next step is disabled until a matching Face Velocity Master configuration is available.
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pleats Per Feet & Filtration Area Inputs (Read-only, auto-populated) */}
           <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
-            <FormField label="No. of Pleats / Feet">
+            <FormField
+              label={
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span>No. of Pleats / Feet</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Auto-populated</span>
+                </div>
+              }
+            >
               <Input
-                type="number"
-                step="any"
+                type="text"
                 name="pleatsPerFeet"
-                placeholder={matchedFaceVelocityConfig ? String(matchedFaceVelocityConfig.pleatsPerFeet) : "e.g. 11"}
-                value={formData.pleatsPerFeet}
-                onChange={handleChange}
-                disabled={submitting}
+                placeholder={isFetchingFaceVelocity ? "Searching..." : "Auto-fetched"}
+                value={formData.pleatsPerFeet !== '' && formData.pleatsPerFeet !== null && formData.pleatsPerFeet !== undefined ? String(formData.pleatsPerFeet) : ''}
+                readOnly
+                disabled
+                className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
               />
             </FormField>
 
-            <FormField label="Filtration Area (Sq. M.)">
+            <FormField
+              label={
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span>Filtration Area (Sq. M.)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Auto-populated</span>
+                </div>
+              }
+            >
               <Input
-                type="number"
-                step="any"
+                type="text"
                 name="filtrationArea"
-                placeholder={matchedFaceVelocityConfig ? String(matchedFaceVelocityConfig.filtrationArea) : "e.g. 1.05"}
-                value={formData.filtrationArea}
-                onChange={handleChange}
-                disabled={submitting}
+                placeholder={isFetchingFaceVelocity ? "Searching..." : "Auto-fetched"}
+                value={formData.filtrationArea !== '' && formData.filtrationArea !== null && formData.filtrationArea !== undefined ? `${formData.filtrationArea} Sq. M.` : ''}
+                readOnly
+                disabled
+                className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
               />
             </FormField>
           </div>
@@ -2832,7 +3098,28 @@ return (
                 </strong>
               </div>
 
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2">
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Face Velocity</span>
+                <strong className="text-xs text-blue-700 font-bold">
+                  {formData.faceVelocity ? `${formData.faceVelocity} FPM` : '—'}
+                </strong>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Pleats / Foot</span>
+                <strong className="text-xs text-slate-800">
+                  {formData.pleatsPerFeet || '—'}
+                </strong>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Filtration Area</span>
+                <strong className="text-xs text-slate-800">
+                  {formData.filtrationArea ? `${formData.filtrationArea} Sq. M.` : '—'}
+                </strong>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2 sm:col-span-1">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Airflow Capacity</span>
                 <strong className="text-xs font-mono font-bold text-blue-700">
                   {calculatedCfm !== null ? `${calculatedCfm} CFM` : '—'}
