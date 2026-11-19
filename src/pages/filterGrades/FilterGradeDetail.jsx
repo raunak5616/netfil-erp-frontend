@@ -114,6 +114,7 @@ const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, onSuccess, canEdit,
                     <th className="px-4 py-3 border-b border-slate-200">Efficiency @ Micron</th>
                     <th className="px-4 py-3 border-b border-slate-200">Initial P.D.</th>
                     <th className="px-4 py-3 border-b border-slate-200">Final P.D.</th>
+                    <th className="px-4 py-3 border-b border-slate-200">No. of Folds</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -126,6 +127,15 @@ const FilterGradeDetail = ({ grade, isOpen, onClose, onEdit, onSuccess, canEdit,
                       <td className="px-4 py-3 text-slate-700">{v.efficiency || '—'}</td>
                       <td className="px-4 py-3 text-slate-700">{v.initialPressureDrop || '—'}</td>
                       <td className="px-4 py-3 text-slate-700">{v.finalPressureDrop || '—'}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {v.noOfFolds ? (
+                          <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-xs">
+                            {v.noOfFolds}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 text-xs italic">Not configured</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

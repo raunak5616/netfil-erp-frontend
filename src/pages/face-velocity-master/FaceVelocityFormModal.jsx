@@ -33,7 +33,6 @@ const FaceVelocityFormModal = ({
   const [formData, setFormData] = useState({
     minDepth: '',
     maxDepth: '',
-    pleatsPerFeet: '',
     faceVelocity: '',
     status: 'active',
     remarks: '',
@@ -71,7 +70,6 @@ const FaceVelocityFormModal = ({
       setFormData({
         minDepth: configData.minDepth !== undefined ? String(configData.minDepth) : '',
         maxDepth: configData.maxDepth !== undefined ? String(configData.maxDepth) : '',
-        pleatsPerFeet: configData.pleatsPerFeet !== undefined ? String(configData.pleatsPerFeet) : '',
         faceVelocity: configData.faceVelocity !== undefined ? String(configData.faceVelocity) : '',
         status: configData.status || 'active',
         remarks: configData.remarks || '',
@@ -81,7 +79,6 @@ const FaceVelocityFormModal = ({
       setFormData({
         minDepth: '',
         maxDepth: '',
-        pleatsPerFeet: '',
         faceVelocity: '',
         status: 'active',
         remarks: '',
@@ -160,11 +157,6 @@ const FaceVelocityFormModal = ({
       return 'Minimum Depth cannot be greater than Maximum Depth.';
     }
 
-    const pleats = Number(formData.pleatsPerFeet);
-    if (!formData.pleatsPerFeet || isNaN(pleats) || pleats <= 0) {
-      return 'No. of Pleats Per Feet must be a positive number.';
-    }
-
     const fv = Number(formData.faceVelocity);
     if (!formData.faceVelocity || isNaN(fv) || fv <= 0) {
       return 'Face Velocity must be a positive number (FPM).';
@@ -191,7 +183,6 @@ const FaceVelocityFormModal = ({
         filterGrade: selectedGradeIds[0],
         minDepth: Number(formData.minDepth),
         maxDepth: Number(formData.maxDepth),
-        pleatsPerFeet: Number(formData.pleatsPerFeet),
         faceVelocity: Number(formData.faceVelocity),
         status: formData.status,
         remarks: formData.remarks?.trim() || '',
@@ -455,21 +446,7 @@ const FaceVelocityFormModal = ({
             <span>Engineering Performance Specifications</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Pleats / Foot" required>
-              <Input
-                type="number"
-                name="pleatsPerFeet"
-                value={formData.pleatsPerFeet}
-                onChange={handleChange}
-                placeholder="e.g. 11"
-                min="1"
-                step="1"
-                disabled={loading}
-                required
-              />
-            </FormField>
-
+          <div>
             <FormField label="Face Velocity (FPM)" required>
               <Input
                 type="number"

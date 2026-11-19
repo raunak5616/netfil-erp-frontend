@@ -123,11 +123,15 @@ export const resolveItemTechnicalSpecs = (itemObj = null, fallbackDims = {}) => 
     }
   }
 
+  // 5. Resolve No. of Folds
+  let resolvedNoOfFolds = (itemObj?.noOfFolds || itemObj?.filterGrade?.noOfFolds || fallbackDims?.noOfFolds || '').trim();
+
   return {
     moc: resolvedMoc,
     temperatureRange: resolvedTempRange,
     bonding: resolvedBonding,
     gasketMoc: resolvedGasketMoc,
+    noOfFolds: resolvedNoOfFolds,
   };
 };
 
@@ -483,6 +487,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
           const tempRange = itemSpecs.temperatureRange;
           const bonding = itemSpecs.bonding;
           const gasketMoc = itemSpecs.gasketMoc;
+          const noOfFolds = itemSpecs.noOfFolds;
 
           const dims = {
             itemLength: origL,
@@ -507,6 +512,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
             temperatureRange: tempRange,
             bonding: bonding,
             gasketMoc: gasketMoc,
+            noOfFolds: noOfFolds,
           };
 
           const flangeId = reqItem.flangeDesign?._id || reqItem.flangeDesign || reqItem.flangeDesignSnapshot?.flangeDesignId || '';
@@ -949,6 +955,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
       const itemTempRange = itemSpecs.temperatureRange;
       const itemBonding = itemSpecs.bonding;
       const itemGasketMoc = itemSpecs.gasketMoc;
+      const itemNoOfFolds = itemSpecs.noOfFolds;
 
       // 7. Flange Design & Hole Config
       let nextFlangeDesign = '';
@@ -984,6 +991,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
         temperatureRange: itemTempRange,
         bonding: itemBonding,
         gasketMoc: itemGasketMoc,
+        noOfFolds: itemNoOfFolds,
       };
 
       updated[index] = {
@@ -1802,9 +1810,12 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   <div>
                                     Catalog Item Selected: <strong>{selectedCatalogItem.itemName}</strong> ({selectedCatalogItem.itemCode})
                                     {selectedCatalogItem.filterGrade && (
-                                      <div style={{ fontSize: '11px', color: 'var(--neutral-600)', marginTop: '2px' }}>
-                                        Filter Grade: <strong>{typeof selectedCatalogItem.filterGrade === 'object' ? selectedCatalogItem.filterGrade.filterGrade : selectedCatalogItem.filterGrade}</strong>
-                                        {typeof selectedCatalogItem.filterGrade === 'object' && selectedCatalogItem.filterGrade.eurovent ? ` (${selectedCatalogItem.filterGrade.eurovent})` : ''}
+                                      <div style={{ fontSize: '11px', color: 'var(--neutral-600)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span>Filter Grade: <strong>{typeof selectedCatalogItem.filterGrade === 'object' ? selectedCatalogItem.filterGrade.filterGrade : selectedCatalogItem.filterGrade}</strong>
+                                        {typeof selectedCatalogItem.filterGrade === 'object' && selectedCatalogItem.filterGrade.eurovent ? ` (${selectedCatalogItem.filterGrade.eurovent})` : ''}</span>
+                                        {(selectedCatalogItem.noOfFolds || selectedCatalogItem.filterGrade?.noOfFolds) && (
+                                          <span>• No. of Folds: <strong>{selectedCatalogItem.noOfFolds || selectedCatalogItem.filterGrade?.noOfFolds}</strong></span>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -2435,6 +2446,18 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                               <option value={itemObj.dimensions.gasketMoc}>{itemObj.dimensions.gasketMoc}</option>
                                             )}
                                           </Select>
+                                        </FormField>
+
+                                        <FormField label="No. of Folds" helperText="Configured from Filter Grade Master">
+                                          <Input
+                                            type="text"
+                                            placeholder="e.g. 10 or 10–11"
+                                            value={itemObj.dimensions.noOfFolds || ''}
+                                            onChange={(e) => handleItemDimensionChange(itemIndex, 'noOfFolds', e.target.value)}
+                                            disabled={submitting}
+                                            readOnly={hasCatalogItem}
+                                            style={hasCatalogItem ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : undefined}
+                                          />
                                         </FormField>
                                       </div>
                                     </div>

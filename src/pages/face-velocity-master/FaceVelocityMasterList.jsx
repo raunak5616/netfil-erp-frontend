@@ -168,13 +168,6 @@ const FaceVelocityMasterList = () => {
       ),
     },
     {
-      key: 'pleatsPerFeet',
-      header: 'Pleats / Ft',
-      width: '110px',
-      align: 'center',
-      render: (val) => <span className="text-xs font-semibold text-slate-700">{val}</span>,
-    },
-    {
       key: 'faceVelocity',
       header: 'Face Velocity',
       width: '130px',
@@ -252,7 +245,7 @@ const FaceVelocityMasterList = () => {
     <div className="space-y-4">
       <PageHeader
         title="Face Velocity Master"
-        subtitle="Manage Grade-wise dimensions, depth ranges, pleats, filtration area, and face velocities"
+        subtitle="Manage Filter Grade depth ranges and face velocities"
         breadcrumbs={[
           { label: 'Master' },
           { label: 'Item Master' },
@@ -297,7 +290,7 @@ const FaceVelocityMasterList = () => {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               type="text"
-              placeholder="Search dimension, pleats, velocity..."
+              placeholder="Search grade, depth, velocity..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 text-xs"

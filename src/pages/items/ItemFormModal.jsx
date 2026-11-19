@@ -252,6 +252,7 @@ const ItemFormModal = ({
     gasketMoc: 'EPDM',
     customGasketMoc: '',
     bonding: '',
+    noOfFolds: '',
   });
 
   // Specification state: map of specId -> { value, isApply, isFix, isExisting }
@@ -581,6 +582,7 @@ const ItemFormModal = ({
         gasketMoc: initialGasket,
         customGasketMoc: '',
         bonding: item.bonding || (matchedR ? matchedR.bondingValue : ''),
+        noOfFolds: item.noOfFolds || item.filterGrade?.noOfFolds || '',
       });
       if (item.faceVelocityMaster && typeof item.faceVelocityMaster === 'object') {
         setMatchedFaceVelocityConfig(item.faceVelocityMaster);
@@ -642,6 +644,7 @@ const ItemFormModal = ({
         gasketMoc: 'EPDM',
         customGasketMoc: '',
         bonding: '',
+        noOfFolds: '',
       });
       setFilterType('');
       setImageError('');
@@ -873,15 +876,34 @@ const variantOptions = useMemo(() => {
   });
 }, [selectedFg, filterType]);
 
+const selectedVariantObj = useMemo(() => {
+  if (!selectedFg || !Array.isArray(selectedFg.variants) || !formData.filterGradeVariant) return null;
+  const match = variantOptions.find((vo) => vo.key === formData.filterGradeVariant);
+  return match?.variant || null;
+}, [selectedFg, variantOptions, formData.filterGradeVariant]);
+
 // Auto-select first variant when grade changes and variants are available
 useEffect(() => {
-  if (variantOptions.length > 0 && !formData.filterGradeVariant) {
-    setFormData(prev => ({
-      ...prev,
-      filterGradeVariant: variantOptions[0].key
-    }));
+  if (variantOptions.length > 0) {
+    const currentMatches = variantOptions.some((vo) => vo.key === formData.filterGradeVariant);
+    if (!formData.filterGradeVariant || !currentMatches) {
+      const firstVo = variantOptions[0];
+      setFormData((prev) => ({
+        ...prev,
+        filterGradeVariant: firstVo.key,
+        noOfFolds: firstVo.variant?.noOfFolds || ''
+      }));
+    }
+  } else if (!selectedFg) {
+    if (formData.filterGradeVariant || formData.noOfFolds) {
+      setFormData((prev) => ({
+        ...prev,
+        filterGradeVariant: '',
+        noOfFolds: ''
+      }));
+    }
   }
-}, [variantOptions, formData.filterGradeVariant]);
+}, [variantOptions, formData.filterGradeVariant, selectedFg]);
 
 // Dynamic Face Velocity Master Lookup:
 // When filterGrade and filterDepth are entered for FILTER items,
@@ -931,7 +953,6 @@ useEffect(() => {
           setFormData((prev) => ({
             ...prev,
             faceVelocity: res.configuration.faceVelocity,
-            pleatsPerFeet: res.configuration.pleatsPerFeet,
             faceVelocityMaster: res.configuration._id,
           }));
         } else {
@@ -1071,7 +1092,8 @@ const handleGradeSelect = (gradeId) => {
     setFormData(prev => ({
       ...prev,
       filterGrade: '',
-      filterGradeVariant: ''
+      filterGradeVariant: '',
+      noOfFolds: ''
     }));
     setSelectedMicron('');
     setIsGradeMicronLocked(false);
@@ -1092,7 +1114,8 @@ const handleGradeSelect = (gradeId) => {
   setFormData(prev => ({
     ...prev,
     filterGrade: gradeId,
-    filterGradeVariant: ''
+    filterGradeVariant: '',
+    noOfFolds: ''
   }));
   setErrorMessage('');
 };
@@ -1104,7 +1127,8 @@ const handleMicronSelect = (micronVal) => {
     setFormData(prev => ({
       ...prev,
       filterGrade: '',
-      filterGradeVariant: ''
+      filterGradeVariant: '',
+      noOfFolds: ''
     }));
     setIsGradeMicronLocked(false);
     setErrorMessage('');
@@ -1115,11 +1139,15 @@ const handleMicronSelect = (micronVal) => {
   const matchingGrades = filterGrades.filter(fg => getMicronForGrade(fg._id) === micronVal);
   if (matchingGrades.length > 0) {
     const isAlreadyMatching = matchingGrades.some(fg => String(fg._id) === String(formData.filterGrade));
-    const targetGradeId = isAlreadyMatching ? formData.filterGrade : matchingGrades[0]._id;
+    const targetGrade = isAlreadyMatching
+      ? filterGrades.find(fg => String(fg._id) === String(formData.filterGrade))
+      : matchingGrades[0];
+    const targetGradeId = targetGrade?._id;
     setFormData(prev => ({
       ...prev,
       filterGrade: targetGradeId,
-      filterGradeVariant: ''
+      filterGradeVariant: '',
+      noOfFolds: ''
     }));
     setIsGradeMicronLocked(true);
   } else {
@@ -1134,7 +1162,8 @@ const handleResetGradeMicron = () => {
   setFormData(prev => ({
     ...prev,
     filterGrade: '',
-    filterGradeVariant: ''
+    filterGradeVariant: '',
+    noOfFolds: ''
   }));
   setSelectedMicron('');
   setErrorMessage('');
@@ -1226,6 +1255,12 @@ const handleChange = (e) => {
 
     if (name === 'filterGrade') {
       next.filterGradeVariant = '';
+      next.noOfFolds = '';
+    }
+
+    if (name === 'filterGradeVariant') {
+      const match = variantOptions.find((vo) => vo.key === value);
+      next.noOfFolds = match?.variant?.noOfFolds || '';
     }
 
     if (name === 'temperatureRange') {
@@ -1575,6 +1610,7 @@ const handleSubmit = async (e) => {
       moc: formData.productType === 'FILTER' ? (formData.moc || '') : '',
       bonding: formData.productType === 'FILTER' ? (formData.bonding || '') : '',
       gasketMoc: formData.productType === 'FILTER' ? effectiveGasketMoc : '',
+      noOfFolds: formData.productType === 'FILTER' ? (selectedVariantObj?.noOfFolds || formData.noOfFolds || '') : '',
       // Store temperature range as the range itself (e.g. 20–70 °C), NOT converted to a number
       temperatureRating: formData.productType === 'FILTER' ? (effectiveTempRange || formData.temperatureRating || '') : null,
       temperatureRange: formData.productType === 'FILTER' ? (effectiveTempRange || '') : '',
@@ -2335,6 +2371,30 @@ return (
             />
           </div>
         )}
+
+        {formData.filterGrade && formData.filterGradeVariant && (
+          <div className="sm:col-span-2 pt-1">
+            {selectedVariantObj?.noOfFolds ? (
+              <div className="bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2.5 flex items-center justify-between text-[11px] shadow-2xs">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Layers size={13} className="text-slate-600 shrink-0" />
+                  <span>No. of Folds (from Technical Variant):</span>
+                  <strong className="text-slate-900 font-semibold">{selectedVariantObj.noOfFolds}</strong>
+                </span>
+                <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
+                  Variant Config
+                </span>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-2.5 flex items-center gap-2 text-[11px] shadow-2xs">
+                <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                <span>
+                  ⚠️ <strong>Missing configuration:</strong> No fold value configured for this Technical Variant in Filter Grade Master.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
 
@@ -2723,8 +2783,6 @@ return (
                       </span>
                     )}
                     <span>•</span>
-                    <span>Pleats / Ft: <strong>{matchedFaceVelocityConfig.pleatsPerFeet}</strong></span>
-                    <span>•</span>
                     <span>Face Velocity: <strong>{matchedFaceVelocityConfig.faceVelocity} FPM</strong></span>
                   </div>
                 </div>
@@ -2767,28 +2825,6 @@ return (
               </div>
             </div>
           )}
-
-          {/* Pleats Per Feet Input (Read-only, auto-populated) */}
-          <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70">
-            <FormField
-              label={
-                <div className="flex items-center justify-between gap-1 w-full">
-                  <span>No. of Pleats / Feet</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Auto-populated</span>
-                </div>
-              }
-            >
-              <Input
-                type="text"
-                name="pleatsPerFeet"
-                placeholder={isFetchingFaceVelocity ? "Searching..." : "Auto-fetched"}
-                value={formData.pleatsPerFeet !== '' && formData.pleatsPerFeet !== null && formData.pleatsPerFeet !== undefined ? String(formData.pleatsPerFeet) : ''}
-                readOnly
-                disabled
-                className="bg-slate-50 cursor-not-allowed font-medium text-slate-800"
-              />
-            </FormField>
-          </div>
         </div>
       )}
 
@@ -3035,6 +3071,13 @@ return (
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-500 uppercase block font-semibold">No. of Folds</span>
+                <strong className="text-xs text-slate-800">
+                  {selectedVariantObj?.noOfFolds || formData.noOfFolds || <span className="text-amber-600 font-normal italic">Not configured</span>}
+                </strong>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Operating Temperature</span>
                 <strong className="text-xs text-slate-800 font-mono">
                   {formData.temperatureRange || (formData.temperatureRating ? `${formData.temperatureRating} °C` : '—')}
@@ -3084,13 +3127,6 @@ return (
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 uppercase block font-semibold">Pleats / Foot</span>
-                <strong className="text-xs text-slate-800">
-                  {formData.pleatsPerFeet || '—'}
-                </strong>
-              </div>
-
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 col-span-2 sm:col-span-1">
                 <span className="text-[10px] text-slate-500 uppercase block font-semibold">Airflow Capacity</span>
                 <strong className="text-xs font-mono font-bold text-blue-700">
                   {calculatedCfm !== null ? `${calculatedCfm} CFM` : '—'}

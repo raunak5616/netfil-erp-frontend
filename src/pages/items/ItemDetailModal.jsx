@@ -331,6 +331,10 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                             <div className="text-[10px] text-blue-600 uppercase font-semibold">Final PD</div>
                             <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.finalPressureDrop || '—'}</div>
                           </div>
+                          <div>
+                            <div className="text-[10px] text-blue-600 uppercase font-semibold">No. of Folds</div>
+                            <div className="text-xs font-semibold text-slate-800 mt-0.5">{selectedVariantObj.noOfFolds || item.noOfFolds || '—'}</div>
+                          </div>
                         </div>
                       </div>
                     );

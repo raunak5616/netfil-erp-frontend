@@ -66,8 +66,9 @@ const FilterGradeList = () => {
       const code = (grade.filterGrade || '').toLowerCase();
       const euro = (grade.eurovent || '').toLowerCase();
       const iso = (grade.iso || '').toLowerCase();
+      const variantFolds = Array.isArray(grade.variants) && grade.variants.some(v => (v.noOfFolds || '').toLowerCase().includes(term));
 
-      return code.includes(term) || euro.includes(term) || iso.includes(term);
+      return code.includes(term) || euro.includes(term) || iso.includes(term) || variantFolds;
     });
 
     return [...list].sort((a, b) =>

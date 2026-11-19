@@ -20,7 +20,8 @@ const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
     media: '',
     efficiency: '',
     initialPressureDrop: '',
-    finalPressureDrop: ''
+    finalPressureDrop: '',
+    noOfFolds: ''
   };
 
   const [formData, setFormData] = useState({
@@ -271,6 +272,13 @@ const FilterGradeForm = ({ gradeData, isOpen, onClose, onSuccess }) => {
                       value={variant.finalPressureDrop}
                       onChange={(e) => handleVariantChange(index, 'finalPressureDrop', e.target.value)}
                       placeholder="e.g. 70 mm Wc"
+                    />
+                  </FormField>
+                  <FormField label="No. of Folds" fullWidth helperText="E.g. 10 or 10–11">
+                    <Input
+                      value={variant.noOfFolds || ''}
+                      onChange={(e) => handleVariantChange(index, 'noOfFolds', e.target.value)}
+                      placeholder="e.g. 10 or 10–11"
                     />
                   </FormField>
                 </div>

@@ -1870,7 +1870,13 @@ const SalesOrderDrawingWorkspaceModal = ({
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">No. of Folds:</span>
-                          <strong className="text-slate-900 font-semibold">{activeItem?.noOfFolds || '72 - 76 Folds'}</strong>
+                          {activeItem?.noOfFolds && !String(activeItem.noOfFolds).toLowerCase().includes('not configured') ? (
+                            <strong className="text-slate-900 font-semibold">{activeItem.noOfFolds}</strong>
+                          ) : (
+                            <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              ⚠️ Not Configured
+                            </span>
+                          )}
                         </div>
                         <div className="flex justify-between py-1 border-b border-slate-100">
                           <span className="text-slate-500 font-medium">Optimized Temperature:</span>
