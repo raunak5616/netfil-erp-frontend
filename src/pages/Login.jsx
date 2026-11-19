@@ -7,7 +7,6 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Check,
   KeyRound,
   ShieldCheck
 } from 'lucide-react';
@@ -19,7 +18,6 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [demoLoaded, setDemoLoaded] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const { login } = useAuth();
@@ -47,14 +45,6 @@ const Login = () => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const fillDemoCredentials = () => {
-    setUsername('admin');
-    setPassword('Admin@123');
-    setDemoLoaded(true);
-    setErrorMessage('');
-    setTimeout(() => setDemoLoaded(false), 2500);
   };
 
   return (
@@ -184,22 +174,6 @@ const Login = () => {
               )}
             </button>
           </form>
-
-          {/* Discrete Demo Login Helper */}
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <div>
-              <span className="font-semibold text-slate-700">Demo Account:</span>{' '}
-              <span className="font-mono text-slate-600">admin / Admin@123</span>
-            </div>
-            <button
-              type="button"
-              onClick={fillDemoCredentials}
-              className="px-2.5 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-            >
-              {demoLoaded ? <Check size={13} className="text-emerald-600" /> : null}
-              {demoLoaded ? 'Filled' : 'Auto Fill'}
-            </button>
-          </div>
 
         </div>
 

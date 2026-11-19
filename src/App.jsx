@@ -16,7 +16,6 @@ import ItemCategoryList from './pages/item-categories/ItemCategoryList';
 import SpecificationList from './pages/specifications/SpecificationList';
 import FilterGradeList from './pages/filterGrades/FilterGradeList';
 import FaceVelocityMasterList from './pages/face-velocity-master/FaceVelocityMasterList';
-import FlangeDesignList from './pages/flange-designs/FlangeDesignList';
 import DrawingMasterList from './pages/drawing-master/DrawingMasterList';
 import TermsMasterList from './pages/terms/TermsMasterList';
 import ClientList from './pages/clients/ClientList';
