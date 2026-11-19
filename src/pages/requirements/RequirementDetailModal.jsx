@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { resolveItemTechnicalSpecs } from './RequirementFormModal';
+import { resolveItemTechnicalSpecs } from './components/requirementFormConstants';
 import { 
   Building2, 
   Calendar, 

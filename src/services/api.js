@@ -28,10 +28,14 @@ api.interceptors.request.use(
   }
 );
 
-// Global response interceptor for handling 401 errors
+// Global response interceptor for handling 401 errors and standardizing error messages
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Attach clean, normalized userMessage
+    const serverMessage = error.response?.data?.message;
+    error.userMessage = serverMessage || error.message || 'A network error occurred. Please try again.';
+
     if (error.response && error.response.status === 401) {
       // Clear credentials if token is invalid or expired
       localStorage.removeItem('netfil_token');
