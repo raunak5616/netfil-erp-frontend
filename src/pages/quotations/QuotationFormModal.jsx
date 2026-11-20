@@ -152,6 +152,139 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
     },
   ]);
 
+  // Maps a single Requirement item to Quotation line item structure
+  const mapReqItemToLineItem = (reqItem, idx, selectedReq, allItems = items, allUoms = uoms) => {
+    const itemRef = reqItem.item || selectedReq?.item;
+    const itemObj = (typeof itemRef === 'object' ? itemRef : allItems.find((i) => i._id === itemRef)) || null;
+
+    const itemId = itemObj?._id || (typeof itemRef === 'string' ? itemRef : null) || '';
+    const itemCatId = reqItem.itemCategory?._id || reqItem.itemCategory || itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq?.itemCategory?._id || selectedReq?.itemCategory || '';
+    const uomRef = reqItem.uom || selectedReq?.uom || itemObj?.salesUom || itemObj?.inventoryUom;
+    const uomId = (typeof uomRef === 'object' ? uomRef?._id : uomRef) || allUoms[0]?._id || '';
+    const hsnCode = reqItem.hsnCode || selectedReq?.hsnCode || itemObj?.hsnCode || '';
+
+    let description = reqItem.description || '';
+    if (!description) {
+      if (itemObj) {
+        description = itemObj.itemName;
+      } else if (selectedReq?.type === 'service' && selectedReq?.serviceDescription) {
+        description = selectedReq.serviceDescription;
+      } else if (reqItem.constructionType) {
+        description = `Item #${idx + 1} - ${reqItem.constructionType} Filter`;
+      } else {
+        description = `Item #${idx + 1} - Custom Air Filter Requirement`;
+      }
+    }
+
+    const qty = reqItem.quantity !== null && reqItem.quantity !== undefined ? Number(reqItem.quantity) : (selectedReq?.quantity !== null && selectedReq?.quantity !== undefined ? Number(selectedReq.quantity) : 1);
+    const dims = reqItem.dimensions || selectedReq?.dimensions || {};
+    const specs = Array.isArray(reqItem.specifications) && reqItem.specifications.length > 0 ? reqItem.specifications : (Array.isArray(selectedReq?.specifications) ? selectedReq.specifications : []);
+    const flangeDesignId = reqItem.flangeDesign?._id || reqItem.flangeDesign || selectedReq?.flangeDesign?._id || selectedReq?.flangeDesign || null;
+    const constructionTypeVal = reqItem.constructionType || selectedReq?.constructionType || 'FLANGE';
+
+    // Detailed Technical Snapshot in remarks
+    let remarksText = reqItem.remarks || selectedReq?.remarks || '';
+    if (itemObj?.filterGrade) {
+      const fg = typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade : null;
+      const fgName = fg ? fg.filterGrade : itemObj.filterGrade;
+      const eurovent = fg?.eurovent || '';
+      const iso = fg?.iso || '';
+      const fgStr = [fgName ? `Grade: ${fgName}` : '', eurovent ? `EU: ${eurovent}` : '', iso ? `ISO: ${iso}` : ''].filter(Boolean).join(' / ');
+      if (fgStr && !remarksText.includes('Grade:')) {
+        remarksText = remarksText ? `${fgStr} | ${remarksText}` : fgStr;
+      }
+    }
+
+    const isFlange = constructionTypeVal === 'FLANGE';
+    const bw = Number(dims.bodyWidth || dims.width) || 0;
+    const bh = Number(dims.bodyHeight || dims.height) || 0;
+    const bd = Number(dims.depth || dims.length) || 0;
+    const ofw = isFlange ? (Number(dims.overallFlangeWidth || dims.flangeWidth) || (bw > 0 ? bw + 60 : undefined)) : undefined;
+    const ofh = isFlange ? (Number(dims.overallFlangeHeight || dims.flangeHeight) || (bh > 0 ? bh + 60 : undefined)) : undefined;
+    const fpm = Number(dims.faceVelocity || 500);
+
+    let computedCfm = dims.cfm;
+    if (bw > 0 && bh > 0 && fpm > 0) {
+      const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
+      const rounded10 = Math.round(rawCfm / 10) * 10;
+      computedCfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
+    }
+
+    const cleanDims = {
+      ...dims,
+      constructionType: constructionTypeVal,
+      bodyWidth: bw || undefined,
+      bodyHeight: bh || undefined,
+      depth: bd || undefined,
+      width: bw || dims.width,
+      height: bh || dims.height,
+      length: bd || dims.length,
+      overallFlangeWidth: ofw,
+      overallFlangeHeight: ofh,
+      overallFlangeDepth: isFlange ? bd : undefined,
+      flangeWidth: ofw,
+      flangeHeight: ofh,
+      flangeDepth: isFlange ? bd : undefined,
+      faceVelocity: fpm,
+      cfm: computedCfm,
+    };
+
+    if (isFlange && bw && bh && bd) {
+      const dimStr = `BOX: ${bw}×${bh}×${bd} mm | Flange: ${ofw}×${ofh}×${bd} mm`;
+      if (!remarksText.includes('BOX:')) {
+        remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+      }
+    } else if (bw && bh && bd) {
+      const dimStr = `BOX: ${bw}×${bh}×${bd} mm`;
+      if (!remarksText.includes('BOX:')) {
+        remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+      }
+    } else if (dims && (dims.length || dims.width || dims.outerDiameter)) {
+      const dimStr = (dims.length || dims.width)
+        ? `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`
+        : `OD: ${dims.outerDiameter || '—'} ID: ${dims.innerDiameter || '—'} H: ${dims.height || '—'} ${dims.unit || 'mm'}`;
+      if (!remarksText.includes('Dim:') && !remarksText.includes('OD:')) {
+        remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
+      }
+    }
+
+    const filterGradeRef = reqItem.filterGrade || itemObj?.filterGrade || selectedReq?.filterGrade || null;
+    const filterGradeId = typeof filterGradeRef === 'object' ? filterGradeRef?._id : filterGradeRef;
+    const filterGradeName = typeof filterGradeRef === 'object' ? filterGradeRef?.filterGrade : '';
+
+    return {
+      item: itemId,
+      itemCategory: itemCatId,
+      description: description,
+      quantity: qty,
+      uom: uomId,
+      unitPrice: 0,
+      hsnCode: hsnCode,
+      filterGrade: filterGradeId || null,
+      filterGradeName: filterGradeName,
+      drawing: reqItem.drawing?._id || reqItem.drawing || itemObj?.drawing?._id || itemObj?.drawing || null,
+      drawingSnapshot: reqItem.drawingSnapshot || itemObj?.drawingSnapshot || null,
+      constructionType: constructionTypeVal,
+      holeCount: isFlange ? (reqItem.holeCount || selectedReq?.holeCount || null) : null,
+      flangeHoleConfig: isFlange ? (reqItem.flangeHoleConfig || selectedReq?.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : null)) : null,
+      flangeDesign: flangeDesignId,
+      flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq?.flangeDesignSnapshot || null,
+      dimensions: cleanDims,
+      specifications: specs,
+      faceVelocity: fpm,
+      remarks: remarksText,
+      guard: (reqItem.guard || reqItem.dimensions?.guard) ? {
+        hasGuard: Boolean(reqItem.guard?.hasGuard ?? reqItem.dimensions?.guard?.hasGuard),
+        material: reqItem.guard?.material || reqItem.dimensions?.guard?.material || 'SS304',
+        sides: reqItem.guard?.sides || reqItem.dimensions?.guard?.sides || 'One side',
+      } : {
+        hasGuard: false,
+        material: 'SS304',
+        sides: 'One side',
+      },
+    };
+  };
+
   // Robust Enquiry Line Item Auto-Population Handler
   const populateLineItemsFromRequirement = (selectedReq, allItems = items, allUoms = uoms) => {
     if (!selectedReq) return;
@@ -173,139 +306,32 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
       ? selectedReq.items
       : [selectedReq]; // Fallback to single top-level fields for legacy data
 
-    const mappedLineItems = reqItemsList.map((reqItem, idx) => {
-      const itemRef = reqItem.item || selectedReq.item;
-      const itemObj = (typeof itemRef === 'object' ? itemRef : allItems.find((i) => i._id === itemRef)) || null;
-
-      const itemId = itemObj?._id || (typeof itemRef === 'string' ? itemRef : null) || '';
-      const itemCatId = reqItem.itemCategory?._id || reqItem.itemCategory || itemObj?.itemCategory?._id || itemObj?.itemCategory || selectedReq.itemCategory?._id || selectedReq.itemCategory || '';
-      const uomRef = reqItem.uom || selectedReq.uom || itemObj?.salesUom || itemObj?.inventoryUom;
-      const uomId = (typeof uomRef === 'object' ? uomRef?._id : uomRef) || allUoms[0]?._id || '';
-      const hsnCode = reqItem.hsnCode || selectedReq.hsnCode || itemObj?.hsnCode || '';
-
-      let description = reqItem.description || '';
-      if (!description) {
-        if (itemObj) {
-          description = itemObj.itemName;
-        } else if (selectedReq.type === 'service' && selectedReq.serviceDescription) {
-          description = selectedReq.serviceDescription;
-        } else if (reqItem.constructionType) {
-          description = `Item #${idx + 1} - ${reqItem.constructionType} Filter`;
-        } else {
-          description = `Item #${idx + 1} - Custom Air Filter Requirement`;
-        }
-      }
-
-      const qty = reqItem.quantity !== null && reqItem.quantity !== undefined ? Number(reqItem.quantity) : (selectedReq.quantity !== null && selectedReq.quantity !== undefined ? Number(selectedReq.quantity) : 1);
-      const dims = reqItem.dimensions || selectedReq.dimensions || {};
-      const specs = Array.isArray(reqItem.specifications) && reqItem.specifications.length > 0 ? reqItem.specifications : (Array.isArray(selectedReq.specifications) ? selectedReq.specifications : []);
-      const flangeDesignId = reqItem.flangeDesign?._id || reqItem.flangeDesign || selectedReq.flangeDesign?._id || selectedReq.flangeDesign || null;
-      const constructionTypeVal = reqItem.constructionType || selectedReq.constructionType || 'FLANGE';
-
-      // Detailed Technical Snapshot in remarks
-      let remarksText = reqItem.remarks || selectedReq.remarks || '';
-      if (itemObj?.filterGrade) {
-        const fg = typeof itemObj.filterGrade === 'object' ? itemObj.filterGrade : null;
-        const fgName = fg ? fg.filterGrade : itemObj.filterGrade;
-        const eurovent = fg?.eurovent || '';
-        const iso = fg?.iso || '';
-        const fgStr = [fgName ? `Grade: ${fgName}` : '', eurovent ? `EU: ${eurovent}` : '', iso ? `ISO: ${iso}` : ''].filter(Boolean).join(' / ');
-        if (fgStr && !remarksText.includes('Grade:')) {
-          remarksText = remarksText ? `${fgStr} | ${remarksText}` : fgStr;
-        }
-      }
-
-      const isFlange = constructionTypeVal === 'FLANGE';
-      const bw = Number(dims.bodyWidth || dims.width) || 0;
-      const bh = Number(dims.bodyHeight || dims.height) || 0;
-      const bd = Number(dims.depth || dims.length) || 0;
-      const ofw = isFlange ? (Number(dims.overallFlangeWidth || dims.flangeWidth) || (bw > 0 ? bw + 60 : undefined)) : undefined;
-      const ofh = isFlange ? (Number(dims.overallFlangeHeight || dims.flangeHeight) || (bh > 0 ? bh + 60 : undefined)) : undefined;
-      const fpm = Number(dims.faceVelocity || 500);
-
-      let computedCfm = dims.cfm;
-      if (bw > 0 && bh > 0 && fpm > 0) {
-        const rawCfm = (bw / 304.8) * (bh / 304.8) * fpm;
-        const rounded10 = Math.round(rawCfm / 10) * 10;
-        computedCfm = (rounded10 === 0 && rawCfm > 0) ? Math.round(rawCfm) : rounded10;
-      }
-
-      const cleanDims = {
-        ...dims,
-        constructionType: constructionTypeVal,
-        bodyWidth: bw || undefined,
-        bodyHeight: bh || undefined,
-        depth: bd || undefined,
-        width: bw || dims.width,
-        height: bh || dims.height,
-        length: bd || dims.length,
-        overallFlangeWidth: ofw,
-        overallFlangeHeight: ofh,
-        overallFlangeDepth: isFlange ? bd : undefined,
-        flangeWidth: ofw,
-        flangeHeight: ofh,
-        flangeDepth: isFlange ? bd : undefined,
-        faceVelocity: fpm,
-        cfm: computedCfm,
-      };
-
-      if (isFlange && bw && bh && bd) {
-        const dimStr = `BOX: ${bw}×${bh}×${bd} mm | Flange: ${ofw}×${ofh}×${bd} mm`;
-        if (!remarksText.includes('BOX:')) {
-          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
-        }
-      } else if (bw && bh && bd) {
-        const dimStr = `BOX: ${bw}×${bh}×${bd} mm`;
-        if (!remarksText.includes('BOX:')) {
-          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
-        }
-      } else if (dims && (dims.length || dims.width || dims.outerDiameter)) {
-        const dimStr = (dims.length || dims.width)
-          ? `Dim: ${dims.length || '—'}×${dims.width || '—'}${dims.height ? `×${dims.height}` : ''} ${dims.unit || 'mm'}`
-          : `OD: ${dims.outerDiameter || '—'} ID: ${dims.innerDiameter || '—'} H: ${dims.height || '—'} ${dims.unit || 'mm'}`;
-        if (!remarksText.includes('Dim:') && !remarksText.includes('OD:')) {
-          remarksText = remarksText ? `${remarksText} (${dimStr})` : dimStr;
-        }
-      }
-
-      const filterGradeRef = reqItem.filterGrade || itemObj?.filterGrade || selectedReq.filterGrade || null;
-      const filterGradeId = typeof filterGradeRef === 'object' ? filterGradeRef?._id : filterGradeRef;
-      const filterGradeName = typeof filterGradeRef === 'object' ? filterGradeRef?.filterGrade : '';
-
-      return {
-        item: itemId,
-        itemCategory: itemCatId,
-        description: description,
-        quantity: qty,
-        uom: uomId,
-        unitPrice: 0,
-        hsnCode: hsnCode,
-        filterGrade: filterGradeId || null,
-        filterGradeName: filterGradeName,
-        drawing: reqItem.drawing?._id || reqItem.drawing || itemObj?.drawing?._id || itemObj?.drawing || null,
-        drawingSnapshot: reqItem.drawingSnapshot || itemObj?.drawingSnapshot || null,
-        constructionType: constructionTypeVal,
-        holeCount: isFlange ? (reqItem.holeCount || selectedReq.holeCount || null) : null,
-        flangeHoleConfig: isFlange ? (reqItem.flangeHoleConfig || selectedReq.flangeHoleConfig || (reqItem.holeCount ? `${reqItem.holeCount} Holes` : null)) : null,
-        flangeDesign: flangeDesignId,
-        flangeDesignSnapshot: reqItem.flangeDesignSnapshot || selectedReq.flangeDesignSnapshot || null,
-        dimensions: cleanDims,
-        specifications: specs,
-        faceVelocity: fpm,
-        remarks: remarksText,
-        guard: (reqItem.guard || reqItem.dimensions?.guard) ? {
-          hasGuard: Boolean(reqItem.guard?.hasGuard ?? reqItem.dimensions?.guard?.hasGuard),
-          material: reqItem.guard?.material || reqItem.dimensions?.guard?.material || 'SS304',
-          sides: reqItem.guard?.sides || reqItem.dimensions?.guard?.sides || 'One side',
-        } : {
-          hasGuard: false,
-          material: 'SS304',
-          sides: 'One side',
-        },
-      };
-    });
-
+    const mappedLineItems = reqItemsList.map((reqItem, idx) => mapReqItemToLineItem(reqItem, idx, selectedReq, allItems, allUoms));
     setLineItems(mappedLineItems);
+  };
+
+  const linkedReq = useMemo(() => {
+    if (!quotationDetailData?.quotation?.requirement) return null;
+    const reqObj = quotationDetailData.quotation.requirement;
+    if (typeof reqObj === 'object' && reqObj._id) return reqObj;
+    return requirements.find((r) => r._id === reqObj) || null;
+  }, [quotationDetailData, requirements]);
+
+  const missingReqItemsCount = useMemo(() => {
+    if (!isEdit || !linkedReq || !Array.isArray(linkedReq.items)) return 0;
+    return Math.max(0, linkedReq.items.length - lineItems.length);
+  }, [isEdit, linkedReq, lineItems.length]);
+
+  const handleSyncMissingRequirementItems = () => {
+    if (!linkedReq || !Array.isArray(linkedReq.items)) return;
+    const startIndex = lineItems.length;
+    const newReqItems = linkedReq.items.slice(startIndex);
+    if (newReqItems.length === 0) return;
+
+    const newlyMapped = newReqItems.map((reqItem, offsetIdx) =>
+      mapReqItemToLineItem(reqItem, startIndex + offsetIdx, linkedReq, items, uoms)
+    );
+    setLineItems((prev) => [...prev, ...newlyMapped]);
   };
 
   // Populate Edit Data or Default Terms
@@ -346,7 +372,17 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
             sides: 'One side',
           },
         }));
-        setLineItems(loadedLineItems);
+        let mergedLineItems = [...loadedLineItems];
+        const reqObj = q.requirement;
+        const linkedReqDoc = typeof reqObj === 'object' && reqObj?._id ? reqObj : requirements.find((r) => r._id === reqObj);
+        if (linkedReqDoc && Array.isArray(linkedReqDoc.items) && linkedReqDoc.items.length > loadedLineItems.length) {
+          const newReqItems = linkedReqDoc.items.slice(loadedLineItems.length);
+          const newlyMapped = newReqItems.map((reqItem, offsetIdx) =>
+            mapReqItemToLineItem(reqItem, loadedLineItems.length + offsetIdx, linkedReqDoc, items, uoms)
+          );
+          mergedLineItems = [...loadedLineItems, ...newlyMapped];
+        }
+        setLineItems(mergedLineItems);
 
         const loadedSubtotal = loadedLineItems.reduce(
           (sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
@@ -992,9 +1028,22 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                   2. Quotation Line Items (Manual Rate Entry)
                 </h4>
               </div>
-              <Button type="button" variant="outline" size="xs" onClick={handleAddLineItem} className="text-indigo-700 border-indigo-200 hover:bg-indigo-50">
-                <Plus size={14} className="mr-1" /> Add Line Item
-              </Button>
+              <div className="flex items-center gap-2">
+                {isEdit && missingReqItemsCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={handleSyncMissingRequirementItems}
+                    className="text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100"
+                  >
+                    <Plus size={14} className="mr-1" /> Sync {missingReqItemsCount} New Item(s) from Enquiry
+                  </Button>
+                )}
+                <Button type="button" variant="outline" size="xs" onClick={handleAddLineItem} className="text-indigo-700 border-indigo-200 hover:bg-indigo-50">
+                  <Plus size={14} className="mr-1" /> Add Line Item
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -1318,6 +1367,7 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                       <DrawingSelector
                         filterGradeId={line.filterGrade}
                         filterGradeName={line.filterGradeName}
+                        constructionType={line.constructionType || line.item?.constructionType || ''}
                         value={line.drawing}
                         drawingSnapshot={line.drawingSnapshot}
                         onChange={(drawingId, snapshot) => {

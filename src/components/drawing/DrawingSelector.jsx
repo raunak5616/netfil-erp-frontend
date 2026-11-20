@@ -2,16 +2,42 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useGetDrawingsByFilterGradeQuery } from '../../features/drawingMaster/drawingMasterApi';
 import { Select } from '../ui/FormField';
 import DrawingPreviewModal from '../../pages/drawing-master/DrawingPreviewModal';
-import { Image as ImageIcon, FileText, CheckCircle2, AlertCircle, Eye, Star } from 'lucide-react';
+import { Image as ImageIcon, FileText, CheckCircle2, AlertCircle, AlertTriangle, Eye, Star } from 'lucide-react';
 
 /**
- * Reusable DrawingSelector component with RTK Query caching.
- * Caches drawings per Filter Grade in Redux Toolkit Query to eliminate duplicate network calls
- * across Quotations, Sales Orders, Requirements, and Item Master.
+ * Validates whether a DrawingMaster record is compatible with a given Construction Type ('BOX' or 'FLANGE').
+ */
+export const isDrawingCompatibleWithConstruction = (drawing, targetConstruction) => {
+  if (!drawing) return false;
+  if (!targetConstruction) return true;
+  const target = String(targetConstruction).trim().toUpperCase();
+  const dConst = String(drawing.constructionType || '').trim().toUpperCase();
+  const dType = String(drawing.drawingType || '').trim().toUpperCase();
+
+  if (target === 'BOX') {
+    if (dConst === 'FLANGE' || dType === 'FLANGE') return false;
+    if (dConst === 'BOX' || dType === 'BOX' || dType === 'STANDARD') return true;
+    return dConst !== 'FLANGE' && dType !== 'FLANGE';
+  }
+
+  if (target === 'FLANGE') {
+    if (dConst === 'BOX' || dType === 'BOX' || dType === 'STANDARD') return false;
+    if (dConst === 'FLANGE' || dType === 'FLANGE') return true;
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * Reusable DrawingSelector component with RTK Query caching and dynamic Construction Type synchronization.
+ * Automatically synchronizes with BOX vs FLANGE construction types and selected Filter Grade.
  */
 const DrawingSelector = ({
   filterGradeId,
   filterGradeName = '',
+  constructionType = '',
+  variantFilterClass = '',
   value,
   selectedDrawingId,
   drawingSnapshot = null,
@@ -33,21 +59,43 @@ const DrawingSelector = ({
       ? filterGradeId._id
       : filterGradeId;
 
-  // Track previous grade to differentiate between grade change vs unrelated re-renders
-  const prevGradeIdRef = useRef(gradeId);
+  const normalizedConstruction = useMemo(() => {
+    return (constructionType || '').trim().toUpperCase();
+  }, [constructionType]);
 
-  // Fetch drawings from RTK Query cache
+  // Track previous inputs to differentiate parameter changes vs unrelated re-renders
+  const prevGradeIdRef = useRef(gradeId);
+  const prevConstructionRef = useRef(normalizedConstruction);
+
+  // Fetch drawings from RTK Query cache with constructionType parameter
+  const queryArgs = useMemo(() => {
+    if (!gradeId) return null;
+    const params = { includeFlange: 'true' };
+    if (normalizedConstruction) {
+      params.drawingType = normalizedConstruction;
+      params.constructionType = normalizedConstruction;
+    }
+    return { filterGradeId: gradeId, params };
+  }, [gradeId, normalizedConstruction]);
+
   const { data: drawingsData, isFetching: loading } = useGetDrawingsByFilterGradeQuery(
-    gradeId,
+    queryArgs || gradeId,
     { skip: !gradeId }
   );
 
-  const drawings = useMemo(() => {
+  const rawDrawings = useMemo(() => {
     if (drawingsData?.success && Array.isArray(drawingsData.drawings)) {
       return drawingsData.drawings.filter((d) => d.status === 'active');
     }
     return [];
   }, [drawingsData]);
+
+  // Filter drawings strictly by construction type
+  const filteredDrawings = useMemo(() => {
+    if (!rawDrawings.length) return [];
+    if (!normalizedConstruction) return rawDrawings;
+    return rawDrawings.filter((d) => isDrawingCompatibleWithConstruction(d, normalizedConstruction));
+  }, [rawDrawings, normalizedConstruction]);
 
   // Build snapshot object to persist with historical records
   const createSnapshot = useCallback(
@@ -70,7 +118,7 @@ const DrawingSelector = ({
         format: doc.format || (doc.fileUrl?.split('.').pop() || '').toLowerCase(),
         mimeType: doc.mimeType,
         filterCategory: doc.filterCategory,
-        constructionType: doc.constructionType,
+        constructionType: doc.constructionType || (doc.drawingType === 'FLANGE' ? 'FLANGE' : 'BOX'),
         frontViewImage: doc.frontViewImage,
         sideViewImage: doc.sideViewImage,
         pictorialViewImage: doc.pictorialViewImage,
@@ -79,9 +127,11 @@ const DrawingSelector = ({
     [gradeId, filterGradeName]
   );
 
+  // Synchronization and Auto-Selection Effect
   useEffect(() => {
     if (!gradeId) {
       prevGradeIdRef.current = null;
+      prevConstructionRef.current = null;
       if (effectiveValue) {
         triggerChange?.('', null, null);
       }
@@ -91,45 +141,97 @@ const DrawingSelector = ({
     if (loading) return;
 
     const gradeChanged = prevGradeIdRef.current !== gradeId;
+    const constructionChanged = prevConstructionRef.current !== normalizedConstruction;
     prevGradeIdRef.current = gradeId;
+    prevConstructionRef.current = normalizedConstruction;
 
-    if (drawings.length > 0) {
-      // Check if current value exists in the active drawings of this grade
-      const matchingCurrent = drawings.find((d) => String(d._id) === String(effectiveValue));
+    // Check if current effectiveValue is valid and COMPATIBLE with constructionType
+    const matchingCurrent = filteredDrawings.find((d) => String(d._id) === String(effectiveValue));
+    const currentIsCompatible = matchingCurrent && isDrawingCompatibleWithConstruction(matchingCurrent, normalizedConstruction);
 
-      if (matchingCurrent && !gradeChanged) {
-        // Current selection is already valid for this grade and grade did not change; preserve it!
-      } else if (matchingCurrent && gradeChanged) {
-        // Same ID valid in new grade, preserve snapshot
-        triggerChange?.(matchingCurrent._id, createSnapshot(matchingCurrent), matchingCurrent);
-      } else {
-        // Value missing or incompatible with new grade: auto-select default drawing
-        const defaultDrawing =
-          drawingsData?.defaultDrawing && drawingsData.defaultDrawing.status === 'active'
-            ? drawings.find((d) => String(d._id) === String(drawingsData.defaultDrawing._id)) ||
-              drawingsData.defaultDrawing
-            : drawings.find((d) =>
-                (d.defaultForGrades || []).map((g) => String(g._id || g)).includes(String(gradeId))
-              ) ||
-              drawings.find((d) => d.isDefault) ||
-              drawings[0];
+    if (currentIsCompatible && !gradeChanged && !constructionChanged) {
+      // Current selection is already compatible and neither grade nor construction changed; preserve it!
+      return;
+    }
 
-        if (defaultDrawing) {
-          triggerChange?.(defaultDrawing._id, createSnapshot(defaultDrawing), defaultDrawing);
-        }
+    if (currentIsCompatible && (gradeChanged || constructionChanged)) {
+      // Current selection is still compatible with new grade/construction; refresh snapshot
+      triggerChange?.(matchingCurrent._id, createSnapshot(matchingCurrent), matchingCurrent);
+      return;
+    }
+
+    // Previous selection is missing or INCOMPATIBLE with new construction type / grade:
+    // Automatically select the most appropriate compatible drawing
+    if (filteredDrawings.length > 0) {
+      let candidate = null;
+
+      // 1. Check if backend defaultDrawing is in filteredDrawings
+      if (
+        drawingsData?.defaultDrawing &&
+        drawingsData.defaultDrawing.status === 'active' &&
+        isDrawingCompatibleWithConstruction(drawingsData.defaultDrawing, normalizedConstruction)
+      ) {
+        candidate =
+          filteredDrawings.find((d) => String(d._id) === String(drawingsData.defaultDrawing._id)) ||
+          null;
+      }
+
+      // 2. Prioritize drawings marked default for this specific grade
+      if (!candidate) {
+        candidate = filteredDrawings.find((d) =>
+          (d.defaultForGrades || []).map((g) => String(g._id || g)).includes(String(gradeId))
+        );
+      }
+
+      // 3. Match Grade Variant filterClass if provided (e.g. HEPA vs FINE_PRE)
+      if (!candidate && variantFilterClass) {
+        const vClass = String(variantFilterClass).trim().toUpperCase();
+        candidate = filteredDrawings.find((d) => {
+          const cat = String(d.filterCategory || '').toUpperCase();
+          const dName = String(d.drawingName || '').toUpperCase();
+          if (vClass.includes('HEPA')) return cat.includes('HEPA') || dName.includes('HEPA');
+          if (vClass.includes('PRE') || vClass.includes('FINE')) {
+            return cat.includes('FINE') || cat.includes('PRE') || dName.includes('PRE') || dName.includes('FINE');
+          }
+          return false;
+        });
+      }
+
+      // 4. Prioritize isDefault
+      if (!candidate) {
+        candidate = filteredDrawings.find((d) => d.isDefault);
+      }
+
+      // 5. Fallback to first compatible drawing
+      if (!candidate) {
+        candidate = filteredDrawings[0];
+      }
+
+      if (candidate) {
+        triggerChange?.(candidate._id, createSnapshot(candidate), candidate);
       }
     } else if (drawingsData && !loading) {
-      // No active drawings available for this Filter Grade
+      // No compatible drawings available for this Filter Grade and Construction Type
       if (effectiveValue) {
         triggerChange?.('', null, null);
       }
     }
-  }, [gradeId, drawings, drawingsData, loading, effectiveValue, triggerChange, createSnapshot]);
+  }, [
+    gradeId,
+    normalizedConstruction,
+    filteredDrawings,
+    drawingsData,
+    loading,
+    effectiveValue,
+    variantFilterClass,
+    triggerChange,
+    createSnapshot,
+  ]);
 
-  // Find currently selected drawing object (from loaded drawings list or from historical snapshot)
+  // Find currently selected drawing object (from loaded compatible drawings list or from historical snapshot)
   const currentDrawing =
-    drawings.find((d) => String(d._id) === String(effectiveValue)) ||
-    (drawingSnapshot && drawingSnapshot.drawingId
+    filteredDrawings.find((d) => String(d._id) === String(effectiveValue)) ||
+    (drawingSnapshot && drawingSnapshot.drawingId && isDrawingCompatibleWithConstruction(drawingSnapshot, normalizedConstruction)
       ? {
           _id: drawingSnapshot.drawingId,
           drawingCode: drawingSnapshot.drawingCode,
@@ -151,9 +253,11 @@ const DrawingSelector = ({
       return;
     }
 
-    const picked = drawings.find((d) => String(d._id) === String(selectedId));
+    const picked = filteredDrawings.find((d) => String(d._id) === String(selectedId));
     if (picked) {
       triggerChange?.(picked._id, createSnapshot(picked), picked);
+    } else {
+      triggerChange?.('', null, null);
     }
   };
 
@@ -184,37 +288,50 @@ const DrawingSelector = ({
         </div>
       )}
 
-      {drawings.length === 0 && !loading ? (
-        <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-center gap-2 text-xs">
-          <AlertCircle size={15} className="text-amber-600 shrink-0" />
-          <span>No active drawing available for this Filter Grade</span>
+      {/* Warning when no compatible drawings exist for the selected construction type */}
+      {filteredDrawings.length === 0 && !loading ? (
+        <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl flex items-start gap-2.5 text-xs shadow-2xs">
+          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold block text-amber-950">
+              No Compatible {normalizedConstruction || ''} Engineering Drawing
+            </span>
+            <p className="text-amber-900 text-[11.5px] leading-relaxed">
+              No matching {normalizedConstruction || ''} drawing was found in Drawing Master for{' '}
+              <strong>{filterGradeName || 'selected Grade'}</strong>.
+            </p>
+            <span className="inline-block text-[10.5px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+              Please configure a compatible {normalizedConstruction || ''} drawing in Drawing Master or adjust construction type.
+            </span>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
-          {/* Manual Selection Dropdown */}
+          {/* Manual Selection Dropdown: Strictly displays only compatible drawings */}
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <Select
                 value={effectiveValue || ''}
                 onChange={handleSelectChange}
-                disabled={disabled || loading || drawings.length === 0}
+                disabled={disabled || loading || filteredDrawings.length === 0}
                 className="w-full text-xs"
               >
-                {drawings.map((d) => {
+                <option value="">-- Select Engineering Drawing --</option>
+                {filteredDrawings.map((d) => {
                   const isDef =
                     (Array.isArray(d.defaultForGrades) ? d.defaultForGrades : [])
                       .map((g) => String(g?._id || g))
                       .includes(String(gradeId)) || d.isDefault;
-                  const dt = (d.drawingType || '').toUpperCase();
+                  const dt = (d.drawingType || d.constructionType || '').toUpperCase();
                   const typeLabel =
                     dt === 'FLANGE'
                       ? '[Flange] '
+                      : dt === 'BOX'
+                      ? '[Box] '
                       : dt === 'FINE'
                       ? '[Fine] '
                       : dt === 'HEPA'
                       ? '[HEPA] '
-                      : dt === 'BOX'
-                      ? '[Box] '
                       : '';
                   return (
                     <option key={d._id} value={d._id}>
@@ -273,7 +390,7 @@ const DrawingSelector = ({
                     <span className="font-mono font-bold text-slate-900 text-xs">
                       {currentDrawing.drawingCode}
                     </span>
-                    {currentDrawing.drawingType === 'FLANGE' &&
+                    {(currentDrawing.drawingType === 'FLANGE' || currentDrawing.constructionType === 'FLANGE') &&
                       currentDrawing.holes !== undefined &&
                       currentDrawing.holes !== null && (
                         <span className="text-[10px] text-purple-700 bg-purple-100/70 px-1.5 py-0.2 rounded font-medium">
@@ -299,7 +416,9 @@ const DrawingSelector = ({
 
               {/* Status Note */}
               <div className="text-[10px] text-right text-slate-500 shrink-0">
-                <span className="text-blue-600 font-medium">Grade Matched</span>
+                <span className="text-blue-600 font-medium">
+                  {normalizedConstruction ? `${normalizedConstruction} Matched` : 'Grade Matched'}
+                </span>
               </div>
             </div>
           )}

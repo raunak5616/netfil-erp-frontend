@@ -109,7 +109,7 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
   };
 
   const handleRemoveSpecification = async (specId, specName) => {
-    if (!window.confirm(`Are you sure you want to remove "${specName}" from this category?`)) return;
+    if (!window.confirm(`Are you sure you want to delete "${specName}" from this category?`)) return;
 
     setSubmitting(true);
     setErrorMessage('');
@@ -118,9 +118,10 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
         categoryId: category._id,
         specificationId: specId,
       }).unwrap();
+      setSuccessMessage(`Specification "${specName}" deleted successfully.`);
     } catch (err) {
-      console.error("Remove Specification error:", err);
-      setErrorMessage(err?.data?.message || err?.message || 'Error removing specification');
+      console.error("Delete Specification error:", err);
+      setErrorMessage(err?.data?.message || err?.message || 'Error deleting specification');
     } finally {
       setSubmitting(false);
     }
@@ -434,9 +435,9 @@ const ItemCategoryDetailModal = ({ category, isOpen, onClose, onEdit, canEdit })
                                   icon={Trash2}
                                   onClick={() => handleRemoveSpecification(spec._id, spec.specificationName)}
                                   style={{ color: 'var(--danger-600)' }}
-                                  title="Remove from Category"
+                                  title="Delete from Category"
                                 >
-                                  Remove
+                                  Delete
                                 </Button>
                               </td>
                             )}

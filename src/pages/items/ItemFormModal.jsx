@@ -63,7 +63,9 @@ import {
   ITEM_GROUP_CARDS,
   TEMPERATURE_RANGE_OPTIONS,
   STANDARD_GASKET_MOC_OPTIONS,
-  STANDARD_MOC_OPTIONS
+  STANDARD_MOC_OPTIONS,
+  isVariantCompatible,
+  formatVariantOptionLabel
 } from './components/itemFormConstants';
 
 const ItemFormModal = ({
@@ -757,36 +759,64 @@ const selectedFg = useMemo(() => {
   return filterGrades.find((fg) => String(fg._id) === String(formData.filterGrade));
 }, [formData.filterGrade, filterGrades]);
 
-// Filter Grade Variant options
+// Filter Grade Variant options:
+// Dynamically filtered to ONLY compatible Technical Variants based on:
+// 1. Selected Filter Grade
+// 2. Selected Operating Temperature Range
+// 3. Selected Filter Construction Type (BOX or FLANGE)
 const variantOptions = useMemo(() => {
   if (!selectedFg || !Array.isArray(selectedFg.variants)) return [];
-  return selectedFg.variants.map((v) => {
+
+  const currentConstruction = filterType || formData.constructionType || '';
+  const currentTemp = formData.temperatureRange || formData.temperatureRating || (
+    selectedTempRangeId ? TEMPERATURE_RANGE_OPTIONS.find(r => r.id === selectedTempRangeId)?.rangeLabel : ''
+  );
+
+  return selectedFg.variants
+    .filter((v) => isVariantCompatible(v, {
+      filterType: currentConstruction,
+      constructionType: currentConstruction,
+      temperatureRange: currentTemp,
+      temperatureRating: formData.temperatureRating
+    }))
+    .map((v) => {
+      const classVal = v.filterClass || v.class || 'Std';
+      const typeVal = v.filterType || v.mountingType || (currentConstruction || 'Std');
+      const tempVal = v.temperature || v.tempRating || 'Std Temp';
+      const mediaVal = v.media || v.mediaType || 'Std Media';
+      const key = `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
+      const label = formatVariantOptionLabel(v);
+      return { key, label, variant: v };
+    });
+}, [selectedFg, filterType, formData.constructionType, formData.temperatureRange, formData.temperatureRating, selectedTempRangeId]);
+
+const selectedVariantObj = useMemo(() => {
+  if (!selectedFg || !Array.isArray(selectedFg.variants) || !formData.filterGradeVariant) return null;
+  const match = variantOptions.find((vo) => vo.key === formData.filterGradeVariant);
+  if (match) return match.variant;
+  return selectedFg.variants.find((v) => {
     const classVal = v.filterClass || v.class || 'Std';
     const typeVal = v.filterType || v.mountingType || (filterType || 'Std');
     const tempVal = v.temperature || v.tempRating || 'Std Temp';
     const mediaVal = v.media || v.mediaType || 'Std Media';
     const key = `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
-    const label = `${classVal} — ${typeVal} (${tempVal}, ${mediaVal})`;
-    return { key, label, variant: v };
-  });
-}, [selectedFg, filterType]);
+    return key === formData.filterGradeVariant;
+  }) || null;
+}, [selectedFg, variantOptions, formData.filterGradeVariant, filterType]);
 
-const selectedVariantObj = useMemo(() => {
-  if (!selectedFg || !Array.isArray(selectedFg.variants) || !formData.filterGradeVariant) return null;
-  const match = variantOptions.find((vo) => vo.key === formData.filterGradeVariant);
-  return match?.variant || null;
-}, [selectedFg, variantOptions, formData.filterGradeVariant]);
-
-// Auto-select first variant when grade changes and variants are available
+// Revalidation & Invalidation Effect:
+// When any dependency (Grade, Temperature, Construction Type) changes,
+// verify if currently selected variant is still compatible.
+// If it is no longer compatible, CLEAR it immediately.
+// NEVER automatically select the first available variant.
 useEffect(() => {
-  if (variantOptions.length > 0) {
-    const currentMatches = variantOptions.some((vo) => vo.key === formData.filterGradeVariant);
-    if (!formData.filterGradeVariant || !currentMatches) {
-      const firstVo = variantOptions[0];
+  if (formData.filterGradeVariant) {
+    const isStillCompatible = variantOptions.some((vo) => vo.key === formData.filterGradeVariant);
+    if (!isStillCompatible) {
       setFormData((prev) => ({
         ...prev,
-        filterGradeVariant: firstVo.key,
-        noOfFolds: firstVo.variant?.noOfFolds || ''
+        filterGradeVariant: '',
+        noOfFolds: ''
       }));
     }
   } else if (!selectedFg) {
@@ -1010,7 +1040,9 @@ const handleGradeSelect = (gradeId) => {
     ...prev,
     filterGrade: gradeId,
     filterGradeVariant: '',
-    noOfFolds: ''
+    noOfFolds: '',
+    drawing: '',
+    drawingSnapshot: null,
   }));
   setErrorMessage('');
 };
@@ -1064,8 +1096,9 @@ const handleResetGradeMicron = () => {
   setErrorMessage('');
 };
 
-// Section 3.2: Construction Type Selection (BOX vs FLANGE)
+// Section 3.3: Construction Type Selection (BOX vs FLANGE)
 // Updates item code prefix: BOX -> NFB series, FLANGE -> NFF series
+// Dependent Grade Variant is cleared when construction type changes
 const handleConstructionSelect = (type) => {
   setFilterType(type);
   setFormData(prev => ({
@@ -1073,16 +1106,21 @@ const handleConstructionSelect = (type) => {
     filterType: type,
     constructionType: type,
     flangeType: type === 'FLANGE' ? prev.flangeType : '',
+    filterGradeVariant: '',
+    noOfFolds: '',
+    drawing: '',
+    drawingSnapshot: null,
   }));
   setErrorMessage('');
 };
 
-// Section 3.3, 3.4 & 3.5: Temperature Range Selection, Bonding Adhesive, Gasket MOC & MOC
+// Section 3.2, 3.5 & 3.6: Temperature Range Selection, Bonding Adhesive, Gasket MOC & MOC
 // Requirements:
 // 1. Gasket MOC: <= 250 °C -> EPDM, 250–350 °C -> Glass Fiber Pad.
 // 2. MOC: 200–250 °C and 250–350 °C -> automatically preselect SS304.
 // 3. User can manually change it to Aluminium or SS316.
 // 4. When switching to another temperature range, apply relevant default selection without unnecessarily overwriting a deliberate manual selection.
+// 5. Dependent Grade Variant is cleared when temperature changes
 const handleTempRangeSelect = (rangeId) => {
   setSelectedTempRangeId(rangeId);
   const range = TEMPERATURE_RANGE_OPTIONS.find(r => r.id === rangeId);
@@ -1105,7 +1143,9 @@ const handleTempRangeSelect = (rangeId) => {
         gasketMoc: range.gasketMoc,
         moc: nextMoc,
         customGasketMoc: '',
-        customMoc: ''
+        customMoc: '',
+        filterGradeVariant: '',
+        noOfFolds: ''
       };
     });
   }
@@ -1277,14 +1317,21 @@ const validateCurrentStep = (step) => {
   if (step === 3) {
     if (isFilter) {
       // Step 3: Filter Configuration Validation
+      // Sequence: Grade -> Temperature Range -> Construction Type -> Compatible Grade Variant -> Gasket -> Bonding -> MOC -> Dimensions
       if (!formData.filterGrade) {
         return 'Filter Grade is required.';
+      }
+      if (!formData.temperatureRange && !formData.temperatureRating && !selectedTempRangeId) {
+        return 'Operating Temperature Range is required.';
       }
       if (!filterType) {
         return 'Filter Construction Type (BOX or FLANGE) is required.';
       }
-      if (!formData.temperatureRange && !formData.temperatureRating && !selectedTempRangeId) {
-        return 'Operating Temperature Range is required.';
+      if (variantOptions.length === 0) {
+        return 'No compatible Grade Variant exists for the selected Grade, Temperature, and Construction Type.';
+      }
+      if (!formData.filterGradeVariant) {
+        return 'Please select a compatible Grade Variant before proceeding.';
       }
       if (!formData.gasketMoc) {
         return 'Gasket MOC is required (EPDM or Glass Fiber Pad).';
@@ -1321,6 +1368,9 @@ const validateCurrentStep = (step) => {
       }
       if (!matchedFaceVelocityConfig || !formData.faceVelocityMaster || !formData.faceVelocity) {
         return 'No matching Face Velocity Master configuration found for the selected Filter Grade and Depth. Please configure the required depth range.';
+      }
+      if (!formData.drawing) {
+        return `A compatible ${filterType || 'Engineering'} Drawing must be selected.`;
       }
       return null;
     } else {
@@ -1372,17 +1422,20 @@ const validate = () => {
   }
 
   if (formData.productType === 'FILTER') {
-    if (!filterType) {
-      return 'Filter Type (Box or Flange) is required for Filter items.';
-    }
     if (!formData.filterGrade) {
       return 'Filter Grade is required.';
     }
-    if (formData.filterGrade && !formData.filterGradeVariant) {
-      return 'Filter Grade Variant is required when a Filter Grade is selected.';
-    }
     if (!formData.temperatureRange && !formData.temperatureRating && !selectedTempRangeId) {
       return 'Operating Temperature Range is required.';
+    }
+    if (!filterType && !formData.constructionType) {
+      return 'Filter Construction Type (BOX or FLANGE) is required.';
+    }
+    if (variantOptions.length === 0) {
+      return 'No compatible Grade Variant exists for the selected Grade, Temperature, and Construction Type.';
+    }
+    if (!formData.filterGradeVariant) {
+      return 'Please select a compatible Grade Variant before proceeding.';
     }
     if (!formData.gasketMoc || (formData.gasketMoc === 'OTHER' && !formData.customGasketMoc?.trim())) {
       return 'Gasket MOC is required.';
@@ -2218,351 +2271,408 @@ return (
                   </div>
                 </div>
               )}
+            </div>
 
-      {/* Grade Variant & Engineering Drawing Assignment */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-100">
-        <FormField
-          label="Grade Variant"
-          required={!!formData.filterGrade}
-          helperText={formData.filterGrade ? 'Select specification variant.' : 'Requires Filter Grade first.'}
-        >
-          <Select
-            name="filterGradeVariant"
-            value={formData.filterGradeVariant}
-            onChange={handleChange}
-            disabled={submitting || !formData.filterGrade || variantOptions.length === 0}
-          >
-            <option value="">
-              {!formData.filterGrade
-                ? '-- Select Grade First --'
-                : variantOptions.length === 0
-                  ? '-- No Variants Found --'
-                  : '-- Select Variant --'}
-            </option>
-            {variantOptions.map((vo) => (
-              <option key={vo.key} value={vo.key}>
-                {vo.label}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-
-        {formData.filterGrade && (
-          <div>
-            <DrawingSelector
-              filterGradeId={formData.filterGrade}
-              filterGradeName={selectedFg?.filterGrade || ''}
-              value={formData.drawing}
-              drawingSnapshot={formData.drawingSnapshot}
-              onChange={(drawingId, drawingSnapshot) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  drawing: drawingId || '',
-                  drawingSnapshot: drawingSnapshot || null,
-                }));
-              }}
-              disabled={submitting || loadingData}
-              label="Assigned Engineering Drawing"
-            />
-          </div>
-        )}
-
-        {formData.filterGrade && formData.filterGradeVariant && (
-          <div className="sm:col-span-2 pt-1">
-            {selectedVariantObj?.noOfFolds ? (
-              <div className="bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2.5 flex items-center justify-between text-[11px] shadow-2xs">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <Layers size={13} className="text-slate-600 shrink-0" />
-                  <span>No. of Folds (from Technical Variant):</span>
-                  <strong className="text-slate-900 font-semibold">{selectedVariantObj.noOfFolds}</strong>
-                </span>
-                <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
-                  Variant Config
-                </span>
+            {/* 3.2 Operating Temperature & Bonding Adhesive */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <Thermometer size={15} className="text-amber-600" />
+                  <span>3.2 Operating Temperature & Bonding Adhesive</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </div>
+                <span className="text-[11px] text-slate-400">Stored as temperature range (e.g. 20–70 °C)</span>
               </div>
-            ) : (
-              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-2.5 flex items-center gap-2 text-[11px] shadow-2xs">
-                <AlertTriangle size={14} className="text-amber-600 shrink-0" />
-                <span>
-                  ⚠️ <strong>Missing configuration:</strong> No fold value configured for this Technical Variant in Filter Grade Master.
-                </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {TEMPERATURE_RANGE_OPTIONS.map((rng) => {
+                  const isSelected = selectedTempRangeId === rng.id || (
+                    formData.temperatureRange && formData.temperatureRange.includes(rng.rangeLabel)
+                  );
+                  return (
+                    <button
+                      key={rng.id}
+                      type="button"
+                      onClick={() => handleTempRangeSelect(rng.id)}
+                      className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${isSelected
+                          ? 'border-blue-600 bg-blue-50/70 font-semibold shadow-2xs ring-1 ring-blue-500/20'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs text-slate-900">{rng.rangeLabel}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                          {rng.adhesiveName}
+                        </span>
+                      </div>
+                      <span className="text-[10.5px] text-slate-500">
+                        Adhesive: <strong>{rng.adhesiveName}</strong>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
 
-    {/* 3.2 Construction Type (BOX vs FLANGE) */}
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-          <Box size={15} className="text-purple-600" />
-          <span>3.2 Filter Construction Type</span>
-          <span className="text-red-500 font-bold">*</span>
-        </div>
-        <span className="text-[11px] text-slate-400">Controls drawing views & item code prefix</span>
-      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <FormField
+                  label="Operating Temperature Range"
+                  required
+                  helperText="Temperature range string stored directly in database."
+                >
+                  <Input
+                    name="temperatureRange"
+                    placeholder="e.g. 20–70 °C"
+                    value={formData.temperatureRange}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  />
+                </FormField>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => handleConstructionSelect('BOX')}
-          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer text-left ${filterType === 'BOX'
-              ? 'border-blue-600 bg-blue-50/80 shadow-xs ring-1 ring-blue-500/20'
-              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-            }`}
-        >
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${filterType === 'BOX' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-              }`}
-          >
-            <Box size={20} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-              <span>BOX Construction</span>
-              <span className="font-mono text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded font-bold">NFB Series</span>
+                <FormField label="Bonding Adhesive" required helperText="Media-to-casing bonding adhesive.">
+                  <Input
+                    name="bonding"
+                    value={formData.bonding}
+                    onChange={handleChange}
+                    placeholder="e.g. PU"
+                    disabled={submitting}
+                  />
+                </FormField>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Box casing without flange projection</p>
-          </div>
-        </button>
 
-        <button
-          type="button"
-          onClick={() => handleConstructionSelect('FLANGE')}
-          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer text-left ${filterType === 'FLANGE'
-              ? 'border-emerald-600 bg-emerald-50/80 shadow-xs ring-1 ring-emerald-500/20'
-              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-            }`}
-        >
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${filterType === 'FLANGE' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
-              }`}
-          >
-            <Maximize2 size={20} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-              <span>FLANGE Construction</span>
-              <span className="font-mono text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-bold">NFF Series</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">With mounting flange & pitch pattern</p>
-          </div>
-        </button>
-      </div>
+            {/* 3.3 Filter Construction Type (BOX vs FLANGE) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <Box size={15} className="text-purple-600" />
+                  <span>3.3 Filter Construction Type</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </div>
+                <span className="text-[11px] text-slate-400">Controls drawing views & item code prefix</span>
+              </div>
 
-      {/* Generated Item Code Display */}
-      {filterType ? (
-        <div
-          className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-            filterType === 'BOX'
-              ? 'bg-blue-50/70 border-blue-200'
-              : 'bg-emerald-50/70 border-emerald-200'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-bold shadow-2xs ${
-                filterType === 'BOX'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-emerald-600 text-white'
-              }`}
-            >
-              <Hash size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  Generated Item Code
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleConstructionSelect('BOX')}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer text-left ${filterType === 'BOX'
+                      ? 'border-blue-600 bg-blue-50/80 shadow-xs ring-1 ring-blue-500/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${filterType === 'BOX' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                  >
+                    <Box size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
+                      <span>BOX Construction</span>
+                      <span className="font-mono text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded font-bold">NFB Series</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Box casing without flange projection</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleConstructionSelect('FLANGE')}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer text-left ${filterType === 'FLANGE'
+                      ? 'border-emerald-600 bg-emerald-50/80 shadow-xs ring-1 ring-emerald-500/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${filterType === 'FLANGE' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                  >
+                    <Maximize2 size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
+                      <span>FLANGE Construction</span>
+                      <span className="font-mono text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-bold">NFF Series</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">With mounting flange & pitch pattern</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Generated Item Code Display */}
+              {filterType ? (
+                <div
+                  className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
                     filterType === 'BOX'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      ? 'bg-blue-50/70 border-blue-200'
+                      : 'bg-emerald-50/70 border-emerald-200'
                   }`}
                 >
-                  {filterType === 'BOX' ? 'BOX • NFB Series' : 'FLANGE • NFF Series'}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-bold shadow-2xs ${
+                        filterType === 'BOX'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-emerald-600 text-white'
+                      }`}
+                    >
+                      <Hash size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                          Generated Item Code
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                            filterType === 'BOX'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}
+                        >
+                          {filterType === 'BOX' ? 'BOX • NFB Series' : 'FLANGE • NFF Series'}
+                        </span>
+                      </div>
+                      <div className="font-mono font-black text-slate-900 text-lg tracking-wider mt-0.5">
+                        {displayItemCode}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-left sm:text-right text-[11px] text-slate-500 leading-snug">
+                    <span className="font-medium text-slate-700">Live sequential code preview</span>
+                    <span className="block text-[10.5px] text-slate-400">
+                      {filterType === 'BOX'
+                        ? 'Assigned independently to BOX series'
+                        : 'Assigned independently to FLANGE series'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 flex items-center gap-2.5 text-slate-500 text-xs">
+                  <Info size={16} className="text-blue-500 shrink-0" />
+                  <span>
+                    Select <strong>BOX Construction</strong> or <strong>FLANGE Construction</strong> above to generate and display the corresponding sequential item code (<strong>NFB-XXXX</strong> or <strong>NFF-XXXX</strong>).
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 3.4 Grade Variant & Engineering Drawing Assignment */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <Layers size={15} className="text-indigo-600" />
+                  <span>3.4 Grade Variant & Engineering Drawing Assignment</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  Filtered by Grade, Temperature ({formData.temperatureRange || 'None'}), & Construction ({filterType || 'None'})
                 </span>
               </div>
-              <div className="font-mono font-black text-slate-900 text-lg tracking-wider mt-0.5">
-                {displayItemCode}
+
+              {/* Warning banner when Grade, Temp, and Construction are selected but NO compatible variants found */}
+              {formData.filterGrade && formData.temperatureRange && filterType && variantOptions.length === 0 && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-950 rounded-xl p-3.5 flex items-start gap-2.5 text-xs shadow-2xs">
+                  <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold block text-amber-950">No Compatible Technical Variant Configured</span>
+                    <p className="text-amber-900 text-xs leading-relaxed">
+                      No matching Technical Variant was found in Filter Grade Master for <strong>{selectedFg?.filterGrade || 'Selected Grade'}</strong> with <strong>{filterType}</strong> construction and <strong>{formData.temperatureRange}</strong>.
+                    </p>
+                    <div className="pt-0.5">
+                      <span className="inline-block text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                        Please configure a compatible variant in Filter Grade Master or adjust temperature / construction specifications.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Helper notice if prerequisites not yet selected */}
+              {(!formData.filterGrade || !formData.temperatureRange || !filterType) && (
+                <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 flex items-center gap-2.5 text-slate-500 text-xs">
+                  <Info size={16} className="text-blue-500 shrink-0" />
+                  <span>
+                    Please complete <strong>Filter Grade</strong>, <strong>Operating Temperature</strong>, and <strong>Construction Type</strong> above to view compatible Grade Variants.
+                  </span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                <FormField
+                  label="Grade Variant"
+                  required={!!formData.filterGrade}
+                  helperText={
+                    !formData.filterGrade
+                      ? 'Requires Filter Grade first.'
+                      : !formData.temperatureRange
+                        ? 'Requires Operating Temperature Range.'
+                        : !filterType
+                          ? 'Requires Construction Type selection.'
+                          : variantOptions.length === 0
+                            ? 'No compatible variant found for this combination.'
+                            : 'Select compatible specification variant.'
+                  }
+                >
+                  <Select
+                    name="filterGradeVariant"
+                    value={formData.filterGradeVariant}
+                    onChange={handleChange}
+                    disabled={submitting || !formData.filterGrade || !formData.temperatureRange || !filterType || variantOptions.length === 0}
+                  >
+                    <option value="">
+                      {!formData.filterGrade
+                        ? '-- Select Grade First --'
+                        : !formData.temperatureRange
+                          ? '-- Select Temperature First --'
+                          : !filterType
+                            ? '-- Select Construction Type First --'
+                            : variantOptions.length === 0
+                              ? '-- No Compatible Variants Found --'
+                              : '-- Select Variant --'}
+                    </option>
+                    {variantOptions.map((vo) => (
+                      <option key={vo.key} value={vo.key}>
+                        {vo.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                {formData.filterGrade && (
+                  <div>
+                    <DrawingSelector
+                      filterGradeId={formData.filterGrade}
+                      filterGradeName={selectedFg?.filterGrade || ''}
+                      constructionType={filterType || formData.constructionType}
+                      variantFilterClass={selectedVariantObj?.filterClass || ''}
+                      value={formData.drawing}
+                      drawingSnapshot={formData.drawingSnapshot}
+                      onChange={(drawingId, drawingSnapshot) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          drawing: drawingId || '',
+                          drawingSnapshot: drawingSnapshot || null,
+                        }));
+                      }}
+                      disabled={submitting || loadingData}
+                      label="Assigned Engineering Drawing"
+                    />
+                  </div>
+                )}
+
+                {formData.filterGrade && formData.filterGradeVariant && (
+                  <div className="sm:col-span-2 pt-1">
+                    {selectedVariantObj?.noOfFolds ? (
+                      <div className="bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2.5 flex items-center justify-between text-[11px] shadow-2xs">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Layers size={13} className="text-slate-600 shrink-0" />
+                          <span>No. of Folds (from Technical Variant):</span>
+                          <strong className="text-slate-900 font-semibold">{selectedVariantObj.noOfFolds}</strong>
+                        </span>
+                        <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-medium">
+                          Variant Config
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-2.5 flex items-center gap-2 text-[11px] shadow-2xs">
+                        <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                        <span>
+                          ⚠️ <strong>Missing configuration:</strong> No fold value configured for this Technical Variant in Filter Grade Master.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-          <div className="text-left sm:text-right text-[11px] text-slate-500 leading-snug">
-            <span className="font-medium text-slate-700">Live sequential code preview</span>
-            <span className="block text-[10.5px] text-slate-400">
-              {filterType === 'BOX'
-                ? 'Assigned independently to BOX series'
-                : 'Assigned independently to FLANGE series'}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 flex items-center gap-2.5 text-slate-500 text-xs">
-          <Info size={16} className="text-blue-500 shrink-0" />
-          <span>
-            Select <strong>BOX Construction</strong> or <strong>FLANGE Construction</strong> above to generate and display the corresponding sequential item code (<strong>NFB-XXXX</strong> or <strong>NFF-XXXX</strong>).
-          </span>
-        </div>
-      )}
-    </div>
 
-    {/* 3.3 Operating Temperature & Bonding Adhesive */}
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-          <Thermometer size={15} className="text-amber-600" />
-          <span>3.3 Operating Temperature & Bonding Adhesive</span>
-          <span className="text-red-500 font-bold">*</span>
-        </div>
-        <span className="text-[11px] text-slate-400">Stored as temperature range (e.g. 20–70 °C)</span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        {TEMPERATURE_RANGE_OPTIONS.map((rng) => {
-          const isSelected = selectedTempRangeId === rng.id || (
-            formData.temperatureRange && formData.temperatureRange.includes(rng.rangeLabel)
-          );
-          return (
-            <button
-              key={rng.id}
-              type="button"
-              onClick={() => handleTempRangeSelect(rng.id)}
-              className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${isSelected
-                  ? 'border-blue-600 bg-blue-50/70 font-semibold shadow-2xs ring-1 ring-blue-500/20'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-xs text-slate-900">{rng.rangeLabel}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                  {rng.adhesiveName}
+            {/* 3.5 Gasket MOC (Mandatory Separate Field) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <ShieldCheck size={15} className="text-teal-600" />
+                  <span>3.5 Gasket MOC</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </div>
+                <span className="text-[11px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200">
+                  Auto-mapped from Temperature Range
                 </span>
               </div>
-              <span className="text-[10.5px] text-slate-500">
-                Adhesive: <strong>{rng.adhesiveName}</strong>
-              </span>
-            </button>
-          );
-        })}
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <FormField
-          label="Operating Temperature Range"
-          required
-          helperText="Temperature range string stored directly in database."
-        >
-          <Input
-            name="temperatureRange"
-            placeholder="e.g. 20–70 °C"
-            value={formData.temperatureRange}
-            onChange={handleChange}
-            disabled={submitting}
-          />
-        </FormField>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <FormField
+                  label="Gasket MOC"
+                  required
+                  helperText={
+                    formData.temperatureRange?.includes('250–350')
+                      ? "Automatically set to Glass Fiber Pad for 250–350 °C."
+                      : "Automatically set to EPDM for temperatures up to 250 °C."
+                  }
+                >
+                  <Select
+                    name="gasketMoc"
+                    value={formData.gasketMoc}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  >
+                    {STANDARD_GASKET_MOC_OPTIONS.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                    {formData.gasketMoc && !STANDARD_GASKET_MOC_OPTIONS.includes(formData.gasketMoc) && (
+                      <option value={formData.gasketMoc}>
+                        {formData.gasketMoc} (Historical)
+                      </option>
+                    )}
+                  </Select>
+                </FormField>
+              </div>
+            </div>
 
-        <FormField label="Bonding Adhesive" required helperText="Media-to-casing bonding adhesive.">
-          <Input
-            name="bonding"
-            value={formData.bonding}
-            onChange={handleChange}
-            placeholder="e.g. PU"
-            disabled={submitting}
-          />
-        </FormField>
-      </div>
-    </div>
+            {/* 3.6 Material of Construction (MOC) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <Wrench size={15} className="text-slate-600" />
+                  <span>3.6 Material of Construction (MOC)</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </div>
+                <span className="text-[11px] text-slate-400">Frame casing material</span>
+              </div>
 
-    {/* 3.4 Gasket MOC (Mandatory Separate Field) */}
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-          <ShieldCheck size={15} className="text-teal-600" />
-          <span>3.4 Gasket MOC</span>
-          <span className="text-red-500 font-bold">*</span>
-        </div>
-        <span className="text-[11px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200">
-          Auto-mapped from Temperature Range
-        </span>
-      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <FormField label="Select MOC" required helperText="Options: Aluminium, SS304, SS316">
+                  <Select
+                    name="moc"
+                    value={formData.moc}
+                    onChange={handleChange}
+                    disabled={submitting}
+                  >
+                    <option value="">-- Select MOC --</option>
+                    {STANDARD_MOC_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                    {formData.moc && !STANDARD_MOC_OPTIONS.includes(formData.moc) && (
+                      <option value={formData.moc}>
+                        {formData.moc} (Historical)
+                      </option>
+                    )}
+                  </Select>
+                </FormField>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <FormField
-          label="Gasket MOC"
-          required
-          helperText={
-            formData.temperatureRange?.includes('250–350')
-              ? "Automatically set to Glass Fiber Pad for 250–350 °C."
-              : "Automatically set to EPDM for temperatures up to 250 °C."
-          }
-        >
-          <Select
-            name="gasketMoc"
-            value={formData.gasketMoc}
-            onChange={handleChange}
-            disabled={submitting}
-          >
-            {STANDARD_GASKET_MOC_OPTIONS.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-            {formData.gasketMoc && !STANDARD_GASKET_MOC_OPTIONS.includes(formData.gasketMoc) && (
-              <option value={formData.gasketMoc}>
-                {formData.gasketMoc} (Historical)
-              </option>
-            )}
-          </Select>
-        </FormField>
-      </div>
-    </div>
-
-    {/* 3.5 Material of Construction (MOC) */}
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-          <Wrench size={15} className="text-slate-600" />
-          <span>3.5 Material of Construction (MOC)</span>
-          <span className="text-red-500 font-bold">*</span>
-        </div>
-        <span className="text-[11px] text-slate-400">Frame casing material</span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <FormField label="Select MOC" required helperText="Options: Aluminium, SS304, SS316">
-          <Select
-            name="moc"
-            value={formData.moc}
-            onChange={handleChange}
-            disabled={submitting}
-          >
-            <option value="">-- Select MOC --</option>
-            {STANDARD_MOC_OPTIONS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-            {formData.moc && !STANDARD_MOC_OPTIONS.includes(formData.moc) && (
-              <option value={formData.moc}>
-                {formData.moc} (Historical)
-              </option>
-            )}
-          </Select>
-        </FormField>
-      </div>
-    </div>
-
-    {/* 3.6 Filter Size: Custom Filter Box Size / Dimensions */}
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-          <Maximize2 size={15} className="text-indigo-600" />
-          <span>3.6 Filter Size: {isFlange ? 'Custom Filter Box Size (MM)' : 'Filter Dimensions (MM)'}</span>
+            {/* 3.7 Filter Size: Custom Filter Box Size / Dimensions */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                  <Maximize2 size={15} className="text-indigo-600" />
+                  <span>3.7 Filter Size: {isFlange ? 'Custom Filter Box Size (MM)' : 'Filter Dimensions (MM)'}</span>
           <span className="text-red-500 font-bold">*</span>
         </div>
         <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium border border-blue-200">

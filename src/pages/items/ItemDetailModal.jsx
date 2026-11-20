@@ -3,11 +3,15 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { useGetItemSpecificationsQuery } from '../../features/products/productsApi';
-import { Edit, Sliders, Layers, Package, Scale, ShieldCheck, FileText, History, Maximize2, Wind } from 'lucide-react';
+import { useGetItemSpecificationsQuery, useRemoveItemSpecificationMutation } from '../../features/products/productsApi';
+import { Edit, Sliders, Layers, Package, Scale, ShieldCheck, FileText, History, Maximize2, Wind, Trash2 } from 'lucide-react';
 
 const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'specifications' | 'uom' | 'inventory' | 'accounting_history'
+  const [removeItemSpecMutation] = useRemoveItemSpecificationMutation();
+  const [deletingSpecId, setDeletingSpecId] = useState(null);
+  const [specError, setSpecError] = useState('');
+  const [specSuccess, setSpecSuccess] = useState('');
 
   const { data: specsData, isLoading: loadingSpecs } = useGetItemSpecificationsQuery(item?._id, {
     skip: !isOpen || !item?._id
@@ -18,8 +22,33 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
   useEffect(() => {
     if (isOpen) {
       setActiveTab('general');
+      setSpecError('');
+      setSpecSuccess('');
     }
   }, [isOpen]);
+
+  const handleDeleteSpecification = async (specId, specName) => {
+    if (!window.confirm(`Are you sure you want to delete "${specName}" from this item?`)) {
+      return;
+    }
+
+    setDeletingSpecId(specId);
+    setSpecError('');
+    setSpecSuccess('');
+
+    try {
+      await removeItemSpecMutation({
+        itemId: item._id,
+        specificationId: specId,
+      }).unwrap();
+      setSpecSuccess(`Specification "${specName}" deleted successfully.`);
+    } catch (err) {
+      console.error('Delete item specification error:', err);
+      setSpecError(err?.data?.message || err?.message || 'Failed to delete specification');
+    } finally {
+      setDeletingSpecId(null);
+    }
+  };
 
   if (!isOpen || !item) return null;
 
@@ -702,6 +731,17 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                 </span>
               </div>
 
+              {specError && (
+                <div className="mb-2.5">
+                  <Alert type="danger" message={specError} onClose={() => setSpecError('')} />
+                </div>
+              )}
+              {specSuccess && (
+                <div className="mb-2.5">
+                  <Alert type="success" message={specSuccess} onClose={() => setSpecSuccess('')} />
+                </div>
+              )}
+
               {loadingSpecs ? (
                 <div className="text-xs text-slate-500 p-2">
                   Loading category specifications...
@@ -726,6 +766,7 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                         <th className="px-3 py-2">Configured Value</th>
                         <th className="px-3 py-2">Unit</th>
                         <th className="px-3 py-2">Flags</th>
+                        {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
@@ -733,6 +774,8 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                         const spec = s.specification;
                         const uomCode = spec?.unit?.uomCode || spec?.unit?.uomName || '';
                         const displayVal = typeof s.value === 'boolean' ? (s.value ? 'Yes / True' : 'No / False') : String(s.value);
+                        const targetSpecId = spec?._id || s._id;
+                        const targetSpecName = spec?.specificationName || 'Specification';
                         return (
                           <tr key={s._id || idx} className="hover:bg-slate-50">
                             <td className="px-3 py-2 font-semibold text-slate-600">{idx + 1}</td>
@@ -761,6 +804,21 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                                 {!s.isApply && !s.isFix && <span className="text-slate-400 text-xs">—</span>}
                               </div>
                             </td>
+                            {canEdit && (
+                              <td className="px-3 py-2 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={Trash2}
+                                  loading={deletingSpecId === targetSpecId}
+                                  onClick={() => handleDeleteSpecification(targetSpecId, targetSpecName)}
+                                  style={{ color: 'var(--danger-600)' }}
+                                  title="Delete Specification from Item"
+                                >
+                                  Delete
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}

@@ -1,5 +1,16 @@
 import api from './api';
 
+const getValidImageUrl = (d) => {
+  if (!d) return '';
+  const candidates = [d.fileUrl, d.holeImageUrl, d.referenceImage, d.referenceDrawing];
+  for (const url of candidates) {
+    if (url && typeof url === 'string' && !url.includes('/demo/image/upload/')) {
+      return url;
+    }
+  }
+  return d.fileUrl || d.referenceImage || '';
+};
+
 export const getFlangeDesigns = async (params = {}) => {
   const response = await api.get('/drawing-master', { params: { ...params, drawingType: 'FLANGE' } });
   const drawings = response.data?.drawings || [];
@@ -7,8 +18,8 @@ export const getFlangeDesigns = async (params = {}) => {
     ...d,
     designCode: d.drawingCode || d.designCode,
     designName: d.drawingName || d.designName,
-    referenceImage: d.fileUrl || d.referenceImage,
-    referenceDrawing: d.fileUrl || d.referenceDrawing,
+    referenceImage: getValidImageUrl(d),
+    referenceDrawing: getValidImageUrl(d),
     constructionType: d.constructionType || 'FLANGE'
   }));
   return {
@@ -26,8 +37,8 @@ export const getFlangeDesignById = async (id) => {
       ...d,
       designCode: d.drawingCode || d.designCode,
       designName: d.drawingName || d.designName,
-      referenceImage: d.fileUrl || d.referenceImage,
-      referenceDrawing: d.fileUrl || d.referenceDrawing,
+      referenceImage: getValidImageUrl(d),
+      referenceDrawing: getValidImageUrl(d),
       constructionType: d.constructionType || 'FLANGE'
     } : null
   };

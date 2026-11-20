@@ -581,18 +581,29 @@ const RequirementDetailModal = ({
                                     </strong>
                                   </div>
                                 </div>
-                                {(reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage) && (
-                                  <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>
-                                    <img
-                                      src={reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage}
-                                      alt="Reference Design Preview"
-                                      style={{ maxHeight: '140px', objectFit: 'contain' }}
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                    />
-                                  </div>
-                                )}
+                                {(() => {
+                                  const rawImg = reqItem.flangeDesignSnapshot?.referenceImage || flangeObj?.referenceImage;
+                                  const imgSrc = (rawImg && !rawImg.includes('/demo/image/upload/'))
+                                    ? rawImg
+                                    : (flangeObj?.holeImageUrl || flangeObj?.fileUrl || null);
+                                  if (!imgSrc) return null;
+                                  return (
+                                    <div style={{ display: 'flex', justifyContent: 'center', backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--neutral-200)', marginTop: '4px' }}>
+                                      <img
+                                        src={imgSrc}
+                                        alt="Reference Design Preview"
+                                        style={{ maxHeight: '140px', objectFit: 'contain' }}
+                                        onError={(e) => {
+                                          if (flangeObj?.holeImageUrl && e.currentTarget.src !== flangeObj.holeImageUrl) {
+                                            e.currentTarget.src = flangeObj.holeImageUrl;
+                                          } else {
+                                            e.currentTarget.style.display = 'none';
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             )}
                           </div>

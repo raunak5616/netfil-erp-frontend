@@ -1,5 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { useGetSpecificationsQuery, useUpdateSpecificationStatusMutation } from '../../features/masterData/masterDataApi';
+import { 
+  useGetSpecificationsQuery, 
+  useUpdateSpecificationStatusMutation,
+  useDeleteSpecificationMutation 
+} from '../../features/masterData/masterDataApi';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/ui/PageHeader';
 import DataTable from '../../components/ui/DataTable';
@@ -16,7 +20,8 @@ import {
   Eye, 
   Edit, 
   RefreshCw,
-  Power
+  Power,
+  Trash2
 } from 'lucide-react';
 
 const SpecificationList = () => {
@@ -27,8 +32,10 @@ const SpecificationList = () => {
 
   const { data: specsData, isLoading: loading, error: queryError, refetch } = useGetSpecificationsQuery();
   const [updateSpecificationStatusMutation] = useUpdateSpecificationStatusMutation();
+  const [deleteSpecificationMutation] = useDeleteSpecificationMutation();
 
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
   // Filter states
@@ -57,6 +64,24 @@ const SpecificationList = () => {
     } catch (err) {
       console.error("Failed to update specification status:", err);
       setError(err?.data?.message || err?.message || 'Failed to update specification status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteSpec = async (spec) => {
+    const confirmMessage = `Are you sure you want to delete specification "${spec.specificationName}" (${spec.specificationCode})? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setActionLoading(`del_${spec._id}`);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteSpecificationMutation(spec._id).unwrap();
+      setSuccess(`Specification "${spec.specificationName}" deleted successfully.`);
+    } catch (err) {
+      console.error("Failed to delete specification:", err);
+      setError(err?.data?.message || err?.message || 'Failed to delete specification');
     } finally {
       setActionLoading(null);
     }
@@ -233,6 +258,17 @@ const SpecificationList = () => {
               >
                 {row.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Trash2}
+                loading={actionLoading === `del_${row._id}`}
+                onClick={() => handleDeleteSpec(row)}
+                title="Delete Specification"
+                style={{ color: 'var(--danger-600)' }}
+              >
+                Delete
+              </Button>
             </>
           )}
         </div>
@@ -270,6 +306,14 @@ const SpecificationList = () => {
           </>
         }
       />
+
+      {success && (
+        <Alert
+          type="success"
+          message={success}
+          onClose={() => setSuccess('')}
+        />
+      )}
 
       {(error || queryError) && (
         <Alert

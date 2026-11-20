@@ -34,6 +34,7 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
   const [paymentTerms, setPaymentTerms] = useState(quotation?.paymentTerms || '');
   const [deliveryTerms, setDeliveryTerms] = useState(quotation?.deliveryTerms || '');
   const [generalTerms, setGeneralTerms] = useState(quotation?.generalTerms || '');
+  const [syncRequirementItems, setSyncRequirementItems] = useState(true);
 
   const subtotal = quotation?.subtotal || quotation?.subTotal || 0;
   const numDiscountRate = Math.min(100, Math.max(0, Number(discountRate) || 0));
@@ -78,6 +79,7 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
       const payload = {
         reason: reason.trim(),
         remarks: amendmentRemarks,
+        syncRequirementItems,
         headerUpdates: {
           discountRate: numDiscountRate,
           discountAmount: calculatedDiscountAmount,
@@ -260,6 +262,18 @@ const QuotationAmendmentModal = ({ isOpen, onClose, onSuccess, quotation }) => {
               value={amendmentRemarks}
               onChange={(e) => setAmendmentRemarks(e.target.value)}
             />
+          </div>
+
+          <div style={{ marginBottom: '16px', padding: '10px 12px', background: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#1e40af' }}>
+              <input
+                type="checkbox"
+                checked={syncRequirementItems}
+                onChange={(e) => setSyncRequirementItems(e.target.checked)}
+                style={{ width: '16px', height: '16px' }}
+              />
+              <span>Automatically include newly added items from linked Enquiry in this revision</span>
+            </label>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--gray-200)', paddingTop: '12px' }}>

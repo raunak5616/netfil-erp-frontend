@@ -1948,6 +1948,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                               <DrawingSelector
                                                 selectedDrawingId={catDetails.drawing}
                                                 filterGradeId={catDetails.filterGrade}
+                                                constructionType={catDetails.constructionType || ''}
                                                 onSelect={(drawingId) => {
                                                   handleCatalogDetailChange(itemIndex, 'drawing', drawingId);
                                                 }}

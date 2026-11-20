@@ -45,6 +45,7 @@ export const requirementsApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Requirements', id },
         { type: 'Requirements', id: 'LIST' },
+        { type: 'Quotations', id: 'LIST' },
       ],
     }),
     updateRequirementStatus: builder.mutation({
@@ -56,6 +57,7 @@ export const requirementsApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: 'Requirements', id },
         { type: 'Requirements', id: 'LIST' },
+        { type: 'Quotations', id: 'LIST' },
       ],
     }),
     getUnifiedMis: builder.query({

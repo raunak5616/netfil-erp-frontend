@@ -364,6 +364,7 @@ const QuotationDetailModal = ({
     refetch,
   } = useGetQuotationByIdQuery(quotationId, {
     skip: !isOpen || !quotationId,
+    refetchOnMountOrArgChange: true,
   });
 
   const {
@@ -420,8 +421,8 @@ const QuotationDetailModal = ({
     }
 
     // N >= 1
-    // Rev 00: Original Quotation (snapshot preserved in first amendment)
-    const firstAm = sortedAmendments[0];
+    // Rev 00: Original Quotation (snapshot preserved in amendment where revisionNumber === 0)
+    const firstAm = sortedAmendments.find((a) => a.revisionNumber === 0) || sortedAmendments[0];
     list.push({
       revisionNo: 0,
       revisionLabel: 'Rev 00',
@@ -434,14 +435,14 @@ const QuotationDetailModal = ({
       reason: 'Original Quotation',
       remarks: firstAm?.remarks || '',
       headerSnapshot: firstAm?.headerSnapshot || quotation,
-      itemsSnapshot: firstAm?.itemsSnapshot || items,
-      termsSnapshot: firstAm?.termsSnapshot || terms,
+      itemsSnapshot: firstAm?.itemsSnapshot || [],
+      termsSnapshot: firstAm?.termsSnapshot || [],
     });
 
     // Intermediate Revisions: Rev 01 ... Rev 0(N-1)
     for (let i = 1; i < N; i++) {
-      const prevAm = sortedAmendments[i - 1];
-      const curAm = sortedAmendments[i];
+      const curAm = sortedAmendments.find((a) => a.revisionNumber === i) || sortedAmendments[i];
+      const prevAm = sortedAmendments.find((a) => a.revisionNumber === i - 1) || sortedAmendments[i - 1];
       list.push({
         revisionNo: i,
         revisionLabel: `Rev ${String(i).padStart(2, '0')}`,
@@ -454,13 +455,13 @@ const QuotationDetailModal = ({
         reason: prevAm?.reason || `Amendment ${i}`,
         remarks: prevAm?.remarks || '',
         headerSnapshot: curAm?.headerSnapshot || prevAm?.headerSnapshot || quotation,
-        itemsSnapshot: curAm?.itemsSnapshot || prevAm?.itemsSnapshot || items,
-        termsSnapshot: curAm?.termsSnapshot || prevAm?.termsSnapshot || terms,
+        itemsSnapshot: curAm?.itemsSnapshot || prevAm?.itemsSnapshot || [],
+        termsSnapshot: curAm?.termsSnapshot || prevAm?.termsSnapshot || [],
       });
     }
 
     // Latest Revision: Rev 0N (Current live quotation)
-    const latestAm = sortedAmendments[N - 1];
+    const latestAm = sortedAmendments.find((a) => a.revisionNumber === N - 1) || sortedAmendments[sortedAmendments.length - 1];
     list.push({
       revisionNo: N,
       revisionLabel: `Rev ${String(N).padStart(2, '0')}`,
@@ -534,7 +535,11 @@ const QuotationDetailModal = ({
   const handleAmendmentSuccess = () => {
     setIsAmendModalOpen(false);
     setSelectedRevisionNo(null);
-    if (refetch) refetch();
+    try {
+      if (typeof refetch === 'function') refetch();
+    } catch {
+      // Safe catch if query is not currently active
+    }
     if (onRelease) onRelease();
   };
 

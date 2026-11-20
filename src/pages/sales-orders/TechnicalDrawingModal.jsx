@@ -27,7 +27,10 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
 
   const designCode = snapshot.designCode || (typeof item.flangeDesign === 'object' ? item.flangeDesign?.designCode : (constructionType === 'BOX' ? 'BOX-001' : ''));
   const designName = snapshot.designName || (typeof item.flangeDesign === 'object' ? item.flangeDesign?.designName : (constructionType === 'BOX' ? 'Box Filter Standard' : ''));
-  const referenceImage = snapshot.referenceImage || (typeof item.flangeDesign === 'object' ? item.flangeDesign?.referenceImage : '') || (designCode === 'FLG-002' ? '/flange-designs/flange-design-002.svg' : designCode === 'FLG-003' ? '/flange-designs/flange-design-003.svg' : designCode === 'BOX-001' ? '/flange-designs/box-design-001.svg' : '/flange-designs/flange-design-001.svg');
+  const rawRefImg = snapshot.referenceImage || (typeof item.flangeDesign === 'object' ? item.flangeDesign?.referenceImage : '');
+  const referenceImage = (rawRefImg && !rawRefImg.includes('/demo/image/upload/'))
+    ? rawRefImg
+    : (designCode === 'FLG-002' ? '/flange-designs/flange-design-002.svg' : designCode === 'FLG-003' ? '/flange-designs/flange-design-003.svg' : designCode === 'BOX-001' ? '/flange-designs/box-design-001.svg' : '/flange-designs/flange-design-001.svg');
 
   const bodyWidth = dims.bodyWidth || dims.width;
   const bodyHeight = dims.bodyHeight || dims.height;
@@ -164,6 +167,7 @@ const TechnicalDrawingModal = ({ isOpen, salesOrderId, item, onClose, onDrawingU
           <DrawingSelector
             filterGradeId={filterGradeId}
             filterGradeName={filterGradeName}
+            constructionType={item.constructionType || item.item?.constructionType || ''}
             value={selectedDrawingId}
             drawingSnapshot={selectedSnapshot}
             onChange={(drawingId, snapshot, doc) => {
