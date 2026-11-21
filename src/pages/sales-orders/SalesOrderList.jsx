@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   useGetSalesOrdersQuery,
@@ -16,11 +16,11 @@ import Alert from '../../components/ui/Alert';
 import ActionDropdown from '../../components/ui/ActionDropdown';
 import { Input, Select, AsyncSelect } from '../../components/ui/FormField';
 
-import SalesOrderCreateModal from './SalesOrderCreateModal';
-import SalesOrderDetailModal from './SalesOrderDetailModal';
-import SalesOrderEditModal from './SalesOrderEditModal';
-import SalesOrderDrawingWorkspaceModal from './SalesOrderDrawingWorkspaceModal';
-import SalesOrderWorkOrderCreateModal from './SalesOrderWorkOrderCreateModal';
+const SalesOrderCreateModal = lazy(() => import('./SalesOrderCreateModal'));
+const SalesOrderDetailModal = lazy(() => import('./SalesOrderDetailModal'));
+const SalesOrderEditModal = lazy(() => import('./SalesOrderEditModal'));
+const SalesOrderDrawingWorkspaceModal = lazy(() => import('./SalesOrderDrawingWorkspaceModal'));
+const SalesOrderWorkOrderCreateModal = lazy(() => import('./SalesOrderWorkOrderCreateModal'));
 
 import {
   Plus,
@@ -927,85 +927,95 @@ const SalesOrderList = () => {
 
       {/* Create Modal */}
       {isCreateOpen && (
-        <SalesOrderCreateModal
-          isOpen={isCreateOpen}
-          onClose={() => setIsCreateOpen(false)}
-          onSuccess={() => {
-            setIsCreateOpen(false);
-            refetchSalesOrders();
-            refetchAlerts();
-          }}
-        />
+        <Suspense fallback={null}>
+          <SalesOrderCreateModal
+            isOpen={isCreateOpen}
+            onClose={() => setIsCreateOpen(false)}
+            onSuccess={() => {
+              setIsCreateOpen(false);
+              refetchSalesOrders();
+              refetchAlerts();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Detail Modal */}
       {isDetailOpen && selectedSOId && (
-        <SalesOrderDetailModal
-          isOpen={isDetailOpen}
-          salesOrderId={selectedSOId}
-          initialTab={detailInitialTab}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedSOId(null);
-            setDetailInitialTab('details');
-          }}
-          onEdit={(so) => {
-            setIsDetailOpen(false);
-            setEditingSO(so);
-            setIsEditOpen(true);
-          }}
-          onStatusUpdated={() => {
-            refetchSalesOrders();
-            refetchAlerts();
-          }}
-        />
+        <Suspense fallback={null}>
+          <SalesOrderDetailModal
+            isOpen={isDetailOpen}
+            salesOrderId={selectedSOId}
+            initialTab={detailInitialTab}
+            onClose={() => {
+              setIsDetailOpen(false);
+              setSelectedSOId(null);
+              setDetailInitialTab('details');
+            }}
+            onEdit={(so) => {
+              setIsDetailOpen(false);
+              setEditingSO(so);
+              setIsEditOpen(true);
+            }}
+            onStatusUpdated={() => {
+              refetchSalesOrders();
+              refetchAlerts();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Edit Modal */}
       {isEditOpen && editingSO && (
-        <SalesOrderEditModal
-          isOpen={isEditOpen}
-          salesOrder={editingSO}
-          onClose={() => {
-            setIsEditOpen(false);
-            setEditingSO(null);
-          }}
-          onSuccess={() => {
-            setIsEditOpen(false);
-            setEditingSO(null);
-            refetchSalesOrders();
-            refetchAlerts();
-          }}
-        />
+        <Suspense fallback={null}>
+          <SalesOrderEditModal
+            isOpen={isEditOpen}
+            salesOrder={editingSO}
+            onClose={() => {
+              setIsEditOpen(false);
+              setEditingSO(null);
+            }}
+            onSuccess={() => {
+              setIsEditOpen(false);
+              setEditingSO(null);
+              refetchSalesOrders();
+              refetchAlerts();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Engineering Drawing Workspace Modal */}
       {isDrawingWorkspaceOpen && drawingWorkspaceSOId && (
-        <SalesOrderDrawingWorkspaceModal
-          isOpen={isDrawingWorkspaceOpen}
-          salesOrderId={drawingWorkspaceSOId}
-          onClose={() => {
-            setIsDrawingWorkspaceOpen(false);
-            setDrawingWorkspaceSOId(null);
-          }}
-        />
+        <Suspense fallback={null}>
+          <SalesOrderDrawingWorkspaceModal
+            isOpen={isDrawingWorkspaceOpen}
+            salesOrderId={drawingWorkspaceSOId}
+            onClose={() => {
+              setIsDrawingWorkspaceOpen(false);
+              setDrawingWorkspaceSOId(null);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Direct Work Order Creation Modal */}
       {isCreateWOOpen && selectedSOForWO && (
-        <SalesOrderWorkOrderCreateModal
-          isOpen={isCreateWOOpen}
-          salesOrderId={selectedSOForWO}
-          onClose={() => {
-            setIsCreateWOOpen(false);
-            setSelectedSOForWO(null);
-          }}
-          onSuccess={() => {
-            setIsCreateWOOpen(false);
-            setSelectedSOForWO(null);
-            refetchSalesOrders();
-          }}
-        />
+        <Suspense fallback={null}>
+          <SalesOrderWorkOrderCreateModal
+            isOpen={isCreateWOOpen}
+            salesOrderId={selectedSOForWO}
+            onClose={() => {
+              setIsCreateWOOpen(false);
+              setSelectedSOForWO(null);
+            }}
+            onSuccess={() => {
+              setIsCreateWOOpen(false);
+              setSelectedSOForWO(null);
+              refetchSalesOrders();
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

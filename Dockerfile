@@ -3,6 +3,10 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+# Build arguments with production defaults (relative URL keeps browser code decoupled from hostnames)
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
 # Install dependencies
 COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit
