@@ -10,6 +10,11 @@ export const getEmployeeById = async (id) => {
   return response.data;
 };
 
+export const getNextEmployeeCode = async () => {
+  const response = await api.get('/employees/next-code');
+  return response.data;
+};
+
 export const createEmployee = async (employeeData) => {
   const response = await api.post('/employees', employeeData);
   return response.data;

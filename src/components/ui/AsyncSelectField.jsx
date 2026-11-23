@@ -67,11 +67,19 @@ export const AsyncSelect = ({
   // Sync selectedOption with incoming value prop
   useEffect(() => {
     if (value) {
-      if (!selectedOption || String(selectedOption.value) !== String(value)) {
+      const isDifferentValue = !selectedOption || String(selectedOption.value) !== String(value);
+      const isLabelUpdated = Boolean(initialLabel && selectedOption && selectedOption.label !== initialLabel);
+      const isSecondaryUpdated = Boolean(initialSecondaryLabel && selectedOption && selectedOption.secondaryLabel !== initialSecondaryLabel);
+
+      if (isDifferentValue || isLabelUpdated || isSecondaryUpdated) {
+        // Prevent displaying raw 24-character hexadecimal MongoDB ObjectIds as the visible label
+        const isObjectId = typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value);
+        const resolvedLabel = initialLabel || (selectedOption?.value === value && selectedOption?.label && !/^[0-9a-fA-F]{24}$/.test(selectedOption.label) ? selectedOption.label : (isObjectId ? '' : value));
+
         setSelectedOption({ 
           value, 
-          label: initialLabel || value,
-          secondaryLabel: initialSecondaryLabel
+          label: resolvedLabel,
+          secondaryLabel: initialSecondaryLabel || (selectedOption?.value === value ? selectedOption?.secondaryLabel : '')
         });
       }
     } else {
