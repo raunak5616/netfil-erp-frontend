@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
+  useGetNextEmployeeCodeQuery,
 } from '../../features/employees/employeesApi';
 import { useGetDepartmentsQuery } from '../../features/departments/departmentsApi';
 import { AlertCircle, CheckCircle2, FileText, Upload, Trash2 } from 'lucide-react';
@@ -35,6 +36,11 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   });
   const departments = deptData?.departments || [];
 
+  // Query next sequential employee code for preview in Add mode
+  const { data: nextCodeData, isLoading: loadingNextCode } = useGetNextEmployeeCodeQuery(undefined, {
+    skip: isEditMode || !isOpen,
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -59,7 +65,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
       });
     } else {
       setFormData({
-        employeeCode: '',
+        employeeCode: nextCodeData?.nextCode || '',
         fullName: '',
         department: '',
         designation: '',
@@ -75,7 +81,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
     setFileError('');
     setErrorMessage('');
     setSuccessMessage('');
-  }, [employee, isOpen]);
+  }, [employee, isOpen, nextCodeData?.nextCode]);
 
   if (!isOpen) return null;
 
@@ -129,9 +135,6 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
   };
 
   const validate = () => {
-    if (!isEditMode && !formData.employeeCode.trim()) {
-      return 'Employee code is required.';
-    }
     if (!formData.fullName.trim()) {
       return 'Full name is required.';
     }
@@ -167,7 +170,7 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
 
     try {
       const data = new FormData();
-      if (!isEditMode) {
+      if (!isEditMode && formData.employeeCode) {
         data.append('employeeCode', formData.employeeCode);
       }
       data.append('fullName', formData.fullName);
@@ -247,19 +250,28 @@ const EmployeeFormModal = ({ employee, isOpen, onClose, onSuccess }) => {
 
         <div className="form-grid">
           <div className="form-group">
-            <label className="form-label">
-              Employee Code {!isEditMode && <span className="required">*</span>}
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="form-label mb-0">Employee Code</label>
+              {!isEditMode && (
+                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                  Auto-generated
+                </span>
+              )}
+            </div>
             <input
               type="text"
               name="employeeCode"
-              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              placeholder="e.g. EMP002"
-              value={formData.employeeCode}
-              onChange={handleChange}
-              disabled={isEditMode || submitting}
-              style={isEditMode ? { backgroundColor: 'var(--neutral-100)' } : {}}
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs text-slate-700 bg-slate-100 outline-none cursor-not-allowed font-mono font-semibold"
+              placeholder={loadingNextCode ? "Generating code..." : "Auto-generated code"}
+              value={isEditMode ? formData.employeeCode : (nextCodeData?.nextCode || formData.employeeCode || (loadingNextCode ? "Generating..." : "EMP..."))}
+              readOnly
+              disabled
             />
+            <p className="text-[11px] text-slate-500 mt-1">
+              {isEditMode
+                ? "Employee code is unique and cannot be modified."
+                : "Sequential code is automatically assigned and guaranteed unique by the system."}
+            </p>
           </div>
 
           <div className="form-group">

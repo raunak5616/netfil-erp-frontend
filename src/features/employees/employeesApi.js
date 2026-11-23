@@ -28,13 +28,20 @@ export const employeesApi = apiSlice.injectEndpoints({
       }),
       providesTags: (result, error, id) => [{ type: 'Employees', id }],
     }),
+    getNextEmployeeCode: builder.query({
+      query: () => ({
+        url: '/employees/next-code',
+        method: 'get',
+      }),
+      providesTags: ['EmployeeNextCode'],
+    }),
     createEmployee: builder.mutation({
       query: (employeeData) => ({
         url: '/employees',
         method: 'post',
         data: employeeData,
       }),
-      invalidatesTags: [{ type: 'Employees', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Employees', id: 'LIST' }, 'EmployeeNextCode'],
     }),
     updateEmployee: builder.mutation({
       query: ({ id, data }) => ({
@@ -53,6 +60,7 @@ export const employeesApi = apiSlice.injectEndpoints({
 export const {
   useGetEmployeesQuery,
   useGetEmployeeByIdQuery,
+  useGetNextEmployeeCodeQuery,
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
 } = employeesApi;

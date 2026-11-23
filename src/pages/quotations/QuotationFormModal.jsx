@@ -103,11 +103,16 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   // Initial Requirement Resolution
   const initialReqObj = typeof initialRequirement === 'object' ? initialRequirement : null;
   const initialReqId = initialReqObj?._id || (typeof initialRequirement === 'string' ? initialRequirement : '');
-  const initialClientId = initialReqObj?.client?._id || initialReqObj?.client || '';
+  const initialClientObj = typeof initialReqObj?.client === 'object' ? initialReqObj.client : null;
+  const initialClientId = initialClientObj?._id || initialReqObj?.client || '';
+  const initialClientName = initialClientObj?.companyName || '';
+  const initialClientCode = initialClientObj?.clientCode || '';
 
   // Form Header Data
   const [formData, setFormData] = useState({
     client: initialClientId,
+    clientName: initialClientName,
+    clientCode: initialClientCode,
     requirement: initialReqId,
     quotationType: 'domestic',
     quotationCategory: 'product',
@@ -289,15 +294,21 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   const populateLineItemsFromRequirement = (selectedReq, allItems = items, allUoms = uoms) => {
     if (!selectedReq) return;
 
-    const clientId = typeof selectedReq.client === 'object' ? selectedReq.client?._id : selectedReq.client;
+    const reqClient = selectedReq.client;
+    const reqClientObj = typeof reqClient === 'object' && reqClient !== null ? reqClient : null;
+    const clientId = reqClientObj?._id || (typeof reqClient === 'string' ? reqClient : '');
+    const clientName = reqClientObj?.companyName || '';
+    const clientCode = reqClientObj?.clientCode || '';
     const salesPersonId = typeof selectedReq.salesPerson === 'object' ? selectedReq.salesPerson?._id : selectedReq.salesPerson;
 
     setFormData((prev) => ({
       ...prev,
       client: clientId || prev.client,
+      clientName: clientName || prev.clientName,
+      clientCode: clientCode || prev.clientCode,
       requirement: selectedReq._id || prev.requirement,
       salesPerson: salesPersonId || prev.salesPerson,
-      attentionPerson: (typeof selectedReq.client === 'object' ? selectedReq.client?.contactPerson : '') || prev.attentionPerson,
+      attentionPerson: reqClientObj?.contactPerson || prev.attentionPerson,
       deadline: selectedReq.deadline ? new Date(selectedReq.deadline).toISOString().split('T')[0] : (selectedReq.targetDate ? new Date(selectedReq.targetDate).toISOString().split('T')[0] : prev.deadline),
       nextFollowUpDate: selectedReq.followUpDate ? new Date(selectedReq.followUpDate).toISOString().split('T')[0] : prev.nextFollowUpDate,
     }));
@@ -484,11 +495,69 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
 
   const handleClientChange = (e, selectedOption) => {
     const clientId = e?.target?.value || '';
+    const clientName = selectedOption?.label || '';
+    const clientCode = selectedOption?.secondaryLabel || '';
+    const contactPerson = selectedOption?.contactPerson || '';
+
+    if (!clientId) {
+      setFormData((prev) => ({
+        ...prev,
+        client: '',
+        clientName: '',
+        clientCode: '',
+        requirement: '',
+      }));
+      setError('');
+      return;
+    }
+
+    // If a requirement was already selected, verify if it belongs to this newly selected client
+    if (formData.requirement) {
+      const currentReq = requirements.find((r) => r._id === formData.requirement);
+      const reqClientId = typeof currentReq?.client === 'object' ? currentReq?.client?._id : currentReq?.client;
+      if (reqClientId && String(reqClientId) !== String(clientId)) {
+        // Requirement belongs to a different client; reset requirement & prompt user
+        setFormData((prev) => ({
+          ...prev,
+          client: clientId,
+          clientName: clientName,
+          clientCode: clientCode,
+          requirement: '',
+          attentionPerson: contactPerson || prev.attentionPerson,
+        }));
+        setLineItems([
+          {
+            item: '',
+            itemCategory: '',
+            description: '',
+            quantity: 1,
+            uom: '',
+            unitPrice: 0,
+            hsnCode: '',
+            filterGrade: null,
+            filterGradeName: '',
+            drawing: null,
+            drawingSnapshot: null,
+            remarks: '',
+            guard: {
+              hasGuard: false,
+              material: 'SS304',
+              sides: 'One side',
+            },
+          },
+        ]);
+        setError(`Previous enquiry reference belonged to a different customer and was deselected. Please select an enquiry for ${clientName || 'the selected customer'}.`);
+        return;
+      }
+    }
+
+    setError('');
     setFormData((prev) => ({
       ...prev,
       client: clientId,
-      requirement: '',
-      attentionPerson: selectedOption?.contactPerson || prev.attentionPerson,
+      clientName: clientName,
+      clientCode: clientCode,
+      attentionPerson: contactPerson || prev.attentionPerson,
     }));
   };
 
@@ -509,27 +578,124 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
   }, [isOpen, isEdit, initialReqObj]);
 
   const availableRequirements = useMemo(() => {
-    if (!formData.client) return [];
+    if (!formData.client) return requirements;
     return requirements.filter((r) => {
       const clientId = typeof r.client === 'object' ? r.client?._id : r.client;
-      return clientId === formData.client;
+      return String(clientId) === String(formData.client);
     });
   }, [requirements, formData.client]);
 
-  // Handle Requirement Selection from dropdown
+  // Handle Requirement Selection from dropdown: automatically fetch and select linked Party / Customer
   const handleRequirementChange = (reqId) => {
+    if (!reqId) {
+      setFormData((prev) => ({
+        ...prev,
+        requirement: '',
+      }));
+      setError('');
+      return;
+    }
+
     const targetReq = requirements.find((r) => r._id === reqId);
+    if (!targetReq) {
+      setFormData((prev) => ({ ...prev, requirement: reqId }));
+      return;
+    }
+
     if (!isEdit && targetReq?.linkedQuotation) {
       setError("A quotation has already been generated for this enquiry. Please use the Amend Quotation option to make changes.");
     } else {
       setError('');
     }
-    if (targetReq) {
-      populateLineItemsFromRequirement(targetReq);
-    } else {
-      setFormData((prev) => ({ ...prev, requirement: reqId }));
+
+    const reqClient = targetReq.client;
+    const reqClientObj = typeof reqClient === 'object' && reqClient !== null ? reqClient : null;
+    const reqClientId = reqClientObj?._id || (typeof reqClient === 'string' ? reqClient : '');
+    const reqClientName = reqClientObj?.companyName || '';
+    const reqClientCode = reqClientObj?.clientCode || '';
+    const reqContact = reqClientObj?.contactPerson || '';
+
+    if (!reqClientId) {
+      setError("The selected Enquiry/Requirement has no associated Party/Customer. Please assign a customer to the enquiry before creating a quotation.");
+      setFormData((prev) => ({
+        ...prev,
+        requirement: reqId,
+        client: '',
+        clientName: '',
+        clientCode: '',
+      }));
+      return;
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      requirement: reqId,
+      client: reqClientId,
+      clientName: reqClientName,
+      clientCode: reqClientCode,
+      attentionPerson: reqContact || prev.attentionPerson,
+      deadline: targetReq.deadline ? new Date(targetReq.deadline).toISOString().split('T')[0] : (targetReq.targetDate ? new Date(targetReq.targetDate).toISOString().split('T')[0] : prev.deadline),
+      nextFollowUpDate: targetReq.followUpDate ? new Date(targetReq.followUpDate).toISOString().split('T')[0] : prev.nextFollowUpDate,
+      salesPerson: (typeof targetReq.salesPerson === 'object' ? targetReq.salesPerson?._id : targetReq.salesPerson) || prev.salesPerson,
+    }));
+
+    if (reqClientId && !reqClientName) {
+      triggerGetClients({ limit: 100, status: 'all' })
+        .unwrap()
+        .then((res) => {
+          const list = res?.clients || res?.data || (Array.isArray(res) ? res : []);
+          const match = list.find((c) => c._id === reqClientId);
+          if (match) {
+            setFormData((prev) => ({
+              ...prev,
+              clientName: match.companyName,
+              clientCode: match.clientCode,
+              attentionPerson: prev.attentionPerson || match.contactPerson || '',
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+
+    populateLineItemsFromRequirement(targetReq, items, uoms);
   };
+
+  // Ensure clientName and clientCode are populated whenever client is set
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (formData.client && !formData.clientName) {
+      const reqWithClient = requirements.find((r) => {
+        const cId = typeof r.client === 'object' ? r.client?._id : r.client;
+        return cId === formData.client && typeof r.client === 'object' && r.client?.companyName;
+      });
+
+      if (reqWithClient && reqWithClient.client) {
+        setFormData((prev) => ({
+          ...prev,
+          clientName: reqWithClient.client.companyName,
+          clientCode: reqWithClient.client.clientCode || prev.clientCode,
+          attentionPerson: prev.attentionPerson || reqWithClient.client.contactPerson || '',
+        }));
+      } else {
+        triggerGetClients({ limit: 100, status: 'all' })
+          .unwrap()
+          .then((res) => {
+            const list = res?.clients || res?.data || (Array.isArray(res) ? res : []);
+            const match = list.find((c) => c._id === formData.client);
+            if (match) {
+              setFormData((prev) => ({
+                ...prev,
+                clientName: match.companyName,
+                clientCode: match.clientCode,
+                attentionPerson: prev.attentionPerson || match.contactPerson || '',
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [isOpen, formData.client, formData.clientName, requirements, triggerGetClients]);
 
   // Line Item Handlers
   const handleItemSelect = (index, itemId) => {
@@ -910,17 +1076,17 @@ const QuotationFormModal = ({ isOpen, onClose, onSuccess, quotation = null, init
                 <Select
                   value={formData.requirement}
                   onChange={(e) => handleRequirementChange(e.target.value)}
-                  disabled={!formData.client}
                   required
                 >
                   <option value="">
-                    {formData.client ? 'Select Requirement' : 'Select Party First'}
+                    {availableRequirements.length > 0 ? 'Select Requirement Reference' : 'No Enquiries Available'}
                   </option>
                   {availableRequirements.map((r) => {
+                    const clientName = typeof r.client === 'object' ? r.client?.companyName : '';
                     const alreadyQuoted = !isEdit && Boolean(r.linkedQuotation);
                     return (
                       <option key={r._id} value={r._id} disabled={alreadyQuoted}>
-                        {r.requirementNo} ({r.type === 'product' ? 'Product' : 'Service'})
+                        {r.requirementNo}{clientName ? ` — ${clientName}` : ''} ({r.type === 'product' ? 'Product' : 'Service'})
                         {alreadyQuoted ? ` — [Quotation ${r.linkedQuotation.quotationNo} Already Generated]` : ''}
                       </option>
                     );

@@ -51,10 +51,6 @@ const StoreList = lazy(() => import('./pages/store/StoreList'));
 const InventoryStockList = lazy(() => import('./pages/inventory/InventoryStockList'));
 const StockTransactionsList = lazy(() => import('./pages/inventory/StockTransactionsList'));
 const QualityInspectionList = lazy(() => import('./pages/quality/QualityInspectionList'));
-const DeliveryChallanList = lazy(() => import('./pages/dispatch/DeliveryChallanList'));
-const InvoiceList = lazy(() => import('./pages/accounts/InvoiceList'));
-const PaymentList = lazy(() => import('./pages/accounts/PaymentList'));
-const DocumentCenter = lazy(() => import('./pages/docs/DocumentCenter'));
 const AdminApprovals = lazy(() => import('./pages/admin/AdminApprovals'));
 
 function App() {
@@ -603,61 +599,6 @@ function App() {
                       element={
                         <ErrorBoundary level="module" title="Terms Master Error">
                           <TermsMasterList />
-                        </ErrorBoundary>
-                      }
-                    />
-                  </Route>
-
-                  {/* Protected Dispatch & Delivery Challans Route */}
-                  <Route element={<ProtectedRoute requiredPermission={["DELIVERY_CHALLAN_VIEW", "SALES_ORDER_VIEW", "WORK_ORDER_VIEW"]} />}>
-                    <Route
-                      path="/delivery-challans"
-                      element={
-                        <ErrorBoundary level="module" title="Delivery Challan Error">
-                          <DeliveryChallanList />
-                        </ErrorBoundary>
-                      }
-                    />
-                  </Route>
-
-                  {/* Protected Invoicing & Accounts Routes */}
-                  <Route element={<ProtectedRoute requiredPermission={["INVOICE_VIEW", "SALES_ORDER_VIEW", "PURCHASE_ORDER_VIEW"]} />}>
-                    <Route
-                      path="/invoices"
-                      element={
-                        <ErrorBoundary level="module" title="Invoices Error">
-                          <InvoiceList />
-                        </ErrorBoundary>
-                      }
-                    />
-                  </Route>
-
-                  <Route element={<ProtectedRoute requiredPermission={["PAYMENT_VIEW", "INVOICE_VIEW", "SALES_ORDER_VIEW"]} />}>
-                    <Route
-                      path="/payments"
-                      element={
-                        <ErrorBoundary level="module" title="Payments Error">
-                          <PaymentList />
-                        </ErrorBoundary>
-                      }
-                    />
-                  </Route>
-
-                  {/* Protected Centralized Document Center Route */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route
-                      path="/documents"
-                      element={
-                        <ErrorBoundary level="module" title="Document Center Error">
-                          <DocumentCenter />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="/document-center"
-                      element={
-                        <ErrorBoundary level="module" title="Document Center Error">
-                          <DocumentCenter />
                         </ErrorBoundary>
                       }
                     />
