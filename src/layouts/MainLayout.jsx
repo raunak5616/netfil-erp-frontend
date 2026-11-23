@@ -42,6 +42,11 @@ import {
   ShieldCheck,
   FileImage,
   Gauge,
+  History,
+  ArrowRightLeft,
+  Receipt,
+  CreditCard,
+  FolderTree,
 } from 'lucide-react';
 
 const MainLayout = () => {
@@ -121,11 +126,14 @@ const MainLayout = () => {
     const productionPaths = ['/work-orders'];
     const isProductionChild = productionPaths.some((p) => path.startsWith(p));
 
-    const purchasePaths = ['/suppliers', '/purchase-enquiries', '/purchase-orders', '/goods-receipts'];
+    const purchasePaths = ['/suppliers', '/purchase-enquiries', '/purchase-orders', '/goods-receipts', '/quality-inspections'];
     const isPurchaseChild = purchasePaths.some((p) => path.startsWith(p));
 
-    const storePaths = ['/purchase-requisitions', '/stores'];
+    const storePaths = ['/purchase-requisitions', '/stores', '/inventory'];
     const isStoreChild = storePaths.some((p) => path.startsWith(p));
+
+    const dispatchPaths = ['/delivery-challans', '/invoices', '/payments'];
+    const isDispatchChild = dispatchPaths.some((p) => path.startsWith(p));
 
     const updates = {};
     if (isItemMasterChild) {
@@ -149,6 +157,9 @@ const MainLayout = () => {
     }
     if (isStoreChild) {
       updates['store-module'] = true;
+    }
+    if (isDispatchChild) {
+      updates['dispatch-module'] = true;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -206,10 +217,18 @@ const MainLayout = () => {
       '/order-boms': [{ label: 'BOM' }, { label: 'Order BOMs' }],
       '/work-orders': [{ label: 'Shop Floor' }, { label: 'Work Orders' }],
       '/stores': [{ label: 'Store' }, { label: 'Store Management' }],
+      '/inventory': [{ label: 'Store' }, { label: 'Inventory & Stock On Hand' }],
+      '/inventory/transactions': [{ label: 'Store' }, { label: 'Stock Movement Ledger' }],
       '/purchase-requisitions': [{ label: 'Store' }, { label: 'Purchase Requisitions' }],
       '/purchase-enquiries': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Enquiries' }],
       '/purchase-orders': [{ label: 'Purchase & Procurement' }, { label: 'Purchase Orders' }],
       '/goods-receipts': [{ label: 'Purchase & Procurement' }, { label: 'Goods Receipts (GRN)' }],
+      '/quality-inspections': [{ label: 'Purchase & Procurement' }, { label: 'Quality Inspections (QA)' }],
+      '/delivery-challans': [{ label: 'Dispatch' }, { label: 'Delivery Challans' }],
+      '/invoices': [{ label: 'Accounts' }, { label: 'Invoices & Billing' }],
+      '/payments': [{ label: 'Accounts' }, { label: 'Payments Ledger' }],
+      '/document-center': [{ label: 'Documents' }, { label: 'Document Center & Media Hub' }],
+      '/documents': [{ label: 'Documents' }, { label: 'Document Center & Media Hub' }],
       '/admin/approvals': [{ label: 'Administration' }, { label: 'Master Approvals' }],
     };
     return map[path] || [{ label: 'Workspace' }];
@@ -246,20 +265,23 @@ const MainLayout = () => {
             { label: 'Purchase Enquiries', path: '/purchase-enquiries', icon: FileText, permission: 'PURCHASE_ENQUIRY_VIEW' },
             { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, permission: 'PURCHASE_ORDER_VIEW' },
             { label: 'Goods Receipts', path: '/goods-receipts', icon: Package, permission: 'GOODS_RECEIPT_VIEW' },
+            { label: 'Quality Inspections', path: '/quality-inspections', icon: ShieldCheck, permission: ['QUALITY_INSPECTION_VIEW', 'GOODS_RECEIPT_VIEW'] },
           ],
         },
       ],
     },
     {
-      title: 'STORE',
+      title: 'STORE & INVENTORY',
       items: [
         {
           id: 'store-module',
-          label: 'Store',
+          label: 'Store & Inventory',
           icon: Package,
           isGroup: true,
           children: [
-            { label: 'Store Management', path: '/stores', icon: Package, permission: 'STORE_VIEW' },
+            { label: 'Stock On Hand', path: '/inventory', icon: Package, permission: ['INVENTORY_STOCK_VIEW', 'STORE_VIEW'] },
+            { label: 'Stock Movement Ledger', path: '/inventory/transactions', icon: History, permission: ['INVENTORY_STOCK_VIEW', 'STORE_VIEW'] },
+            { label: 'Store Management', path: '/stores', icon: Layers, permission: 'STORE_VIEW' },
             { label: 'Purchase Requisitions', path: '/purchase-requisitions', icon: ClipboardList, permission: 'PURCHASE_REQUISITION_VIEW' },
           ],
         },
@@ -327,16 +349,40 @@ const MainLayout = () => {
         },
       ],
     },
+    {
+      title: 'DISPATCH, ACCOUNTS & MEDIA',
+      items: [
+        {
+          id: 'dispatch-module',
+          label: 'Dispatch & Accounts',
+          icon: Truck,
+          isGroup: true,
+          children: [
+            { label: 'Delivery Challans', path: '/delivery-challans', icon: Truck, permission: ['DELIVERY_CHALLAN_VIEW', 'SALES_ORDER_VIEW', 'WORK_ORDER_VIEW'] },
+            { label: 'Invoices & Billing', path: '/invoices', icon: Receipt, permission: ['INVOICE_VIEW', 'SALES_ORDER_VIEW', 'PURCHASE_ORDER_VIEW'] },
+            { label: 'Payments Ledger', path: '/payments', icon: CreditCard, permission: ['PAYMENT_VIEW', 'INVOICE_VIEW', 'SALES_ORDER_VIEW'] },
+          ],
+        },
+        { label: 'Document Center', path: '/document-center', icon: FolderTree, permission: null },
+      ],
+    },
   ];
 
   // Quick navigation items for Cmd+K search dialog
   const quickJumpItems = [
+    { label: 'Delivery Challans (Dispatch)', path: '/delivery-challans', category: 'Dispatch', permission: ['DELIVERY_CHALLAN_VIEW', 'SALES_ORDER_VIEW'] },
+    { label: 'Invoices & Billing', path: '/invoices', category: 'Accounts', permission: ['INVOICE_VIEW', 'SALES_ORDER_VIEW'] },
+    { label: 'Payments Ledger', path: '/payments', category: 'Accounts', permission: ['PAYMENT_VIEW', 'INVOICE_VIEW'] },
+    { label: 'Document Center & Media Hub', path: '/document-center', category: 'Documents', permission: null },
     { label: 'Supplier Management', path: '/suppliers', category: 'Purchase', permission: 'SUPPLIER_VIEW' },
+    { label: 'Stock On Hand', path: '/inventory', category: 'Store', permission: ['INVENTORY_STOCK_VIEW', 'STORE_VIEW'] },
+    { label: 'Stock Movement Ledger', path: '/inventory/transactions', category: 'Store', permission: ['INVENTORY_STOCK_VIEW', 'STORE_VIEW'] },
     { label: 'Store Management', path: '/stores', category: 'Store', permission: 'STORE_VIEW' },
     { label: 'Purchase Requisitions', path: '/purchase-requisitions', category: 'Store', permission: 'PURCHASE_REQUISITION_VIEW' },
     { label: 'Purchase Enquiries', path: '/purchase-enquiries', category: 'Purchase', permission: 'PURCHASE_ENQUIRY_VIEW' },
     { label: 'Purchase Orders', path: '/purchase-orders', category: 'Purchase', permission: 'PURCHASE_ORDER_VIEW' },
     { label: 'Goods Receipts (GRN)', path: '/goods-receipts', category: 'Purchase', permission: 'GOODS_RECEIPT_VIEW' },
+    { label: 'Quality Inspections (QA)', path: '/quality-inspections', category: 'Purchase', permission: ['QUALITY_INSPECTION_VIEW', 'GOODS_RECEIPT_VIEW'] },
     { label: 'Items Catalog', path: '/items', category: 'Item Master', permission: 'ITEM_VIEW' },
     { label: 'Item Groups', path: '/item-groups', category: 'Item Master', permission: 'ITEM_GROUP_VIEW' },
     { label: 'Item Categories', path: '/item-categories', category: 'Item Master', permission: 'ITEM_CATEGORY_VIEW' },

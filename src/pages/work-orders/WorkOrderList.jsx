@@ -16,6 +16,8 @@ import WorkOrderCreateModal from './WorkOrderCreateModal';
 import WorkOrderEditModal from './WorkOrderEditModal';
 import WorkOrderDetailModal from './WorkOrderDetailModal';
 import WorkOrderActionModal from './WorkOrderActionModal';
+import MaterialIssueModal from './MaterialIssueModal';
+import ProductionExecutionModal from './ProductionExecutionModal';
 
 import {
   Plus,
@@ -24,6 +26,7 @@ import {
   Eye,
   Edit3,
   ArrowRight,
+  ArrowUpRight,
   Play,
   CheckCircle2,
   XCircle,
@@ -105,6 +108,10 @@ const WorkOrderList = () => {
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [actionType, setActionType] = useState(null);
   const [selectedWorkOrderForAction, setSelectedWorkOrderForAction] = useState(null);
+
+  const [isMaterialIssueOpen, setIsMaterialIssueOpen] = useState(false);
+  const [isExecutionOpen, setIsExecutionOpen] = useState(false);
+  const [selectedWorkOrderForExecution, setSelectedWorkOrderForExecution] = useState(null);
 
   // Handle location state navigation from Order BOM page
   useEffect(() => {
@@ -399,6 +406,36 @@ const WorkOrderList = () => {
               </Button>
             )}
 
+            {/* Material Issue (RELEASED or IN_PROGRESS) */}
+            {['RELEASED', 'IN_PROGRESS'].includes(row.status) && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setSelectedWorkOrderId(row._id);
+                  setIsMaterialIssueOpen(true);
+                }}
+                title="Issue Materials from Store"
+              >
+                <ArrowUpRight size={13} style={{ marginRight: '3px' }} color="var(--primary-600)" /> Issue Mat
+              </Button>
+            )}
+
+            {/* Shop Floor Production Execution (RELEASED, IN_PROGRESS, COMPLETED) */}
+            {['RELEASED', 'IN_PROGRESS', 'COMPLETED'].includes(row.status) && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setSelectedWorkOrderForExecution(row);
+                  setIsExecutionOpen(true);
+                }}
+                title="Track Shop Floor Execution & Output"
+              >
+                <Wrench size={13} style={{ marginRight: '3px' }} color="var(--warning-600)" /> Execution
+              </Button>
+            )}
+
             {/* IN_PROGRESS Actions */}
             {canComplete && row.status === 'IN_PROGRESS' && (
               <Button
@@ -619,6 +656,36 @@ const WorkOrderList = () => {
             setIsActionOpen(false);
             setSelectedWorkOrderForAction(null);
             setActionType(null);
+            fetchWorkOrdersData();
+          }}
+        />
+      )}
+
+      {/* Material Issue Modal */}
+      {isMaterialIssueOpen && selectedWorkOrderId && (
+        <MaterialIssueModal
+          isOpen={isMaterialIssueOpen}
+          workOrderId={selectedWorkOrderId}
+          onClose={() => {
+            setIsMaterialIssueOpen(false);
+            setSelectedWorkOrderId(null);
+          }}
+          onSuccess={() => {
+            fetchWorkOrdersData();
+          }}
+        />
+      )}
+
+      {/* Production Execution Modal */}
+      {isExecutionOpen && selectedWorkOrderForExecution && (
+        <ProductionExecutionModal
+          isOpen={isExecutionOpen}
+          workOrder={selectedWorkOrderForExecution}
+          onClose={() => {
+            setIsExecutionOpen(false);
+            setSelectedWorkOrderForExecution(null);
+          }}
+          onSuccess={() => {
             fetchWorkOrdersData();
           }}
         />

@@ -128,6 +128,86 @@ export const workOrdersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { id }) => [{ type: 'WorkOrders', id: `ATTACHMENTS_${id}` }],
     }),
+
+    // Material Issues Endpoints
+    getMaterialIssues: builder.query({
+      query: (params = {}) => ({
+        url: '/material-issues',
+        method: 'get',
+        params,
+      }),
+      providesTags: [{ type: 'MaterialIssues', id: 'LIST' }],
+    }),
+    getMaterialIssueById: builder.query({
+      query: (issueId) => ({
+        url: `/material-issues/${issueId}`,
+        method: 'get',
+      }),
+      providesTags: (result, error, issueId) => [{ type: 'MaterialIssues', id: issueId }],
+    }),
+    createMaterialIssue: builder.mutation({
+      query: (data) => ({
+        url: '/material-issues',
+        method: 'post',
+        data,
+      }),
+      invalidatesTags: [
+        { type: 'MaterialIssues', id: 'LIST' },
+        { type: 'WorkOrders', id: 'LIST' },
+        { type: 'Inventory', id: 'STOCK_LIST' },
+        { type: 'Inventory', id: 'TXN_LIST' },
+      ],
+    }),
+
+    // Production Execution Endpoints
+    getProductionExecutions: builder.query({
+      query: (params = {}) => ({
+        url: '/production-executions',
+        method: 'get',
+        params,
+      }),
+      providesTags: [{ type: 'ProductionExecutions', id: 'LIST' }],
+    }),
+    getProductionExecutionById: builder.query({
+      query: (executionId) => ({
+        url: `/production-executions/${executionId}`,
+        method: 'get',
+      }),
+      providesTags: (result, error, executionId) => [{ type: 'ProductionExecutions', id: executionId }],
+    }),
+    createProductionExecution: builder.mutation({
+      query: (data) => ({
+        url: '/production-executions',
+        method: 'post',
+        data,
+      }),
+      invalidatesTags: [
+        { type: 'ProductionExecutions', id: 'LIST' },
+        { type: 'WorkOrders', id: 'LIST' },
+      ],
+    }),
+    completeProductionExecution: builder.mutation({
+      query: ({ id, data }) => ({
+        url: `/production-executions/${id}/complete`,
+        method: 'patch',
+        data,
+      }),
+      invalidatesTags: [
+        { type: 'ProductionExecutions', id: 'LIST' },
+        { type: 'WorkOrders', id: 'LIST' },
+      ],
+    }),
+    cancelProductionExecution: builder.mutation({
+      query: ({ id, data }) => ({
+        url: `/production-executions/${id}/cancel`,
+        method: 'patch',
+        data,
+      }),
+      invalidatesTags: [
+        { type: 'ProductionExecutions', id: 'LIST' },
+        { type: 'WorkOrders', id: 'LIST' },
+      ],
+    }),
   }),
 });
 
@@ -145,5 +225,13 @@ export const {
   useUploadWorkOrderAttachmentMutation,
   useReplaceWorkOrderAttachmentMutation,
   useDeleteWorkOrderAttachmentMutation,
+  useGetMaterialIssuesQuery,
+  useGetMaterialIssueByIdQuery,
+  useCreateMaterialIssueMutation,
+  useGetProductionExecutionsQuery,
+  useGetProductionExecutionByIdQuery,
+  useCreateProductionExecutionMutation,
+  useCompleteProductionExecutionMutation,
+  useCancelProductionExecutionMutation,
 } = workOrdersApi;
 

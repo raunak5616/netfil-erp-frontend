@@ -48,6 +48,13 @@ const SupplierList = lazy(() => import('./pages/suppliers/SupplierList'));
 const SupplierForm = lazy(() => import('./pages/suppliers/SupplierForm'));
 const SupplierDetail = lazy(() => import('./pages/suppliers/SupplierDetail'));
 const StoreList = lazy(() => import('./pages/store/StoreList'));
+const InventoryStockList = lazy(() => import('./pages/inventory/InventoryStockList'));
+const StockTransactionsList = lazy(() => import('./pages/inventory/StockTransactionsList'));
+const QualityInspectionList = lazy(() => import('./pages/quality/QualityInspectionList'));
+const DeliveryChallanList = lazy(() => import('./pages/dispatch/DeliveryChallanList'));
+const InvoiceList = lazy(() => import('./pages/accounts/InvoiceList'));
+const PaymentList = lazy(() => import('./pages/accounts/PaymentList'));
+const DocumentCenter = lazy(() => import('./pages/docs/DocumentCenter'));
 const AdminApprovals = lazy(() => import('./pages/admin/AdminApprovals'));
 
 function App() {
@@ -440,6 +447,18 @@ function App() {
                     />
                   </Route>
 
+                  {/* Protected Quality Inspection Module Route */}
+                  <Route element={<ProtectedRoute requiredPermission={["QUALITY_INSPECTION_VIEW", "GOODS_RECEIPT_VIEW"]} />}>
+                    <Route
+                      path="/quality-inspections"
+                      element={
+                        <ErrorBoundary level="module" title="Quality Inspection Error">
+                          <QualityInspectionList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
                   {/* Protected Store Management Module Route */}
                   <Route element={<ProtectedRoute requiredPermission="STORE_VIEW" />}>
                     <Route
@@ -447,6 +466,26 @@ function App() {
                       element={
                         <ErrorBoundary level="module" title="Store Management Error">
                           <StoreList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
+                  {/* Protected Inventory Stock & Movement Routes */}
+                  <Route element={<ProtectedRoute requiredPermission={["INVENTORY_STOCK_VIEW", "STORE_VIEW"]} />}>
+                    <Route
+                      path="/inventory"
+                      element={
+                        <ErrorBoundary level="module" title="Inventory Stock Error">
+                          <InventoryStockList />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/inventory/transactions"
+                      element={
+                        <ErrorBoundary level="module" title="Stock Transactions Error">
+                          <StockTransactionsList />
                         </ErrorBoundary>
                       }
                     />
@@ -564,6 +603,61 @@ function App() {
                       element={
                         <ErrorBoundary level="module" title="Terms Master Error">
                           <TermsMasterList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
+                  {/* Protected Dispatch & Delivery Challans Route */}
+                  <Route element={<ProtectedRoute requiredPermission={["DELIVERY_CHALLAN_VIEW", "SALES_ORDER_VIEW", "WORK_ORDER_VIEW"]} />}>
+                    <Route
+                      path="/delivery-challans"
+                      element={
+                        <ErrorBoundary level="module" title="Delivery Challan Error">
+                          <DeliveryChallanList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
+                  {/* Protected Invoicing & Accounts Routes */}
+                  <Route element={<ProtectedRoute requiredPermission={["INVOICE_VIEW", "SALES_ORDER_VIEW", "PURCHASE_ORDER_VIEW"]} />}>
+                    <Route
+                      path="/invoices"
+                      element={
+                        <ErrorBoundary level="module" title="Invoices Error">
+                          <InvoiceList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
+                  <Route element={<ProtectedRoute requiredPermission={["PAYMENT_VIEW", "INVOICE_VIEW", "SALES_ORDER_VIEW"]} />}>
+                    <Route
+                      path="/payments"
+                      element={
+                        <ErrorBoundary level="module" title="Payments Error">
+                          <PaymentList />
+                        </ErrorBoundary>
+                      }
+                    />
+                  </Route>
+
+                  {/* Protected Centralized Document Center Route */}
+                  <Route element={<ProtectedRoute />}>
+                    <Route
+                      path="/documents"
+                      element={
+                        <ErrorBoundary level="module" title="Document Center Error">
+                          <DocumentCenter />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/document-center"
+                      element={
+                        <ErrorBoundary level="module" title="Document Center Error">
+                          <DocumentCenter />
                         </ErrorBoundary>
                       }
                     />
