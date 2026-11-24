@@ -319,7 +319,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                   </Button>
                 )}
 
-                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                {canCreateWO && salesOrder.status === 'confirmed' && (
                   <Button
                     variant="primary"
                     size="sm"
@@ -635,7 +635,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                     Customer PO Reference: <strong className="text-slate-700">{salesOrder.customerPoNumber || 'N/A'}</strong>
                   </p>
                 </div>
-                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                {canCreateWO && salesOrder.status === 'confirmed' && (
                   <Button
                     variant="primary"
                     size="sm"
@@ -654,7 +654,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
                     Create a direct Work Order from this Sales Order and customer PO reference without needing a BOM.
                   </p>
-                  {canCreateWO && salesOrder.status !== 'cancelled' && (
+                  {canCreateWO && salesOrder.status === 'confirmed' && (
                     <Button
                       variant="primary"
                       size="sm"
@@ -831,7 +831,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                     Customer PO Reference: <strong className="text-slate-700">{salesOrder.customerPoNumber || 'N/A'}</strong>
                   </p>
                 </div>
-                {canCreateWO && salesOrder.status !== 'cancelled' && (
+                {canCreateWO && salesOrder.status === 'confirmed' && (
                   <Button
                     variant="primary"
                     size="sm"
@@ -850,7 +850,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
                     Create a direct Work Order from this Sales Order and customer PO reference without needing a BOM.
                   </p>
-                  {canCreateWO && salesOrder.status !== 'cancelled' && (
+                  {canCreateWO && salesOrder.status === 'confirmed' && (
                     <Button
                       variant="primary"
                       size="sm"

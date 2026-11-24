@@ -50,11 +50,11 @@ const WorkOrderCreateModal = ({ isOpen, initialOrderBOM = null, onClose, onSucce
   const plants = plantListData?.plants || [];
 
   const { data: soListData, isLoading: loadingSOList } = useGetSalesOrdersQuery(
-    { limit: 100 },
+    { status: 'confirmed', limit: 100 },
     { skip: !isOpen || mode !== 'SALES_ORDER' }
   );
   const salesOrders = useMemo(() => {
-    return (soListData?.salesOrders || []).filter(s => s.status !== 'cancelled');
+    return (soListData?.salesOrders || []).filter(s => s.status === 'confirmed');
   }, [soListData]);
 
   // =========================================================================

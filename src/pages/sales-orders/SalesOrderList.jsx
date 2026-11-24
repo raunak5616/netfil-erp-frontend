@@ -464,7 +464,7 @@ const SalesOrderList = () => {
               label: 'Create Work Order',
               icon: Wrench,
               color: 'var(--success-700)',
-              show: canCreateWO && row.status !== 'cancelled',
+              show: canCreateWO && row.status === 'confirmed',
               onClick: () => {
                 setSelectedSOForWO(row._id);
                 setIsCreateWOOpen(true);
