@@ -175,11 +175,22 @@ const RequirementList = () => {
       header: 'Enquiry No',
       width: '125px',
       minWidth: '125px',
-      render: (val) => (
-        <span className="font-mono font-bold whitespace-nowrap text-blue-700 text-xs">
-          {val}
-        </span>
-      ),
+      render: (val, row) => {
+        if (!val) return <span className="text-slate-400 italic text-xs">—</span>;
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedRequirement(row);
+              setIsDetailOpen(true);
+            }}
+            className="font-mono font-bold whitespace-nowrap text-blue-700 hover:text-blue-900 hover:underline cursor-pointer bg-transparent border-0 p-0 text-left text-xs transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-sm"
+            title={`View Enquiry Details for ${val}`}
+          >
+            {val}
+          </button>
+        );
+      },
     },
     {
       key: 'requirementDate',

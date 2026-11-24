@@ -1395,7 +1395,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                 <option value="">-- Unassigned --</option>
                 {employees.map((emp) => (
                   <option key={emp._id} value={emp._id}>
-                    {emp.fullName} ({emp.employeeCode})
+                    {emp.employeeCode || emp.fullName}
                   </option>
                 ))}
               </Select>
@@ -1717,7 +1717,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                     {selectedCatalogItem.filterGrade && (
                                       <div style={{ fontSize: '11px', color: 'var(--neutral-600)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                         <span>Filter Grade: <strong>{typeof selectedCatalogItem.filterGrade === 'object' ? selectedCatalogItem.filterGrade.filterGrade : selectedCatalogItem.filterGrade}</strong>
-                                        {typeof selectedCatalogItem.filterGrade === 'object' && selectedCatalogItem.filterGrade.eurovent ? ` (${selectedCatalogItem.filterGrade.eurovent})` : ''}</span>
+                                          {typeof selectedCatalogItem.filterGrade === 'object' && selectedCatalogItem.filterGrade.eurovent ? ` (${selectedCatalogItem.filterGrade.eurovent})` : ''}</span>
                                         {(selectedCatalogItem.noOfFolds || selectedCatalogItem.filterGrade?.noOfFolds) && (
                                           <span>• No. of Folds: <strong>{selectedCatalogItem.noOfFolds || selectedCatalogItem.filterGrade?.noOfFolds}</strong></span>
                                         )}
@@ -2227,7 +2227,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                   )}
                                 </div>
 
-                                                                {/* ENGINEERING SPECIFICATIONS SECTION */}
+                                {/* ENGINEERING SPECIFICATIONS SECTION */}
                                 <div style={{ gridColumn: 'span 2', marginTop: '6px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid var(--neutral-300)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--neutral-200)' }}>
                                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px' }}>
