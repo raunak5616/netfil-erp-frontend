@@ -280,11 +280,19 @@ const EnquiryMis = () => {
         key: 'requirementNo',
         header: 'Enquiry No',
         sortable: true,
-        render: (val) => (
-          <span style={{ fontWeight: 600, color: 'var(--primary-700)', fontFamily: 'monospace' }}>
-            {val}
-          </span>
-        ),
+        render: (val, row) => {
+          if (!val) return '-';
+          return (
+            <button
+              type="button"
+              onClick={() => handleViewDetail(row)}
+              className="font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer bg-transparent border-0 p-0 text-left text-xs transition-colors focus:outline-none"
+              title={`View Enquiry Details for ${val}`}
+            >
+              {val}
+            </button>
+          );
+        },
       },
       {
         key: 'requirementDate',
@@ -315,9 +323,8 @@ const EnquiryMis = () => {
         header: 'Type',
         render: (val) => (
           <span
-            className={`badge ${
-              val === 'product' ? 'badge-primary' : 'badge-secondary'
-            }`}
+            className={`badge ${val === 'product' ? 'badge-primary' : 'badge-secondary'
+              }`}
             style={{ textTransform: 'capitalize' }}
           >
             {val}
@@ -359,7 +366,7 @@ const EnquiryMis = () => {
       {
         key: 'salesPerson',
         header: 'Sales Person',
-        render: (_, row) => row?.salesPerson?.fullName || '-',
+        render: (_, row) => row?.salesPerson?.employeeCode || row?.salesPerson?.fullName || '-',
       },
       {
         key: 'followUpDate',
@@ -649,7 +656,7 @@ const EnquiryMis = () => {
                 <option value="all">All Sales Persons</option>
                 {salesPersons.map((emp) => (
                   <option key={emp._id} value={emp._id}>
-                    {emp.fullName} ({emp.employeeCode})
+                    {emp.employeeCode || emp.fullName}
                   </option>
                 ))}
               </Select>

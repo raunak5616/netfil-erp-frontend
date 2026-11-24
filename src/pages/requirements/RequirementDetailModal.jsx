@@ -3,21 +3,21 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { resolveItemTechnicalSpecs } from './components/requirementFormConstants';
-import { 
-  Building2, 
-  Calendar, 
-  User, 
-  Package, 
-  FileText, 
-  Clock, 
-  Edit, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Tag, 
-  Maximize2, 
-  Image as ImageIcon, 
-  ChevronDown, 
+import {
+  Building2,
+  Calendar,
+  User,
+  Package,
+  FileText,
+  Clock,
+  Edit,
+  Phone,
+  Mail,
+  MapPin,
+  Tag,
+  Maximize2,
+  Image as ImageIcon,
+  ChevronDown,
   ChevronUp,
   FileDiff,
   ExternalLink,
@@ -126,17 +126,17 @@ const RequirementDetailModal = ({
   const itemList = Array.isArray(requirement.items) && requirement.items.length > 0
     ? requirement.items
     : [{
-        itemCategory: requirement.itemCategory,
-        item: requirement.item,
-        quantity: requirement.quantity,
-        uom: requirement.uom,
-        constructionType: requirement.constructionType,
-        flangeDesign: requirement.flangeDesign,
-        flangeDesignSnapshot: requirement.flangeDesignSnapshot,
-        dimensions: requirement.dimensions,
-        specifications: requirement.specifications,
-        remarks: requirement.remarks,
-      }];
+      itemCategory: requirement.itemCategory,
+      item: requirement.item,
+      quantity: requirement.quantity,
+      uom: requirement.uom,
+      constructionType: requirement.constructionType,
+      flangeDesign: requirement.flangeDesign,
+      flangeDesignSnapshot: requirement.flangeDesignSnapshot,
+      dimensions: requirement.dimensions,
+      specifications: requirement.specifications,
+      remarks: requirement.remarks,
+    }];
 
   return (
     <Modal
@@ -699,9 +699,9 @@ const RequirementDetailModal = ({
           <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
             <div>
               <span style={{ color: 'var(--neutral-500)' }}>Sales Person: </span>
-              <strong style={{ color: 'var(--neutral-900)' }}>
-                {salesPerson ? `${salesPerson.fullName} (${salesPerson.employeeCode})` : 'Unassigned'}
-              </strong>
+                <strong style={{ color: 'var(--neutral-900)' }} className="font-mono">
+                  {salesPerson ? (salesPerson.employeeCode || salesPerson.fullName) : 'Unassigned'}
+                </strong>
             </div>
 
             <div>

@@ -3,8 +3,8 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Alert from '../../components/ui/Alert';
-import { 
-  getSalesOrderItemDrawing, 
+import {
+  getSalesOrderItemDrawing,
   getSalesOrderDrawings,
 } from '../../services/salesOrderService';
 import { printWorkOrderPdf } from '../../services/workOrderService';
@@ -16,17 +16,17 @@ import {
 } from '../../features/salesOrders/salesOrdersApi';
 import { useGetWorkOrdersQuery } from '../../features/workOrders/workOrdersApi';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  FileText, 
-  Building2, 
-  Calendar, 
-  UserCheck, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Edit, 
-  Layers, 
-  Package, 
+import {
+  FileText,
+  Building2,
+  Calendar,
+  UserCheck,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Edit,
+  Layers,
+  Package,
   ExternalLink,
   ShieldCheck,
   Ban,
@@ -118,12 +118,12 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
 
   const handleStatusTransition = async (targetStatus) => {
     if (!salesOrder) return;
-    
+
     const confirmText = targetStatus === 'confirmed'
       ? `Are you sure you want to CONFIRM Sales Order "${salesOrder.salesOrderNo}"? This will lock commercial snapshot totals.`
       : targetStatus === 'cancelled'
-      ? `Are you sure you want to CANCEL Sales Order "${salesOrder.salesOrderNo}"? This action cannot be undone.`
-      : `Are you sure you want to change status to ${targetStatus.toUpperCase()}?`;
+        ? `Are you sure you want to CANCEL Sales Order "${salesOrder.salesOrderNo}"? This action cannot be undone.`
+        : `Are you sure you want to change status to ${targetStatus.toUpperCase()}?`;
 
     if (!window.confirm(confirmText)) return;
 
@@ -433,7 +433,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
           {/* TAB 1: ORDER & COMMERCIAL DETAILS */}
           {activeTab === 'details' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
+
               {/* Customer PO & Terms Card */}
               <div className="bg-white rounded-md border border-slate-200 shadow-sm p-4 md:p-5" style={{ padding: '14px', background: 'white' }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--neutral-800)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -456,7 +456,9 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                   </div>
                   <div>
                     <div style={{ color: 'var(--neutral-500)' }}>Sales Person</div>
-                    <strong>{salesOrder.salesPerson?.fullName || 'Unassigned'}</strong>
+                    <strong style={{ color: 'var(--neutral-900)' }} className="font-mono">
+                      {salesOrder.salesPerson?.employeeCode || salesOrder.salesPerson?.fullName || 'Unassigned'}
+                    </strong>
                   </div>
                 </div>
 
@@ -545,7 +547,7 @@ const SalesOrderDetailModal = ({ isOpen, salesOrderId, onClose, onEdit, onStatus
                           </td>
                           <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                             {checkDrawingEligible(it) ? (
-                              <button 
+                              <button
                                 onClick={() => {
                                   setDrawingWorkspaceInitialItemId(it._id);
                                   setIsDrawingWorkspaceOpen(true);
