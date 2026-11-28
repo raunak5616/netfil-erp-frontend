@@ -19,10 +19,16 @@ export const axiosBaseQuery =
       return { data: result.data };
     } catch (axiosError) {
       const err = axiosError;
+      const status = err.response?.status;
+      let message = err.response?.data?.message || err.message;
+      if (status === 413) {
+        message = 'Request payload too large (HTTP 413). Please reduce file or payload size.';
+      }
       return {
         error: {
-          status: err.response?.status,
+          status,
           data: err.response?.data || err.message,
+          message,
         },
       };
     }

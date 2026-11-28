@@ -784,7 +784,7 @@ const variantOptions = useMemo(() => {
       const typeVal = v.filterType || v.mountingType || (currentConstruction || 'Std');
       const tempVal = v.temperature || v.tempRating || 'Std Temp';
       const mediaVal = v.media || v.mediaType || 'Std Media';
-      const key = `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
+      const key = v._id ? String(v._id) : `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
       const label = formatVariantOptionLabel(v);
       return { key, label, variant: v };
     });
@@ -795,11 +795,12 @@ const selectedVariantObj = useMemo(() => {
   const match = variantOptions.find((vo) => vo.key === formData.filterGradeVariant);
   if (match) return match.variant;
   return selectedFg.variants.find((v) => {
+    if (v._id && String(v._id) === String(formData.filterGradeVariant)) return true;
     const classVal = v.filterClass || v.class || 'Std';
     const typeVal = v.filterType || v.mountingType || (filterType || 'Std');
     const tempVal = v.temperature || v.tempRating || 'Std Temp';
     const mediaVal = v.media || v.mediaType || 'Std Media';
-    const key = `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
+    const key = v._id ? String(v._id) : `${classVal}||${typeVal}||${tempVal}||${mediaVal}`;
     return key === formData.filterGradeVariant;
   }) || null;
 }, [selectedFg, variantOptions, formData.filterGradeVariant, filterType]);

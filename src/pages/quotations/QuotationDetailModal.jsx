@@ -42,6 +42,7 @@ const findFilterGradeVariant = (filterGrade, itemDoc = {}, it = {}) => {
 
   if (variantKey) {
     const found = variants.find((v) => {
+      if (v._id && String(v._id) === variantKey) return true;
       const k1 = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||').toLowerCase();
       const k2 = [v.filterClass, v.filterType || v.mountingType, v.temperature, v.media].join('||').toLowerCase();
       const vk = variantKey.toLowerCase();
