@@ -314,7 +314,8 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
                   
                   {item.filterGradeVariant ? (() => {
                     const selectedVariantObj = item.filterGrade.variants?.find(
-                      v => [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
+                      v => (v._id && String(v._id) === item.filterGradeVariant)
+                           || [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
                            || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
                     );
                     
@@ -678,7 +679,8 @@ const ItemDetailModal = ({ item, isOpen, onClose, onEdit, canEdit }) => {
 
                 {item.filterGradeVariant && (() => {
                   const selectedVariantObj = item.filterGrade.variants?.find(
-                    v => [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
+                    v => (v._id && String(v._id) === item.filterGradeVariant)
+                         || [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
                          || [v.filterClass, v.filterType, v.temperature, v.media].join('||') === item.filterGradeVariant
                   );
 

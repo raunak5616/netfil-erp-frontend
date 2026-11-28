@@ -1932,7 +1932,7 @@ const RequirementFormModal = ({ requirement, isOpen, onClose, onSuccess }) => {
                                                 >
                                                   <option value="">-- Select Variant --</option>
                                                   {applicableVariants.map((v, vIdx) => {
-                                                    const key = [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
+                                                    const key = v._id ? String(v._id) : [v.filterClass, v.mountingType || v.filterType, v.temperature, v.media].join('||');
                                                     return (
                                                       <option key={`fg_var_${vIdx}`} value={key}>
                                                         {v.filterClass || 'Standard'} | {v.mountingType || v.filterType || 'Any'} | {v.temperature || 'Ambient'} | {v.media || 'Standard Media'}
